@@ -1,0 +1,253 @@
+---
+title: SSSF Skill Engineering — Pocock protocols as node behaviour
+created: 2026-08-25
+status: planned
+version: 1.0
+updated: 2026-08-25
+---
+
+# Plan: SSSF Skill Engineering
+
+> Source PRD: `docs/prd-skill-engineering.md` (v1.0)
+> Source research: `raw/research.md`
+
+## Architectural decisions
+
+Durable across every phase. Settle these once; do not relitigate them per phase.
+
+- **Delivery mechanism**: skills arrive as **text inside `--system-prompt`**, not
+  as discoverable Skill tools. `--setting-sources ''` and `--strict-mcp-config`
+  stay exactly as they are. This was chosen after probing that
+  `--setting-sources ''` hides user skills while `--setting-sources user`
+  exposes them along with the operator's hooks, plugins and MCP servers.
+- **Config key**: `skill_engineering: list[str]` on `defaults` and on `agents[]`.
+  Paths, not names — the same convention `prompt_engineering` already uses.
+- **Merge rule**: a per-agent list **replaces** the default, never appends.
+  Identical to `tools` and `harness_engineering`. Absent key = empty list.
+- **Vendor location**: `adws/adw_data/skill_engineering/<name>.md`, committed to
+  the repo. Runtime lives under `data_dir`; this is deliberately *not* runtime —
+  it is reviewed source, and it belongs in diffs.
+- **Composition order**: agent's own `system.md` first, then skills in the order
+  the engineer listed them. Never sorted. Order is meaningful and stable
+  composition is what keeps the prompt cache working.
+- **Precedence**: the agent's identity and output contract outrank any injected
+  protocol. Where `tdd.md` and `builder/system.md` disagree about output shape,
+  the envelope contract wins.
+- **Enforcement**: outcome gates only. No gate ever attempts to prove a protocol
+  was followed.
+- **Coding-agent scope**: `claude_code` only. `pi` ignores `skill_engineering`
+  exactly as `claude_code` ignores `harness_engineering`, and both directions are
+  warned about rather than left silent.
+- **Backward compatibility**: a roster with no `skill_engineering` key must
+  compose a byte-identical system prompt to today. This is a test, not an
+  aspiration.
+
+---
+
+## Phase 1: Tracer bullet — one skill, one agent, end to end
+
+**User stories**: 1, 7, 8, 17, 24, 25
+
+### What to build
+
+The thinnest complete path: an engineer puts one skill file path on one agent in
+the roster, and that skill's text provably reaches the model.
+
+Cuts through every layer — config parsing, pre-spawn validation, composition,
+delivery to `claude -p`, and persistence of what was actually sent. Hard-code
+nothing about *which* skill; a single hand-placed Markdown file under
+`adws/adw_data/skill_engineering/` is enough to prove the path.
+
+Deliberately excluded so the slice stays thin: defaults merging, multiple
+skills, trace events, cost reporting, the vendoring script.
+
+### Acceptance criteria
+
+- [ ] `skill_engineering` on a single agent is parsed and reaches the code that
+      builds the system prompt
+- [ ] The composed prompt is the agent's `system.md`, then a stable delimiter
+      naming the skill, then the skill body
+- [ ] The composed prompt is what `claude -p --system-prompt` receives
+- [ ] The exact composed text is written to the agent's session directory and is
+      readable after the run
+- [ ] A roster naming a missing or empty skill file fails in `validate()`,
+      before any process spawns, with the agent name and the path in the message
+- [ ] An agent with no `skill_engineering` key composes a byte-identical prompt
+      to the current behaviour, proven by a test
+- [ ] Composition is deterministic: the same config yields the same string
+- [ ] Verified live on the real repo with one cheap agent call, and the injected
+      text is confirmed present in the session directory
+
+---
+
+## Phase 2: Defaults, multiples, and ordering
+
+**User stories**: 5, 6, 16, 19, 21
+
+### What to build
+
+Widen the tracer bullet to the full config surface: a house-wide default that
+every agent inherits, per-agent lists that replace it, and several skills on one
+agent composed in the stated order.
+
+Includes an engineer's own hand-written skill file, since a local convention
+must travel the same road as a borrowed protocol — if that path differs, the
+feature has two implementations and one of them will rot.
+
+### Acceptance criteria
+
+- [ ] `defaults.skill_engineering` applies to every agent that omits its own
+- [ ] A per-agent list replaces the default rather than appending to it
+- [ ] Absent in both places means no skills and no behaviour change
+- [ ] Multiple skills appear in the listed order, never sorted
+- [ ] Each skill is separated by a delimiter that names it, so the model — and a
+      human reading the persisted prompt — can tell where one protocol ends
+- [ ] A repo-local, hand-authored skill file works identically to a vendored one
+- [ ] Config-merge behaviour is covered by tests at the level `validate()` is
+      already exercised
+
+---
+
+## Phase 3: Trace and cost visibility
+
+**User stories**: 9, 10, 11
+
+### What to build
+
+Make skill injection visible in the two places an engineer looks: the terminal
+while it runs, and the database afterwards.
+
+Skills ride in the system prompt and are therefore re-sent on every internal
+turn, on top of the ~15.5k-token Claude Code base prompt. That cost must be a
+number the engineer sees at the moment they are paying it, not a surprise on an
+invoice. A soft budget warns; it never fails a run, because the engineer may
+have decided the discipline is worth the money.
+
+### Acceptance criteria
+
+- [ ] The `agent_start` event carries the list of skills injected
+- [ ] The agent-session row records the same, so history explains behaviour
+- [ ] The console reports skills and their estimated token cost at agent start,
+      through `run.console` and never a bare `print()`
+- [ ] A configurable soft budget emits a warning when the composed prompt
+      exceeds it, and does not fail the run
+- [ ] Token accounting is monotonic in the number of skills attached
+- [ ] A trace from a run with skills can be read back and answers "which
+      protocols was this agent given"
+
+---
+
+## Phase 4: Vendoring with provenance
+
+**User stories**: 2, 3, 4
+
+### What to build
+
+One command that copies a named skill from a source directory into
+`adws/adw_data/skill_engineering/`, stamping a provenance header: where it came
+from, when, and a content hash so later drift is detectable.
+
+Vendoring is a deliberate, reviewable act that produces a diff. There is no
+auto-update and no sync: silently refreshing a vendored skill would undo the
+reproducibility the whole design exists to buy.
+
+The provenance header must be stripped before injection — a comment about where
+a file came from is not an instruction to the model, and leaving it in the
+prompt is both noise and a small correctness risk.
+
+### Acceptance criteria
+
+- [ ] A single command vendors a named skill from a path the engineer supplies
+- [ ] The vendored file carries source path, date, and a content hash
+- [ ] Re-vendoring an unchanged skill is a no-op or a clearly reported no-change
+- [ ] Drift against the source is detectable and reported
+- [ ] The provenance header is stripped from the text that reaches the model,
+      proven by a test
+- [ ] The vendored file is plain Markdown the engineer can edit in place
+- [ ] Nothing is auto-updated, ever
+
+---
+
+## Phase 5: Documentation, guidance and audit
+
+**User stories**: 12, 13, 14, 15, 20, 22, 23
+
+### What to build
+
+Make the feature discoverable and its limits explicit — the failure mode this
+repo has already been bitten by is a config field that is silently ignored.
+
+Recommended pairings are documented but **not** enabled in the starter roster:
+adding unrequested per-turn cost to every fresh install would be wrong.
+
+An audit recipe answers "which skills are vendored, and which agents use them"
+without reading YAML.
+
+### Acceptance criteria
+
+- [ ] `references/config.md` documents `skill_engineering`, the merge rule,
+      composition order, precedence, and the cost implication
+- [ ] A cookbook covers vendoring and attaching a skill end to end
+- [ ] `skill_engineering` under `pi` and `harness_engineering` under
+      `claude_code` are both documented as ignored, and both warn at validation
+- [ ] Recommended pairings are documented — builder + `tdd`, reviewer +
+      `codebase-design`, planner + a grilling protocol, fix-loop builder +
+      `diagnosing-bugs` — and none is enabled by default
+- [ ] A `just` recipe lists vendored skills and the agents that use them
+- [ ] The template roster and the skill's own templates stay consistent with the
+      repo copy, so a fresh install does not reintroduce stale claims
+
+---
+
+## Phase 6: Manual acceptance — does it actually change the work?
+
+**User stories**: 12, 14, 15
+
+### What to build
+
+Not code. The one claim this feature makes that no unit test can assert: that
+attaching a protocol changes what the agent produces.
+
+Run the same small feature request twice through a real build phase — once with
+`tdd.md` attached to the builder, once without — from the same clean baseline,
+changing only the skill list. Compare the resulting diffs, the test files, the
+order of work visible in the trace, and the cost.
+
+Record the result honestly in the plan, including the possibility that it makes
+little difference. A negative result is worth knowing before rolling the pattern
+across a roster, and this repo has already twice found that a change which
+"obviously" worked did nothing measurable.
+
+### Acceptance criteria
+
+- [ ] Two runs from an identical baseline, differing only in `skill_engineering`
+- [ ] Both diffs, both traces, and both costs captured
+- [ ] A written comparison: what changed in the work, and what it cost per turn
+- [ ] An explicit recommendation on whether the default roster should adopt any
+      pairing, with the evidence behind it
+- [ ] The repo is left clean; any scratch commits or branches are removed
+
+---
+
+## Risks and open questions
+
+- **Cost may outweigh benefit.** A 3k-token protocol on a nine-turn build phase
+  is real money, re-sent every turn. Phase 6 exists to answer this with numbers
+  rather than intuition.
+- **Skill text is written for interactive sessions.** Pocock's skills assume a
+  human is present to answer questions. `grill-me` in particular may be actively
+  wrong inside a headless run that has nobody to grill — the planner could stall
+  or invent answers. Attach grilling protocols to the planner only after Phase 6
+  has been run against one.
+- **Prompt-contract collisions.** A skill instructing the model to output prose
+  will fight the envelope's JSON contract, and the symptom will be a JSON retry
+  loop that costs money to diagnose. Precedence is documented; Phase 1's
+  ordering test is the guard.
+- **Vendored skills drift** from upstream by design. Phase 4 reports drift; it
+  never resolves it.
+
+## Version history
+
+| Version | Date | Changes |
+|---|---|---|
+| 1.0 | 2026-08-25 | Initial plan. Six vertical slices from PRD v1.0; scope limited to the skill layer. |

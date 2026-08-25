@@ -1,0 +1,3 @@
+{"version":3,"term":{"cols":80,"rows":24},"timestamp":1787644620,"command":"just phases 6dbd32b4","env":{"SHELL":"/bin/zsh"}}
+[0.184, "o", "1|request|engineer|Alexei Kozhushkov|success|0\r\n2|plan|agent|planner|success|0\r\n3|build|agent|builder|success|0\r\n4|test_1|code|quality|success|0\r\n5|fix_1|agent|builder|success|0\r\n6|test_2|code|quality|success|0\r\n7|commit|code|git|success|0\r\n"]
+[0.002, "x", "0"]
