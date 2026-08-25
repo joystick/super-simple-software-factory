@@ -33,16 +33,42 @@ GITIGNORE_ENTRIES = [
 ]
 
 
-def stamp(src: Path, dest: Path, force: bool, stamped: list, skipped: list) -> None:
+# Stamped once, then owned by the engineer. `--force` alone will NOT overwrite
+# these; `--reset-owned` is required on top, and says out loud what it does.
+#
+# Both files are templates only on the day they land. `quality.py` ships every
+# gate as an `echo` placeholder that exits 0, and wiring them to the repo's real
+# commands is the first thing an engineer does; `sssf.config.yaml` is the roster.
+# Restoring either from the template is not a lost edit you would notice — it is
+# a factory that still runs, still reports every phase green, and no longer
+# checks anything. That failure is silent by construction, so it gets a second
+# flag rather than riding along with `--force`.
+OWNED_AFTER_STAMP = frozenset({
+    "adws/adw_modules/quality.py",
+    "adws/adw_sssf_config/sssf.config.yaml",
+})
+
+
+def stamp(src: Path, dest: Path, force: bool, stamped: list, skipped: list,
+          root: Path, reset_owned: bool, preserved: list) -> None:
     if src.is_dir():
         for child in sorted(src.iterdir()):
             if child.name == "__pycache__":
                 continue
-            stamp(child, dest / child.name, force, stamped, skipped)
+            stamp(child, dest / child.name, force, stamped, skipped,
+                  root, reset_owned, preserved)
         return
-    if dest.exists() and not force:
-        skipped.append(str(dest))
-        return
+    if dest.exists():
+        try:
+            relative = dest.resolve().relative_to(root.resolve()).as_posix()
+        except ValueError:                       # dest outside root; treat as normal
+            relative = ""
+        if relative in OWNED_AFTER_STAMP and not reset_owned:
+            preserved.append(relative)
+            return
+        if not force:
+            skipped.append(str(dest))
+            return
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dest)
     stamped.append(str(dest))
@@ -61,24 +87,31 @@ def ensure_gitignore(root: Path, stamped: list) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--force", action="store_true", help="overwrite existing files")
+    parser.add_argument("--reset-owned", action="store_true",
+                        help="also overwrite engineer-owned files "
+                             f"({', '.join(sorted(OWNED_AFTER_STAMP))}). "
+                             "Restores the placeholder gates — every quality "
+                             "check will pass unconditionally until rewired.")
     args = parser.parse_args()
 
     root = Path.cwd()
-    stamped, skipped = [], []
+    stamped, skipped, preserved = [], [], []
 
-    stamp(TEMPLATES / "adws", root / "adws", args.force, stamped, skipped)
-    stamp(TEMPLATES / "prompt_engineering",
-          root / "adws" / "adw_data" / "prompt_engineering", args.force, stamped, skipped)
-    stamp(TEMPLATES / "harness_engineering",
-          root / "adws" / "adw_data" / "harness_engineering", args.force, stamped, skipped)
-    stamp(TEMPLATES / "sssf.config.yaml",
-          root / "adws" / "adw_sssf_config" / "sssf.config.yaml",
-          args.force, stamped, skipped)
-    stamp(TEMPLATES / "env.sample", root / ".env.sample", args.force, stamped, skipped)
+    def put(src: Path, dest: Path) -> None:
+        stamp(src, dest, args.force, stamped, skipped, root, args.reset_owned, preserved)
+
+    put(TEMPLATES / "adws", root / "adws")
+    put(TEMPLATES / "prompt_engineering",
+        root / "adws" / "adw_data" / "prompt_engineering")
+    put(TEMPLATES / "harness_engineering",
+        root / "adws" / "adw_data" / "harness_engineering")
+    put(TEMPLATES / "sssf.config.yaml",
+        root / "adws" / "adw_sssf_config" / "sssf.config.yaml")
+    put(TEMPLATES / "env.sample", root / ".env.sample")
     # The recipes are part of the operating experience, and several cookbooks
     # plus the run banner tell you to use them, so a stamped repo has to have
     # them. Skipped like any other file if the repo already has a justfile.
-    stamp(TEMPLATES / "justfile", root / "justfile", args.force, stamped, skipped)
+    put(TEMPLATES / "justfile", root / "justfile")
     ensure_gitignore(root, stamped)
 
     print(f"sssf installed into {root}")
@@ -87,6 +120,12 @@ def main() -> int:
         print(f"    + {s}")
     if skipped:
         print(f"  skipped (already exist, use --force to overwrite): {len(skipped)}")
+    if preserved:
+        print(f"  preserved (yours, --force does not touch these): {len(preserved)}")
+        for p in preserved:
+            print(f"    = {p}")
+        print("    these hold your wired gate commands and your roster;")
+        print("    --reset-owned restores the template placeholders, which pass unconditionally")
     print("\nnext steps:")
     print("  1. cp .env.sample .env   # then set the key(s) your roster needs")
     print("  2. just demo             # two cheap read-only runs, end to end")

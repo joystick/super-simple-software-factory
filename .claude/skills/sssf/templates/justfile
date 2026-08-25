@@ -40,6 +40,10 @@ demo:
 prompt *ARGS:
     uv run adws/adw_prompt.py --config {{config}} "$@"
 
+# every quality block, no agents, no cost: just quality "why you are checking"
+quality *ARGS:
+    uv run adws/adw_quality.py --config {{config}} "$@"
+
 # read-only recon: just scout "where is auth handled"
 scout *ARGS:
     uv run adws/adw_scout.py --config {{config}} "$@"

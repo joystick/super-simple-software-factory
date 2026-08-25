@@ -8,8 +8,8 @@ It lives at **`adws/adw_sssf_config/sssf.config.yaml`** — the default path eve
 
 ```yaml
 defaults:
-  coding_agent: pi
-  model: google/gemini-3.6-flash        # ALWAYS provider/model-id
+  coding_agent: claude_code
+  model: anthropic/claude-sonnet-4-6    # ALWAYS provider/model-id
   thinking: medium
   harness_engineering: []
   tools: [read, bash, edit, write, grep, find, ls]
@@ -21,8 +21,8 @@ observability:
 
 agents:
   - name: planner
-    coding_agent: pi
-    model: google/gemini-3.6-flash        # ALWAYS provider/model-id
+    coding_agent: claude_code
+    model: anthropic/claude-opus-4-6      # ALWAYS provider/model-id
     thinking: high
     color: "#a78bfa"
     purpose: Turn a request into a plan the builder can implement without asking questions.
@@ -42,11 +42,11 @@ agents:
 
 | Field | Type | Meaning |
 |---|---|---|
-| `coding_agent` | `pi` \| `claude_code` | Which interface runs the agent. **v1 implements `pi` only**; `claude_code` is specced and stubbed in `agent_cc.py`, landing in v2. |
-| `model` | string | Model id. For Pi, any id registered in `~/.pi/agent/models.json`. Default `gemini-3.6-flash`. |
+| `coding_agent` | `pi` \| `claude_code` | Which interface runs the agent. Both are implemented (`agent_pi.py`, `agent_cc.py`) and may be mixed per agent. Default `claude_code`. |
+| `model` | string | Model id, always `provider/id`. `claude_code`: `anthropic/<id>`. `pi`: anything `pi --list-models` lists. Default `anthropic/claude-sonnet-4-6`. |
 | `thinking` | enum | Reasoning effort — see below. Default `medium`. |
 | `color` | hex string | Lane color for every agent that does not set its own. Default empty — the visualizer falls back to its own palette. |
-| `harness_engineering` | list[string] | Coding-agent extensions. Pi: extension names. Claude Code: reserved (MCP, hooks). |
+| `harness_engineering` | list[string] | Pi extension paths, passed as `pi -e <path>`. **Ignored under `claude_code`** — silently, with no warning. See "Harness engineering" below. |
 | `tools` | list[string] | Roster-wide tool allowlist. Every agent that omits its own `tools` inherits this. Unset = all tools usable. |
 | `protected_files` | list[string] | Paths **no** agent may modify unless it names them in its own `writes`. Default: `adws/adw_modules/`, `adws/adw_sssf_config/`, `adws/adw_*.py` — an agent must not be able to edit the machinery that decides whether its work passed. |
 | `data_dir` | path | Runtime home. Sessions land at `{data_dir}/sessions/{adw_id}/{agent_name}/`. Default `adws/adw_data`. |
@@ -85,11 +85,80 @@ Pi's reasoning-effort ladder, lowest to highest:
 off | minimal | low | medium | high | xhigh | max
 ```
 
-Mapped to Pi's reasoning effort control and honored when the model is registered with `reasoning: true` in `~/.pi/agent/models.json`. On a non-reasoning model the setting is inert — no error, no effect. Rough guidance: `high`/`xhigh` for planners and reviewers, `medium` for builders, `low` for mechanical read-and-report agents. (For Claude Code in v2, the same field maps to the thinking budget.)
+Mapped to Pi's reasoning effort control and honored when the model is registered with `reasoning: true` in `~/.pi/agent/models.json`. On a non-reasoning model the setting is inert — no error, no effect. Rough guidance: `high`/`xhigh` for planners and reviewers, `medium` for builders, `low` for mechanical read-and-report agents. Under `claude_code` the same field maps to a thinking-token budget, exported as `MAX_THINKING_TOKENS` (the CLI has no flag for it).
+
+## Coding agents
+
+`coding_agent` picks the module that runs a phase. Both implement the same
+surface — `run(request, on_event, on_spawn, on_exit) -> PiResult`,
+`resolve_model()`, `ToolCallTracker` — so `agents.execute()` selects one and
+stops caring. The field is per-agent, so a roster can mix them: cheap read-only
+agents on one, planner and builder on the other.
+
+### `claude_code` — headless `claude -p`
+
+One turn is one non-interactive CLI invocation:
+
+```
+claude -p --output-format stream-json --verbose \
+  --model <id> --system-prompt <the agent's rendered system prompt> \
+  --session-id <uuid>  |  --resume <uuid> \
+  --setting-sources '' --strict-mcp-config \
+  --allowedTools <mapped from the agent's tools> \
+  --permission-mode bypassPermissions \
+  <the prompt>
+```
+
+What each part is doing, and why:
+
+- **`-p` with `stream-json`** — headless, one JSON event per line, read as it
+  arrives so tool calls reach the tracer live rather than after the turn.
+- **`--model`** — the roster's model with the `anthropic/` prefix stripped.
+- **`--system-prompt`** — *replaces* Claude Code's default prompt, not
+  `--append-`. An SSSF agent is defined by its own `prompt_engineering`; letting
+  the default prompt survive underneath would mean two sets of instructions.
+- **History** — turn one mints `--session-id`, every later turn in the phase
+  (JSON retries, gate corrections, fix loops) uses `--resume`. That is what
+  keeps a correction inside the context window the agent already built. SSSF
+  session ids are not UUIDs, so they fold into a stable UUIDv5; the mapping is
+  deterministic, which is what lets a rejoined run find its session.
+- **`--setting-sources '' --strict-mcp-config`** — the agent runs hermetic. It
+  does not inherit the engineer's hooks, plugins, custom agents or MCP servers.
+  Measured cost of *not* doing this: 22,478 vs 17,932 prompt tokens per turn.
+  The point is not the 20% — it is that `prompt_engineering` and `tools` are
+  supposed to be the whole of what an agent sees.
+- **`--permission-mode bypassPermissions`** — prompting for approval in a
+  headless run would hang forever. The roster's `tools` is the allowlist and
+  `permissions.py` is the enforcement.
+
+**No Anthropic API calls.** Agents run on the engineer's logged-in Claude Code
+session. `agent_cc.API_AUTH_VARS` is stripped from the child's environment
+(`ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`,
+`ANTHROPIC_CUSTOM_HEADERS`, `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`)
+so a key that reaches the ADW cannot quietly reroute agents onto metered
+billing. That is a live path, not a hypothetical: the justfile does
+`set dotenv-load`, `operator_env()` copies `os.environ` wholesale, and
+`env.sample` invites provider keys — one `ANTHROPIC_API_KEY=` line in `.env`
+would otherwise change the invoice with no change to the output or the trace.
+A settings `apiKeyHelper` is the fourth route in, and `--setting-sources ''`
+closes it.
+
+Context windows are a hardcoded table in `agent_cc.CONTEXT_WINDOWS` (default
+200k) because the CLI exposes no catalog to read them from.
+
+### `pi`
+
+Runs the Pi harness, needs a provider key per model, and is the only interface
+that honours `harness_engineering`. See "Model resolution" and
+"Harness engineering" below.
 
 ## Model resolution
 
-**Always write `model` as `provider/model-id`.** `agents.py` hands the string to the Pi interface, which resolves it against pi's merged catalog — `~/.pi/agent/models.json` plus pi's built-in providers. The same model is usually carried by more than one provider (`gemini-3.6-flash` lives under `google` *and* under `openrouter` as `google/gemini-3.6-flash`), and a bare id that matches several **raises at resolution**:
+**Always write `model` as `provider/model-id`.** `agents.py` hands the string to whichever interface the agent's `coding_agent` selects, and each resolves it its own way.
+
+Under **`claude_code`**, the provider half must be `anthropic`; anything else raises at `validate()` rather than on the first billed call, because Claude Code talks to Anthropic only. The id is passed straight through as `claude --model <id>`, so it must be a name the CLI accepts — a full id like `claude-sonnet-4-6`, or one of the aliases `sonnet` / `opus` / `haiku`. There is no catalog command to check against; an unknown id fails when the agent runs.
+
+Under **`pi`**, the rest of this section applies. It resolves against pi's merged catalog — `~/.pi/agent/models.json` plus pi's built-in providers. The same model is usually carried by more than one provider (`gemini-3.6-flash` lives under `google` *and* under `openrouter` as `google/gemini-3.6-flash`), and a bare id that matches several **raises at resolution**:
 
 ```
 agent 'scout': model pattern 'gemini-3.6-flash' is ambiguous:
@@ -197,6 +266,10 @@ Rule: **every entry in `harness_engineering` that registers a tool must have tha
 
 ## Harness engineering
 
-`harness_engineering` entries are pi extension **file paths**, passed through as `pi -e <path>`, one flag per entry, scoped to that agent only. This is where per-agent harness changes live — e.g. an output-tightening extension for an agent that keeps wrapping its envelope in prose. The starter roster ships with none. On Claude Code the field is reserved for MCP config and hooks in v2.
+`harness_engineering` entries are pi extension **file paths**, passed through as `pi -e <path>`, one flag per entry, scoped to that agent only. This is where per-agent harness changes live — e.g. an output-tightening extension for an agent that keeps wrapping its envelope in prose.
+
+**Under `coding_agent: claude_code` the field is ignored.** Not deferred, not partially honoured — `agent_cc.build_command` never reads it, and nothing warns you. An agent that declares `subagents.ts` and lists `subagent_create` in its `tools` still gets subagents, because `_map_tools` aliases every `subagent_*` name onto Claude Code's own `Task` tool; it just is not the extension the config names. Anything else an extension would have done — new tools, output shaping, extra flags — does not happen. If a roster depends on a pi extension, that agent belongs on `coding_agent: pi`.
+
+The reason it is ignored rather than translated: pi extensions are TypeScript loaded into pi's own harness. Claude Code's equivalent surfaces are MCP servers and hooks, which are a different shape and arrive through `--mcp-config` and settings, not `-e`. A faithful translation is not a mapping exercise, so the field stays pi-only until someone writes that path deliberately.
 
 **If the extension registers a tool, name that tool in the agent's `tools` list too** — `--tools` filters extension tools exactly like builtins, so an unnamed extension tool is silently unavailable no matter that the extension loaded fine. See [Extension tools must be named explicitly](#extension-tools-must-be-named-explicitly) above. Extensions that only shape output or add flags (no tool registration) need no `tools` change.

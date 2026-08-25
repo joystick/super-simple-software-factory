@@ -15,13 +15,28 @@ from typing import Optional
 
 import yaml
 
-from . import agent_pi, permissions, prompts
+from . import agent_cc, agent_pi, permissions, prompts
 from .data_types import (AgentCall, AgentConfig, EnvelopeBase, EventRecord,
                          GateCheck, GateReport, Phase, PiRequest, SSSFConfig,
                          UsageBreakdown)
 from .utils import new_id
 
 JSON_FIX_ATTEMPTS = 2      # continue-with-correction attempts for malformed JSON
+
+# The two coding agents behind a phase. Both expose the same surface —
+# run(request, on_event, on_spawn, on_exit) -> PiResult, resolve_model(pattern),
+# ToolCallTracker — so everything below picks a module and stops caring which.
+INTERFACES = {"pi": agent_pi, "claude_code": agent_cc}
+
+
+def interface(agent: AgentConfig):
+    """The coding-agent module that runs this agent."""
+    try:
+        return INTERFACES[agent.coding_agent]
+    except KeyError:
+        raise SystemExit(f"agent {agent.name!r}: unknown coding_agent "
+                         f"{agent.coding_agent!r} (expected one of "
+                         f"{', '.join(INTERFACES)})") from None
 
 
 class GateFailure(RuntimeError):
@@ -58,15 +73,17 @@ def validate(cfg: SSSFConfig, required: list[str]) -> None:
         except SystemExit as e:
             problems.append(str(e))
             continue
-        if agent.coding_agent != "pi":
-            problems.append(f"agent {name!r}: coding_agent {agent.coding_agent!r} "
-                            f"is not implemented in v1 (pi only)")
+        if agent.coding_agent not in INTERFACES:
+            problems.append(f"agent {name!r}: unknown coding_agent "
+                            f"{agent.coding_agent!r} (expected one of "
+                            f"{', '.join(INTERFACES)})")
+            continue
         for label, ref in (("system", agent.prompt_engineering.system),
                            ("user", agent.prompt_engineering.user)):
             if not Path(ref).is_file():
                 problems.append(f"agent {name!r}: {label} prompt not found: {ref}")
         try:
-            agent_pi.resolve_model(agent.model)
+            interface(agent).resolve_model(agent.model)
         except ValueError as e:
             problems.append(f"agent {name!r}: {e}")
     if problems:
@@ -78,6 +95,7 @@ def validate(cfg: SSSFConfig, required: list[str]) -> None:
 def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
     """One agent call: render prompts -> pi run -> typed parse -> gates -> envelope."""
     agent = resolve(run.cfg, phase.params.owner)
+    coder = interface(agent)
     agent_dir = run.session_dir / agent.name
     agent_dir.mkdir(parents=True, exist_ok=True)
 
@@ -117,16 +135,17 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
             model=agent.model,
             thinking=agent.thinking,
             session_id=session_id,
-            # absolute: these are read by the pi subprocess, which runs in repo_root
-            session_dir=str((agent_dir / "pi_sessions").resolve()),
+            # absolute: these are read by the coding-agent subprocess, which
+            # runs in repo_root
+            session_dir=str((agent_dir / f"{agent.coding_agent}_sessions").resolve()),
             raw_output_path=str((agent_dir / "raw_output.jsonl").resolve()),
             tools=agent.tools,
             extensions=agent.harness_engineering,
             cwd=str(run.repo_root),
         )
-        result = agent_pi.run(
+        result = coder.run(
             request,
-            on_event=_event_forwarder(run, phase, agent.name),
+            on_event=_event_forwarder(run, phase, agent, coder),
             on_spawn=lambda pid: run.tracer.process_start(
                 run.adw_id, "agent", agent.name, pid,
                 f"{agent.coding_agent} {agent.name} {agent.model}"),
@@ -232,9 +251,14 @@ def _agent_session_id(run, agent: AgentConfig) -> str:
     return f"sssf-{run.adw_id}-{agent.name}-{new_id(4)}"
 
 
-def _event_forwarder(run, phase: Phase, agent_name: str):
-    """One tool_call event per real tool call, with its exact args and result."""
-    tracker = agent_pi.ToolCallTracker()
+def _event_forwarder(run, phase: Phase, agent: AgentConfig, coder):
+    """One tool_call event per real tool call, with its exact args and result.
+
+    The tracker comes from whichever coding agent is running — pi's and Claude
+    Code's tool streams are shaped differently, but both trackers emit the same
+    normalized record, so nothing downstream changes."""
+    agent_name = agent.name
+    tracker = coder.ToolCallTracker()
 
     def forward(event: dict) -> None:
         record = tracker.observe(event)

@@ -52,8 +52,11 @@ def _pi_catalog() -> list[tuple[str, str, int]]:
         return []
     if result.returncode != 0:
         return []
+    # pi >= 0.73 prints the model table on stderr, not stdout. Read whichever
+    # stream actually carried it, so the catalog is not silently empty.
+    table = result.stdout if result.stdout.strip() else result.stderr
     rows = []
-    for line in result.stdout.splitlines()[1:]:
+    for line in table.splitlines()[1:]:
         columns = line.split()
         if len(columns) < 3:
             continue

@@ -23,7 +23,7 @@ adws/
 │   ├── data_types.py            AgentCall, PhaseParams, Phase, Envelope + one output type per agent call
 │   ├── agents.py                load_config, validate, resolve entry → interface + model + thinking
 │   ├── runner.py                the Run object: run.phase(PhaseParams) → ph.call(AgentCall)
-│   ├── agent_pi.py              Pi interface (v1)   ·   agent_cc.py  Claude Code (v2, stubbed)
+│   ├── agent_pi.py              Pi interface   ·   agent_cc.py  Claude Code (headless `claude -p`)
 │   ├── gates.py                 gate(envelope, run) -> GateReport — one check per item verified
 │   ├── changes.py               git diff vs a resolved base → ChangeSet → envelope for the documenter
 │   ├── prompts.py, session.py, tracer.py, console.py, git_helper.py, utils.py
@@ -37,7 +37,7 @@ adws/
     └── sssf.db                  gitignored SQLite trace db the visualizer polls
 ```
 
-**v1 runs Pi only.** `coding_agent: pi`, default model `gemini-3.6-flash`, thinking `medium`. `claude_code` is specced in the config and stubbed in the interface — it lands in v2.
+**Two coding agents, selectable per agent.** `claude_code` is the default — headless `claude -p` on the logged-in Claude Code session, no API key, default model `anthropic/claude-sonnet-4-6`, thinking `medium`. `pi` runs the Pi harness against any provider `pi --list-models` lists, and is the only one that honours `harness_engineering`.
 
 ## The phase model
 
