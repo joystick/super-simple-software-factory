@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reference — Gate cookbook</title>
+<link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+
+<div class="meta">Reference 02 &nbsp;·&nbsp; keep open while wiring or writing a gate</div>
+
+<h1>Gate cookbook</h1>
+<p class="subtitle">Two families, the recipes for each, and the ways they get quietly broken.</p>
+
+<h2>Which one do I need?</h2>
+
+<table>
+  <tr><th>You want to check…</th><th>Family</th><th>File</th></tr>
+  <tr><td>do the tests pass / does it lint / do types hold</td><td>quality block</td><td><code>quality.py</code></td></tr>
+  <tr><td>did the agent actually write what it claimed</td><td>envelope gate</td><td><code>gates.py</code></td></tr>
+  <tr><td>is the plan any <em>good</em></td><td><em>neither</em> — that is a reviewer agent</td><td>—</td></tr>
+</table>
+
+<h2>Recipe — wiring a quality block</h2>
+
+<pre><code>def test(run) -&gt; QualityCheckResult:
+    return _run(QualityCheckSpec(
+        name="test",
+        area="backend",
+        operation="build",
+        argv=["deno", "test", "--doc"],
+        timeout_seconds=600,
+    ), run)</code></pre>
+
+<ol>
+  <li><code>argv</code> is a <strong>list</strong>, never a shell string.</li>
+  <li>Binaries by <strong>bare name</strong> — they inherit the operator's environment.</li>
+  <li><strong>Scope in the config file</strong> (<code>deno.json</code>,
+      <code>pyproject.toml</code>), not in the argv.</li>
+  <li><strong>Delete blocks you do not have</strong>, and drop them from
+      <code>run_quality()</code>.</li>
+  <li><strong>Verify by mutation.</strong> See reference 01.</li>
+</ol>
+
+<h2>Recipe — writing an envelope gate</h2>
+
+<pre><code>def my_gate(envelope: EnvelopeBase, run) -&gt; GateReport:
+    report = GateReport()
+    for item in things_to_check:
+        ok = ...
+        report.check(str(item), ok, "evidence if ok, reason if not")
+    return report</code></pre>
+
+<table>
+  <tr><th>Rule</th><th>Why</th></tr>
+  <tr><td>one <code>check()</code> per item</td><td>a green gate then says what it verified</td></tr>
+  <tr><td>record passes too</td><td>otherwise green carries no information</td></tr>
+  <tr><td><code>note</code> is written for the agent</td><td>on failure it becomes the correction text</td></tr>
+  <tr><td>never build violations by hand</td><td>they are derived from failed checks</td></tr>
+  <tr><td>check only the mechanically checkable</td><td>quality of judgement belongs to a reviewer</td></tr>
+</table>
+
+<p>Attach per call:</p>
+
+<pre><code>ph.call(AgentCall(output_type=PlanOutput, prompt=prompt,
+                  gates=[gates.artifacts_exist, gates.files_non_empty]))</code></pre>
+
+<h2>Built in</h2>
+
+<table>
+  <tr><th>Gate</th><th>Checks</th></tr>
+  <tr><td><code>artifacts_exist</code></td><td>declared artifacts are on disk</td></tr>
+  <tr><td><code>files_non_empty</code></td><td>…and not zero bytes</td></tr>
+  <tr><td><code>json_parses</code></td><td>declared JSON parses</td></tr>
+  <tr><td><code>diff_matches_claims</code></td><td>files claimed changed exist</td></tr>
+  <tr><td><code>verdict_consistent</code></td><td>a verdict agrees with its own findings</td></tr>
+  <tr><td><code>tests_pass(cmd)</code></td><td>factory: <code>cmd</code> must exit 0</td></tr>
+</table>
+
+<h2>What happens on failure</h2>
+
+<pre><code>quality block fails  →  output feeds the FIX LOOP → builder repairs → gate re-runs
+envelope gate fails  →  violations sent into the SAME agent session as a
+                        correction, bounded by the phase's `retries`</code></pre>
+
+<p>Both are the same idea: a failure is not an error to report, it is an <strong>input to
+the next attempt</strong>.</p>
+
+<h2>Ways a gate gets quietly broken</h2>
+
+<table>
+  <tr><th>Hazard</th><th>Symptom</th></tr>
+  <tr><td><code>cmd | tee log</code></td><td>exit code becomes <code>tee</code>'s — gate can never fail</td></tr>
+  <tr><td>shell string argv</td><td>admits the above, plus quoting bugs</td></tr>
+  <tr><td>filter matching nothing</td><td>exit 0, zero tests run</td></tr>
+  <tr><td>scope in the argv</td><td>gate and local run drift apart</td></tr>
+  <tr><td>path renamed</td><td>checks a directory that no longer holds the code</td></tr>
+  <tr><td>gate returns a bare bool</td><td>green says nothing about what was examined</td></tr>
+  <tr><td>vague <code>note</code></td><td>the agent is told "failed" and cannot act</td></tr>
+  <tr><td>gating a formatter</td><td>auto-fixable, so it turns a fix into a failure</td></tr>
+  <tr><td>linting <code>protected_files</code></td><td>a red gate no agent is permitted to fix</td></tr>
+</table>
+
+<div class="trap">
+  <span class="label">The rule that governs both families</span>
+  <p>A gate you have not watched fail is not a gate. Wiring is not finishing; writing is
+  not finishing. Watching it fail is finishing.</p>
+</div>
+
+<footer>
+  <p>Sources: <code>adws/adw_modules/gates.py</code> module docstring ·
+     <code>adws/adw_modules/quality.py</code> banner ·
+     <a href="https://martinfowler.com/bliki/SelfTestingCode.html">Fowler — Self Testing Code</a></p>
+  <p><a href="../lessons/0002-wiring-and-writing-gates.html">← Lesson 2</a> ·
+     <a href="0001-verifying-a-gate.html">Reference 01 — verifying</a> ·
+     <a href="../MISSION.md">Mission</a></p>
+</footer>
+
+</body>
+</html>

@@ -42,7 +42,7 @@ agents:
 
 | Field | Type | Meaning |
 |---|---|---|
-| `coding_agent` | `pi` \| `claude_code` | Which interface runs the agent. Both are implemented (`agent_pi.py`, `agent_cc.py`) and may be mixed per agent. Default `claude_code`. |
+| `coding_agent` | `pi` \| `claude_code` \| `agy` | Which interface runs the agent. All three are implemented (`agent_pi.py`, `agent_cc.py`, `agent_agy.py`) and may be mixed per agent. Default `claude_code`. |
 | `model` | string | Model id, always `provider/id`. `claude_code`: `anthropic/<id>`. `pi`: anything `pi --list-models` lists. Default `anthropic/claude-sonnet-4-6`. |
 | `thinking` | enum | Reasoning effort — see below. Default `medium`. |
 | `color` | hex string | Lane color for every agent that does not set its own. Default empty — the visualizer falls back to its own palette. |
@@ -151,6 +151,41 @@ Context windows are a hardcoded table in `agent_cc.CONTEXT_WINDOWS` (default
 Runs the Pi harness, needs a provider key per model, and is the only interface
 that honours `harness_engineering`. See "Model resolution" and
 "Harness engineering" below.
+
+### `agy` — Antigravity CLI
+
+A gateway: one CLI in front of Gemini, Claude and GPT-OSS models, so `agy models`
+is the catalog and a roster entry is always `agy/<model-id>`.
+
+    agy -p=<prompt> --model <id> --output-format stream-json
+        --add-dir <repo> --dangerously-skip-permissions --print-timeout 900s
+        [--conversation <id>]
+
+Four things differ from `claude_code`, each of which shaped the adapter:
+
+- **The prompt is a flag VALUE.** `agy -p "text"` is silently mis-parsed; it must
+  be `-p=text`.
+- **There is no `--system-prompt`.** An SSSF agent *is* its system prompt, so the
+  adapter folds it into every user turn behind a labelled delimiter. That is
+  advice inside the conversation rather than a separate channel — weaker, and
+  re-sent every turn. Consider it when a system prompt carries a strict output
+  contract.
+- **`--add-dir` is required.** Without it the file tools are not rooted at cwd,
+  and the failure is bizarre rather than obvious: a probe for a file sitting in
+  cwd searched `~/Downloads`, then ran `find` across the whole home directory,
+  burning 120k tokens over 41 tool calls before timing out having written
+  nothing.
+- **`thinking` is IGNORED.** Effort is encoded in the model id
+  (`-high` / `-medium` / `-low`), and passing `--effort` as well is a hard error.
+  Ask for more effort by choosing `agy/gemini-3.7-flash-high`.
+
+Also: `agy` exits **0** when its result payload reports `ERROR`, so a timeout
+arrives as a successful process with a failed body. The adapter raises on that
+explicitly — otherwise the factory would treat a stalled turn as a completed one.
+
+**No cost data.** `agy` reports tokens but never dollars, so `PiResult.cost` stays
+0.00 for this interface. A `$0.00` in the trace means *unknown*, not *free*.
+Authentication is OAuth against the Code Assist backend, not an API key.
 
 ## Model resolution
 

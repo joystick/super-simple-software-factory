@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reference — Prompting an ADW</title>
+<link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+
+<div class="meta">Reference 03 &nbsp;·&nbsp; every example below is a prompt that really ran</div>
+
+<h1>Prompting <code>just sdlc</code></h1>
+<p class="subtitle">What to write, what not to bother writing, and the order to do it in.</p>
+
+<div class="trap">
+  <span class="label">Before any of this</span>
+  <p><strong>Gates wired, and each one watched failing.</strong> A prompt cannot make a
+  factory careful. Behind an unverified gate, a good prompt just produces unchecked work
+  faster.</p>
+</div>
+
+<h2>The division of labour</h2>
+
+<table>
+  <tr><th>The prompt</th><th>The gates</th></tr>
+  <tr><td>states <strong>intent</strong> — what you want to exist</td><td>enforce the <strong>standard</strong> — whether it holds up</td></tr>
+</table>
+
+<p>This is why <em>"write clean, correct code with good test coverage"</em> is wasted
+words. Nothing checks it, so nothing enforces it. Say what you want built; let the gates
+say whether it is acceptable.</p>
+
+<h2>Anatomy</h2>
+
+<p>Six parts. Not all are needed every time; parts 1, 2 and 6 nearly always are.</p>
+
+<table>
+  <tr><th>#</th><th>Part</th><th>Example, from a real run</th></tr>
+  <tr><td>1</td><td><strong>Outcome</strong></td><td>"Add a <code>savings_percent</code> property to <code>Receipt</code>"</td></tr>
+  <tr><td>2</td><td><strong>Behaviour pinned</strong></td><td>"the total discount as a percentage of the subtotal, rounded to one decimal place, returning 0.0 when the subtotal is zero"</td></tr>
+  <tr><td>3</td><td><strong>Reach</strong>, if it spans things</td><td>"everywhere a percent is currently accepted: MemberDiscount, BulkDiscount, CouponDiscount and the tax_percent argument"</td></tr>
+  <tr><td>4</td><td><strong>Convention anchor</strong></td><td>"follows the existing conventions (integer cents, applies to the subtotal, validated percent)"</td></tr>
+  <tr><td>5</td><td><strong>What to test</strong></td><td>"Add tests covering a matching code, a non-matching code, no code, and an invalid percent"</td></tr>
+  <tr><td>6</td><td><strong>Protection clause</strong></td><td>"Do not modify or delete any existing test"</td></tr>
+</table>
+
+<div class="why">
+  <span class="label">Why part 6 is not optional</span>
+  <p>The builder has unrestricted write access. When a test blocks it, <strong>deleting an
+  assertion is the cheapest path to green.</strong> It did not take that path in any run
+  here — but that is virtue you have not constrained, and virtue is not a gate.</p>
+  <p>For a refactor, the stronger form: <em>"No behaviour change: every existing test must
+  pass unchanged."</em></p>
+</div>
+
+<h2>Four prompts that worked</h2>
+
+<pre><code>just sdlc "Add a savings_percent property to Receipt: the total discount as a
+percentage of the subtotal, rounded to one decimal place, returning 0.0 when the
+subtotal is zero. Add tests for it. Do not modify or delete any existing test."
+                                                              → 7/7 phases, $0.48</code></pre>
+
+<pre><code>just sdlc "Add coupon code support to the pricing engine: a CouponDiscount rule
+that takes a code and a percent, applies only when that exact code is passed to
+price_cart, and follows the existing conventions (integer cents, applies to the
+subtotal, validated percent). Add tests covering a matching code, a non-matching
+code, no code, and an invalid percent. Do not change existing behaviour."
+                                                              → 5/5 phases, $0.61</code></pre>
+
+<p>Two more ran at $0.76 and $1.14. The $1.14 used a <strong>byte-identical prompt</strong>
+to the $0.61 run — the difference was the planner model, not the wording. <strong>Cost
+tracks model choice far more than prompt length.</strong></p>
+
+<h2>Not worth writing</h2>
+
+<table>
+  <tr><th>Don't</th><th>Because</th></tr>
+  <tr><td>"write clean, maintainable code"</td><td>not checkable, so nothing enforces it</td></tr>
+  <tr><td>"be careful" / "make sure it's correct"</td><td>same — the gates decide this</td></tr>
+  <tr><td>"improve the pricing engine"</td><td>no outcome to plan against; you will get something arbitrary</td></tr>
+  <tr><td>"edit pricing.py, add a class called X with methods Y and Z"</td><td>you have written the plan yourself — if you want that, say so, but then the planner is wasted spend</td></tr>
+  <tr><td>a request needing three plans</td><td>keep it to what one plan can express; feed slices one at a time</td></tr>
+</table>
+
+<h2>The order to work in</h2>
+
+<ol>
+  <li><p><strong>Clean tree.</strong> <code>git status</code>. The commit phase runs
+  <code>git add -A</code> and stages <em>everything</em> — unrelated work in progress lands
+  in the agent's commit.</p></li>
+  <li><p><strong>Branch you are willing to throw away.</strong></p></li>
+  <li><p><strong><code>just plan "…"</code> first</strong> for anything architectural. The
+  planner alone costs tens of cents. Read <code>specs/&lt;adw_id&gt;_*.md</code> — this is
+  the cheap checkpoint where you find out it misread your architecture, instead of paying
+  for a plan <em>and</em> a bad diff.</p></li>
+  <li><p><strong><code>just sdlc "…"</code></strong> once the plan reads right.</p></li>
+  <li><p><strong>Read the diff, not the banner.</strong> Green means the gates you verified
+  found nothing wrong. That is all it has ever meant.</p></li>
+</ol>
+
+<h2>Long prompts</h2>
+
+<p>The positional argument accepts <strong>inline text or a path to a prompt file</strong>:</p>
+
+<pre><code>just sdlc specs/next-feature.md</code></pre>
+
+<p>Better for anything you want to revise, review or reuse — and it puts the request under
+version control alongside the work it produced.</p>
+
+<h2>Budget</h2>
+
+<table>
+  <tr><th>Workflow</th><th>Agents</th><th>Measured here</th></tr>
+  <tr><td><code>just quality</code></td><td>none</td><td>$0.00</td></tr>
+  <tr><td><code>just scout</code></td><td>1, read-only</td><td>cents</td></tr>
+  <tr><td><code>just plan</code></td><td>planner only</td><td>tens of cents</td></tr>
+  <tr><td><code>just sdlc</code></td><td>planner + builder</td><td>$0.48 – $1.14</td></tr>
+</table>
+
+<p>The planner dominates. On one measured pair, moving it from opus to sonnet cut the run
+46% — and produced the better design. Reach for the expensive model on genuinely ambiguous
+work, not by default.</p>
+
+<footer>
+  <p><a href="../lessons/0002-wiring-and-writing-gates.html">← Lesson 2</a> ·
+     <a href="0001-verifying-a-gate.html">Ref 01 — verifying a gate</a> ·
+     <a href="0002-gate-cookbook.html">Ref 02 — gate cookbook</a> ·
+     <a href="../MISSION.md">Mission</a></p>
+</footer>
+
+</body>
+</html>

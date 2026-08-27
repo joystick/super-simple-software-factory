@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 1 — A gate you have not watched fail</title>
+<link rel="stylesheet" href="../assets/lesson.css">
+<script src="../assets/quiz.js" defer></script>
+</head>
+<body>
+
+<div class="meta">Lesson 01 &nbsp;·&nbsp; Objective 1: gates &nbsp;·&nbsp; every figure below was executed</div>
+
+<h1>A gate you have not watched fail</h1>
+<p class="subtitle">Why a green result carries almost no information, and the three-minute
+procedure that turns it into evidence.</p>
+
+<div class="win">
+  <span class="label">The win</span>
+  <p>You can look at any factory — yours or a colleague's — and say precisely what its
+  green banner does and does not establish. And you can settle the question in about three
+  minutes per gate.</p>
+</div>
+
+<h2>What a gate is</h2>
+
+<p>A <strong>gate</strong> is a deterministic check that decides whether an agent's work is
+acceptable. Three properties, and none of them is clever:</p>
+
+<ol>
+  <li><strong>Code runs it, not a model.</strong> No LLM is asked "did the tests pass?" A
+  subprocess runs a command and reads the exit code.</li>
+  <li><strong>It judges the result, not the claim.</strong> The agent says "I added the
+  feature and tests pass." The gate ignores that sentence and runs the suite.</li>
+  <li><strong>Its verdict is an exit code.</strong> <code>0</code> passes. Anything else
+  fails.</li>
+</ol>
+
+<p>That is the entire mechanism. The lack of cleverness is the point: a verdict you cannot
+argue with.</p>
+
+<h2>The problem</h2>
+
+<p>A gate's substance is <em>the command it runs</em>. And:</p>
+
+<pre><code>echo "PLACEHOLDER"   →  exit 0
+deno test            →  exit 0     (when the suite genuinely passes)</code></pre>
+
+<div class="why">
+  <span class="label">The core idea, and everything else follows from it</span>
+  <p>A gate has two states that are <strong>identical from the outside</strong>: it checked
+  something and found nothing wrong, or it is incapable of finding anything wrong.</p>
+  <p>A green result does not distinguish them. Neither does the trace. Neither does
+  reading the config, as we will see.</p>
+</div>
+
+<p>Executed on a repo containing one file and no tooling whatsoever:</p>
+
+<pre><code>$ uv run adws/adw_quality.py "is this repo healthy?"
+
+  quality test:      passed (exit 0)   ← ran: echo 'PLACEHOLDER test…'
+  quality lint:      passed (exit 0)   ← ran: echo 'PLACEHOLDER lint…'
+  quality typecheck: passed (exit 0)   ← ran: echo 'PLACEHOLDER typecheck…'
+  quality build:     passed (exit 0)   ← ran: echo 'PLACEHOLDER build…'
+  checks: 4/4        status ✓ success</code></pre>
+
+<p>No test suite. No linter. No typechecker. Four <code>echo</code> statements and a green
+banner.</p>
+
+<h2>Reading the command is not enough either</h2>
+
+<p>The obvious defence is to inspect what each gate runs. Necessary, and insufficient —
+a real tool with a real command can also check nothing:</p>
+
+<pre><code>$ deno test --filter "smoke"
+ok | 0 passed | 0 failed | 66 filtered out     exit 0
+
+$ deno test
+ok | 66 passed | 0 failed                      exit 0</code></pre>
+
+<p>No placeholder anywhere. A real runner, a plausible command, exit 0, <strong>zero tests
+executed</strong>. A filter that matches nothing, a path that points at the wrong
+directory, a suite scoped to a folder someone renamed — each produces this.</p>
+
+<h2>The only thing that settles it</h2>
+
+<p>For <strong>each</strong> gate <code>G</code>, separately:</p>
+
+<ol class="steps">
+  <li><p>Introduce a defect <strong>of the class that tool exists to catch</strong>.</p></li>
+  <li><p>Run every gate.</p></li>
+  <li><p>Require <em>both</em>: <code>G</code> goes red, <strong>and every other gate stays
+  green</strong>.</p></li>
+  <li><p>Restore.</p></li>
+</ol>
+
+<p>The second half of step 3 is the half people drop, and it is the half that isolates.
+Red-on-<code>G</code> alone cannot distinguish "lint caught my unused import" from
+"everything is red because I broke the build".</p>
+
+<h3>Choosing the probe</h3>
+
+<p>A probe aimed at the wrong tool produces a <em>false diagnosis</em> — the gate stays
+green, and you conclude it is broken when it is healthy. Measured:</p>
+
+<table>
+  <tr><th>Probe</th><th>pytest</th><th>ruff</th><th>mypy</th></tr>
+  <tr><td>extra spaces around operators</td><td>PASS</td><td>PASS</td><td>PASS</td></tr>
+  <tr><td>unused import</td><td>PASS</td><td><strong>FAIL</strong></td><td>PASS</td></tr>
+  <tr><td>wrong type annotation</td><td>PASS</td><td>PASS</td><td><strong>FAIL</strong></td></tr>
+</table>
+
+<p>Whitespace is a <em>formatter's</em> job, not a linter's — which is also why formatting
+must never be a gate at all. It is auto-fixable, so gating on it turns a fix into a
+failure.</p>
+
+<table>
+  <tr><th>Tool</th><th>Job</th><th>Probe with</th></tr>
+  <tr><td>formatter</td><td>layout</td><td><em>nothing — not a gate</em></td></tr>
+  <tr><td>linter</td><td>dead code, suspicious patterns</td><td>an unused import</td></tr>
+  <tr><td>type checker</td><td>types</td><td>a wrong annotation</td></tr>
+  <tr><td>tests</td><td>wrong behaviour</td><td>change a value an assertion depends on</td></tr>
+</table>
+
+<h3>Reading the result</h3>
+
+<table>
+  <tr><th>Outcome</th><th>Diagnosis</th></tr>
+  <tr><td><code>G</code> stays <strong>green</strong></td><td>The gate does not reach that defect. Fix the gate — or if <code>G</code> is a test suite, suspect the <strong>test</strong>.</td></tr>
+  <tr><td>Everything goes red</td><td>The probe was not specific. Choose a narrower one.</td></tr>
+  <tr><td>One <em>other</em> gate also goes red</td><td>A real overlap, or the wrong probe. Overlaps exist — <code>deno test</code> type-checks, so a type error trips both <code>test</code> and <code>check</code>. Know your overlaps; do not accept surprises.</td></tr>
+</table>
+
+<h2>Why per gate, and not "the build went red"</h2>
+
+<p>A dead lint gate and a real bug, run together:</p>
+
+<pre><code>bug present   test: failed   lint: passed   typecheck: passed   →  2/3  RED
+bug fixed     test: passed   lint: passed   typecheck: passed   →  3/3  GREEN</code></pre>
+
+<p>The build went red. A team that stops there concludes all three gates work. One is an
+<code>echo</code>. Once the bug is fixed, that dead gate is <strong>indistinguishable</strong>
+from a healthy one.</p>
+
+<p>Breaking one thing proves <em>at least one</em> gate noticed. It never says which, and
+says nothing about the others.</p>
+
+<div class="trap">
+  <span class="label">A dead gate is worse than no gate</span>
+  <p>SSSF's fix loop hands a failing gate's verbatim output back to the builder to repair,
+  then re-runs the gate. So when the test gate is an <code>echo</code>:</p>
+  <pre><code>build    the builder writes broken code
+test     echo → exit 0 → PASSED
+         ↓  the fix loop NEVER FIRES — there is no failure to feed it,
+            and the builder is never told anything is wrong
+commit   "land the code only after the suite came back green" — it did
+trace    status ✓ success · phases 5/5 passed</code></pre>
+  <p>The bug is committed and the permanent record says the run succeeded. Nobody lied;
+  every component did its job correctly. <strong>A dead gate does not merely fail to catch
+  bugs — it disables the repair machinery and then certifies the result.</strong></p>
+</div>
+
+<h2>What SSSF actually gives you</h2>
+
+<div class="why">
+  <span class="label">One sentence</span>
+  <p>SSSF guarantees that an agent's <strong>claims</strong> are replaced by a
+  <strong>deterministic verdict</strong> before work proceeds. Agent proposes, code
+  disposes.</p>
+  <p>Everything else — roster, envelopes, trace, fix loop, permissions — serves that one
+  guarantee. Its entire strength is the gates. <strong>A factory is exactly as trustworthy
+  as its weakest gate, and a gate's trustworthiness cannot be read, only
+  demonstrated.</strong></p>
+</div>
+
+<h2>Check yourself</h2>
+
+<div class="quiz" data-answer="2">
+  <p class="q"><code>just quality</code> reports 3/3 on a repo you have never seen. What do you know?</p>
+  <button>The repo has a suite, a linter and a typechecker</button>
+  <button>The tools are wired but coverage may still be thin</button>
+  <button>Three commands exited zero, and nothing beyond that</button>
+  <button>The code compiles and its behaviour has been verified</button>
+  <div class="feedback"
+    data-correct="Green establishes only that three processes returned 0. What they checked is a separate question the banner cannot answer."
+    data-wrong="An echo exits 0 too. Until you know which commands ran AND that they can fail, the banner tells you nothing about checking."></div>
+</div>
+
+<div class="quiz" data-answer="1">
+  <p class="q">You delete a guard and every gate stays green. Most likely explanation?</p>
+  <button>The guard was genuinely redundant dead code</button>
+  <button>Nothing exercises the path that guard protects</button>
+  <button>The linter needs a stricter rule set enabled</button>
+  <button>The gates ran against a stale cached result</button>
+  <div class="feedback"
+    data-correct="The overwhelmingly common cause. Suspect the test before the tool — twice in this repo that was the answer."
+    data-wrong="Possible, but rare. Start by assuming nothing drives execution down the guarded path."></div>
+</div>
+
+<div class="quiz" data-answer="3">
+  <p class="q">Why must a probe match the tool it is aimed at?</p>
+  <button>Otherwise the run takes considerably longer</button>
+  <button>Because two gates would go red at once</button>
+  <button>The factory rejects probes it cannot classify</button>
+  <button>A wrong probe makes a healthy gate look broken</button>
+  <div class="feedback"
+    data-correct="Extra whitespace leaves ruff green. Read naively, that says the lint gate is dead — and you would go hunting a fault that is not there."
+    data-wrong="The cost is a false diagnosis: the gate stays green for the wrong reason, and you conclude it is broken when it is fine."></div>
+</div>
+
+<h2>Read this next</h2>
+
+<p><strong>Primary source:</strong>
+<a href="https://martinfowler.com/bliki/SelfTestingCode.html">Martin Fowler — Self Testing Code</a>,
+then <a href="https://martinfowler.com/bliki/TestCoverage.html">Test Coverage</a>. The
+second is directly on this lesson's nerve: coverage reports which lines <em>ran</em>, never
+whether the assertions around them meant anything.</p>
+
+<p>For the technique that automates this, read about
+<a href="https://en.wikipedia.org/wiki/Mutation_testing">mutation testing</a> — it does
+exactly the procedure above, at scale.</p>
+
+<h2>Where this goes next</h2>
+
+<p>Objective 2: reading a trace, and knowing what it cannot tell you. <code>sssf.db</code>
+records cost, phases and tool calls faithfully — and cannot record whether any of it
+meant anything.</p>
+
+<footer>
+  <p><a href="../MISSION.md">Mission</a> &nbsp;·&nbsp;
+     <a href="0001-a-gate-you-have-not-watched-fail.html">Lesson 1</a> &nbsp;·&nbsp;
+     <a href="../reference/0001-verifying-a-gate.html">Reference: verifying a gate</a></p>
+  <p><strong>Ask me things.</strong> This lesson was written after questioning you, not
+  before — the gaps it fixes are the ones your answers exposed. If a claim here feels like
+  something you are taking on trust, say so and we will run it instead.</p>
+</footer>
+
+</body>
+</html>

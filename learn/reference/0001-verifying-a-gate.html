@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reference — Verifying a gate</title>
+<link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+
+<div class="meta">Reference 01 &nbsp;·&nbsp; keep this open when you wire a factory</div>
+
+<h1>Verifying a gate</h1>
+<p class="subtitle">Three minutes per gate. There is no substitute.</p>
+
+<h2>The rule</h2>
+
+<div class="trap">
+  <span class="label">Say it out loud before you trust a green build</span>
+  <p><strong>A gate you have not watched fail is not a gate.</strong></p>
+  <p>Checking and being-incapable-of-checking look identical from outside. Only a
+  deliberate defect separates them.</p>
+</div>
+
+<h2>The procedure</h2>
+
+<p>For <strong>each</strong> gate, separately:</p>
+
+<ol>
+  <li>Introduce a defect of the class <em>that tool</em> exists to catch.</li>
+  <li>Run every gate.</li>
+  <li>Require: that gate <strong>red</strong>, all others <strong>green</strong>.</li>
+  <li>Restore. Confirm all green again.</li>
+</ol>
+
+<h2>Choosing the probe</h2>
+
+<table>
+  <tr><th>Tool</th><th>Job</th><th>Probe</th></tr>
+  <tr><td>formatter</td><td>layout, whitespace</td><td><em>none — never gate on it</em></td></tr>
+  <tr><td>linter</td><td>dead code, unused names</td><td>an unused import</td></tr>
+  <tr><td>type checker</td><td>types</td><td>a wrong annotation</td></tr>
+  <tr><td>tests</td><td>wrong behaviour</td><td>change a value an assertion reads</td></tr>
+  <tr><td>build</td><td>it compiles / bundles</td><td>a syntax error in an entry point</td></tr>
+</table>
+
+<p><strong>A wrong probe yields a false diagnosis:</strong> the gate stays green and you
+conclude it is dead when it is healthy.</p>
+
+<h2>Reading the outcome</h2>
+
+<table>
+  <tr><th>Result</th><th>Means</th><th>Do</th></tr>
+  <tr><td>target red, rest green</td><td>the gate is real</td><td>restore, next gate</td></tr>
+  <tr><td>target <strong>green</strong></td><td>does not reach that defect</td><td>fix the gate; if it is a suite, suspect the <strong>test</strong></td></tr>
+  <tr><td>everything red</td><td>probe too broad</td><td>choose a narrower defect</td></tr>
+  <tr><td>another gate red too</td><td>overlap, or wrong probe</td><td>know your overlaps; verify it is expected</td></tr>
+</table>
+
+<p>Known overlap: <code>deno test</code> type-checks, so a type error trips both
+<code>test</code> and <code>check</code>. <code>pytest</code> and <code>mypy</code> are
+independent — a bad annotation leaves pytest green.</p>
+
+<h2>Wiring hazards</h2>
+
+<table>
+  <tr><th>Hazard</th><th>Why it kills a gate</th></tr>
+  <tr><td><code>cmd | tee log</code></td><td>the <strong>pipe replaces the exit code</strong> with the last command's; <code>tee</code> almost always succeeds</td></tr>
+  <tr><td>shell string instead of an argv list</td><td>admits pipes, redirection and quoting bugs — use a <strong>list</strong>, no shell</td></tr>
+  <tr><td>a filter matching nothing</td><td><code>deno test --filter smoke</code> → exit 0, zero tests run</td></tr>
+  <tr><td>scoped at the wrong directory</td><td>lints or tests a folder that has since been renamed</td></tr>
+  <tr><td>scope written in the argv</td><td>the gate and your local run drift apart — put scope in <code>pyproject.toml</code> / <code>deno.json</code></td></tr>
+  <tr><td>an <code>echo</code> placeholder</td><td>a freshly stamped factory ships every block this way</td></tr>
+  <tr><td>gating on a formatter</td><td>auto-fixable, so it turns a fix into a failure and trains people to ignore red</td></tr>
+</table>
+
+<h2>Why "the build went red" is not enough</h2>
+
+<pre><code>bug present   test: FAILED   lint: passed   typecheck: passed   →  2/3  RED
+bug fixed     test: passed   lint: passed   typecheck: passed   →  3/3  GREEN
+                             └── this gate is an echo, in both rows</code></pre>
+
+<p>A red build proves <em>at least one</em> gate noticed. Never which, never the others.</p>
+
+<h2>What a dead gate costs you</h2>
+
+<pre><code>build    broken code written
+test     echo → 0 → PASSED
+         ↓  fix loop never fires: no failure exists to feed it
+commit    green, so it commits
+trace     status ✓ success · phases 5/5</code></pre>
+
+<p>It disables the repair machinery, then certifies the result. <strong>Worse than no
+factory</strong>, because the trace now looks like evidence.</p>
+
+<h2>The one-line summary of SSSF</h2>
+
+<p>An agent's <em>claims</em> are replaced by a <em>deterministic verdict</em> before work
+proceeds. Everything else serves that. The factory is exactly as trustworthy as its
+weakest gate.</p>
+
+<footer>
+  <p>Sources:
+    <a href="https://martinfowler.com/bliki/SelfTestingCode.html">Fowler — Self Testing Code</a> ·
+    <a href="https://martinfowler.com/bliki/TestCoverage.html">Test Coverage</a> ·
+    <a href="https://en.wikipedia.org/wiki/Mutation_testing">Mutation testing</a></p>
+  <p><a href="../lessons/0001-a-gate-you-have-not-watched-fail.html">← Lesson 1</a> ·
+     <a href="../MISSION.md">Mission</a></p>
+</footer>
+
+</body>
+</html>
