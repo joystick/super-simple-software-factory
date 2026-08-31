@@ -83,3 +83,27 @@ def test_validate_passes_for_an_agent_with_no_skill_engineering(tmp_path, monkey
     cfg = _config()
 
     agents.validate(cfg, ["builder"])  # must not raise — user story 24
+
+
+def test_validate_warns_but_does_not_raise_for_a_non_claude_code_agent_with_skill_engineering(
+        tmp_path, monkeypatch, capsys):
+    # coding_agent="agy" deliberately, same reason as _config()'s own choice
+    # of "claude_code" elsewhere in this file: resolve_model() must be pure
+    # (no `pi --list-models` subprocess) for this test to be about the
+    # warning, not about whether pi happens to be installed on this machine.
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "system.md").write_text("system")
+    (tmp_path / "user.md").write_text("user")
+    skill_dir = tmp_path / "adws" / "adw_data" / "skill_engineering"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "tdd.md").write_text("# TDD\n\nRed, green, refactor.\n")
+    cfg = SSSFConfig(agents=[AgentConfig(
+        name="builder", coding_agent="agy", model="agy/gemini-3.7-flash-medium",
+        prompt_engineering=PromptEngineering(system="system.md", user="user.md"),
+        skill_engineering=["adws/adw_data/skill_engineering/tdd.md"])])
+
+    agents.validate(cfg, ["builder"])  # must not raise
+    captured = capsys.readouterr()
+    assert "warning" in captured.err
+    assert "skill_engineering" in captured.err
+    assert "builder" in captured.err

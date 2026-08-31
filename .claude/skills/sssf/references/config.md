@@ -46,7 +46,9 @@ agents:
 | `model` | string | Model id, always `provider/id`. `claude_code`: `anthropic/<id>`. `pi`: anything `pi --list-models` lists. Default `anthropic/claude-sonnet-4-6`. |
 | `thinking` | enum | Reasoning effort — see below. Default `medium`. |
 | `color` | hex string | Lane color for every agent that does not set its own. Default empty — the visualizer falls back to its own palette. |
-| `harness_engineering` | list[string] | Pi extension paths, passed as `pi -e <path>`. **Ignored under `claude_code`** — silently, with no warning. See "Harness engineering" below. |
+| `harness_engineering` | list[string] | Pi extension paths, passed as `pi -e <path>`. **Ignored under `claude_code`/`agy`** — not deferred, not partially honoured — but `agents.validate()` now warns when a non-`pi` agent has this set, rather than staying silent about it. See "Harness engineering" below. |
+| `skill_engineering` | list[string] | Vendored Pocock-protocol skill file paths, composed onto the agent's system prompt. **Ignored under `pi`/`agy`** — `agents.validate()` warns the same way. See "Skill engineering" below. |
+| `skill_token_budget` | int \| null | Soft ceiling on one agent's estimated `skill_engineering` token cost. `null` (default) = no budget, no warning, ever. Exceeding it only warns — never fails the run. Per-agent overridable, same merge rule as everything else here. |
 | `tools` | list[string] | Roster-wide tool allowlist. Every agent that omits its own `tools` inherits this. Unset = all tools usable. |
 | `protected_files` | list[string] | Paths **no** agent may modify unless it names them in its own `writes`. Default: `adws/adw_modules/`, `adws/adw_sssf_config/`, `adws/adw_*.py` — an agent must not be able to edit the machinery that decides whether its work passed. |
 | `data_dir` | path | Runtime home. Sessions land at `{data_dir}/sessions/{adw_id}/{agent_name}/`. Default `adws/adw_data`. |
@@ -67,7 +69,7 @@ agents:
 | `prompt_engineering.system` | yes | Path to the system prompt — who the agent is, its single purpose, its output contract. |
 | `prompt_engineering.user` | yes | Path to the default user prompt — the task template with `{{prompt}}`, `{{previous_envelope}}`, `{{context_handoff_dir}}`. |
 | `color` | no | Hex swatch (`"#a78bfa"`) for this agent's lane in the visualizer. Travels config → `agent_sessions.color` → `/api/sessions/:adw_id`, and rides the `agent_start` event so a lane is colored while the agent is still running. Unset = the UI's fallback palette. |
-| `coding_agent`, `model`, `thinking`, `color`, `harness_engineering` | no | Override the corresponding `defaults` key. |
+| `coding_agent`, `model`, `thinking`, `color`, `harness_engineering`, `skill_engineering`, `skill_token_budget` | no | Override the corresponding `defaults` key. A per-agent list **replaces** the default's list entirely — it never appends. |
 | `tools` | no | Allowlist. **Omitting the key means all tools usable.** A capability list, not a boundary — see `writes`. |
 | `writes` | no | What this agent may modify **in the repo**, enforced after every call. Omitted = unrestricted (still barred from `protected_files`). `[]` = no repo writes at all. A list = only those paths: a trailing `/` is a directory prefix, `*` matches within one path segment, `**` crosses segments, anything else is an exact path. Naming a `protected_files` path here is what unlocks it. **The session runtime under `data_dir` is always writable** — `writes: []` means read-only with respect to the repo, not unable to write its own report. |
 
@@ -89,7 +91,7 @@ Mapped to Pi's reasoning effort control and honored when the model is registered
 
 ## Coding agents
 
-`coding_agent` picks the module that runs a phase. Both implement the same
+`coding_agent` picks the module that runs a phase. All three implement the same
 surface — `run(request, on_event, on_spawn, on_exit) -> PiResult`,
 `resolve_model()`, `ToolCallTracker` — so `agents.execute()` selects one and
 stops caring. The field is per-agent, so a roster can mix them: cheap read-only
@@ -303,8 +305,44 @@ Rule: **every entry in `harness_engineering` that registers a tool must have tha
 
 `harness_engineering` entries are pi extension **file paths**, passed through as `pi -e <path>`, one flag per entry, scoped to that agent only. This is where per-agent harness changes live — e.g. an output-tightening extension for an agent that keeps wrapping its envelope in prose.
 
-**Under `coding_agent: claude_code` the field is ignored.** Not deferred, not partially honoured — `agent_cc.build_command` never reads it, and nothing warns you. An agent that declares `subagents.ts` and lists `subagent_create` in its `tools` still gets subagents, because `_map_tools` aliases every `subagent_*` name onto Claude Code's own `Task` tool; it just is not the extension the config names. Anything else an extension would have done — new tools, output shaping, extra flags — does not happen. If a roster depends on a pi extension, that agent belongs on `coding_agent: pi`.
+**Under `coding_agent: claude_code`/`agy` the field is ignored.** Not deferred, not partially honoured — `agent_cc.build_command` never reads it. `agents.validate()` prints a warning naming the agent (to stderr, before anything spawns) — see `ignored_field_warnings()` — but the run still proceeds; this is a warning, never a failure. An agent that declares `subagents.ts` and lists `subagent_create` in its `tools` still gets subagents under `claude_code`, because `_map_tools` aliases every `subagent_*` name onto Claude Code's own `Task` tool; it just is not the extension the config names. Anything else an extension would have done — new tools, output shaping, extra flags — does not happen. If a roster depends on a pi extension, that agent belongs on `coding_agent: pi`.
 
 The reason it is ignored rather than translated: pi extensions are TypeScript loaded into pi's own harness. Claude Code's equivalent surfaces are MCP servers and hooks, which are a different shape and arrive through `--mcp-config` and settings, not `-e`. A faithful translation is not a mapping exercise, so the field stays pi-only until someone writes that path deliberately.
 
 **If the extension registers a tool, name that tool in the agent's `tools` list too** — `--tools` filters extension tools exactly like builtins, so an unnamed extension tool is silently unavailable no matter that the extension loaded fine. See [Extension tools must be named explicitly](#extension-tools-must-be-named-explicitly) above. Extensions that only shape output or add flags (no tool registration) need no `tools` change.
+
+## Skill engineering
+
+`skill_engineering` names Pocock-style workflow-protocol files (`tdd`, `codebase-design`, `diagnosing-bugs`, a grilling protocol — anything shaped like a `SKILL.md`) that get composed onto an agent's system prompt at call time. See `docs/prd-skill-engineering.md` for the full design; this section is the field reference.
+
+**Why this exists.** SSSF governs *where and when* an agent runs — phases, gates, the envelope. It says nothing about *how rigorously* the agent works once running. A body of proven engineering-discipline skills already exists as `SKILL.md` files, but SSSF agents run with `--setting-sources ''` for hermeticity, which hides every user-installed skill (measured: 22,478 → 17,932 prompt tokens/turn). `skill_engineering` routes the protocol in as **vendored, committed text** instead — reproducible across machines, reviewable in a diff, and it costs nothing extra in hermeticity.
+
+```yaml
+agents:
+  - name: builder
+    skill_engineering:
+      - adws/adw_data/skill_engineering/tdd.md
+```
+
+**Composition order: the agent's own `system.md` first, then skills in the order listed — never sorted.** The agent's identity and output contract outrank any borrowed protocol; if `tdd.md` and `builder/system.md` disagree about output shape, the envelope contract wins, or the phase fails to parse and the "fix" is a JSON retry loop that costs money to discover. Order is also what keeps the composed prompt — and therefore the prompt cache — stable across runs; an unstable order is a cost regression waiting to be noticed.
+
+**Under `coding_agent: pi`/`agy` the field is ignored** — the same way, and warned about the same way, as `harness_engineering` under `claude_code` above. Skills ride in `--system-prompt`, which is a `claude_code`-specific delivery mechanism.
+
+**Cost is real and re-sent every turn.** A skill's text lands in the system prompt, so it is billed on every internal turn of a phase, on top of the ~15.5k-token Claude Code base prompt no flag removes. Set `skill_token_budget` (roster-wide via `defaults`, or per-agent) to get a warning — never a hard failure — when a composed prompt's estimated cost exceeds it. The estimate is a `chars/4` heuristic, reported as "est." everywhere it's shown, never presented as a real tokenizer count.
+
+**Enforcement stays at outcome gates only.** No gate ever attempts to prove a protocol was followed — no inspecting intermediate commits for a failing test, no requiring the envelope to cite a test written first. `tdd.md` shapes how the builder works; the suite, the linter, and the typechecker judge what came out. A gate that claims to verify process but can be satisfied by a well-worded envelope is worse than no gate.
+
+**Vendoring** — `uv run <skill>/scripts/vendor_skill.py <source>` — copies a skill file into `adws/adw_data/skill_engineering/`, stamped with a provenance header (source path, date, content hash) that's stripped before the text ever reaches a model. Re-vendoring unchanged content is a no-op. `vendor_skill.py --check <vendored-file>` reports drift against the source without touching anything. Nothing auto-updates, ever — see the [attach-a-skill cookbook](../cookbooks/attach_a_skill.md) for the full walkthrough.
+
+**Audit what's vendored and who uses it** — `just skills` (backed by `adws/adw_skills.py`, free: no agents, no trace) lists every vendored file and the agent names that reference it, plus anything an agent names outside the vendored directory.
+
+**Recommended pairings — documented, not enabled by default.** Adding unrequested per-turn cost to every fresh install would be wrong, so the starter roster ships with no `skill_engineering` set anywhere:
+
+| Agent | Skill | Why |
+|---|---|---|
+| `builder` | `tdd` | A feature arrives with tests that were written to fail first. |
+| `reviewer` | `codebase-design` | Judges module depth and interface quality, not just correctness. |
+| `planner` | a grilling protocol | Resolves ambiguity before the expensive build phase starts. Verify this one before trusting it in a headless run — the skill assumes a human is present to answer questions, and a planner with nobody to grill could stall or invent answers. |
+| fix-loop builder | `diagnosing-bugs` | A red gate produces a diagnosis, not a guess. |
+
+Opt in per roster, and read the diff and the trace after the first run either way — a skill changing behaviour is a claim, and this repo does not take claims on their word.

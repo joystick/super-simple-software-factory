@@ -2,7 +2,7 @@
 title: SSSF Skill Engineering — Pocock protocols as node behaviour
 created: 2026-08-25
 status: in-progress
-version: 1.4
+version: 1.5
 updated: 2026-08-31
 ---
 
@@ -264,17 +264,52 @@ without reading YAML.
 
 ### Acceptance criteria
 
-- [ ] `references/config.md` documents `skill_engineering`, the merge rule,
+- [x] `references/config.md` documents `skill_engineering`, the merge rule,
       composition order, precedence, and the cost implication
-- [ ] A cookbook covers vendoring and attaching a skill end to end
-- [ ] `skill_engineering` under `pi` and `harness_engineering` under
+- [x] A cookbook covers vendoring and attaching a skill end to end
+- [x] `skill_engineering` under `pi` and `harness_engineering` under
       `claude_code` are both documented as ignored, and both warn at validation
-- [ ] Recommended pairings are documented — builder + `tdd`, reviewer +
+- [x] Recommended pairings are documented — builder + `tdd`, reviewer +
       `codebase-design`, planner + a grilling protocol, fix-loop builder +
       `diagnosing-bugs` — and none is enabled by default
-- [ ] A `just` recipe lists vendored skills and the agents that use them
-- [ ] The template roster and the skill's own templates stay consistent with the
+- [x] A `just` recipe lists vendored skills and the agents that use them
+- [x] The template roster and the skill's own templates stay consistent with the
       repo copy, so a fresh install does not reintroduce stale claims
+
+**Done 2026-08-31.** `ignored_field_warnings()` (pure) + `audit_skills()`
+(pure except one `Path.glob`) in `agents.py`; `validate()` prints warnings
+to stderr — deliberately not through `run.console`, since `validate()` runs
+before any `Run`/tracer exists in all 12 `adws/adw_*.py` entrypoints, so
+there is nothing yet for a warning to drift from. `adw_skills.py` + `just
+skills` back the audit. `references/config.md` gained a full "Skill
+engineering" section and updated its now-stale "harness_engineering...
+silently, with no warning" line; also fixed an adjacent stale claim
+("Both implement the same surface" → "All three") left over from `agy`
+landing in an earlier phase this session. New cookbook:
+`cookbooks/attach_a_skill.md`, linked from `SKILL.md`'s routing table.
+
+/code-review found one real issue, fixed: `audit_skills()` compared raw
+path strings, so a config author writing `./adws/.../tdd.md` instead of
+the exact form `Path.glob()` returns would misreport a real vendored file
+as "outside the vendor dir" — a false-positive typo warning. Fixed by
+comparing resolved paths. A second flagged item (whether
+`skill_token_budget` is actually consumed anywhere) was a false alarm —
+that wiring landed in Phase 3, outside this diff; confirmed still present
+in the reviewed code.
+
+19 new tests (66 total). Verified live: `just skills` correctly showed an
+unused vendored skill and one used by two agents; `validate()` called
+directly against a real roster with a `pi` agent carrying
+`skill_engineering` printed the warning on stderr without raising;
+`just skills` re-verified against a deliberately `./`-noised config path
+after the path-normalization fix, matched correctly with no false
+"outside vendor dir" report.
+
+**Deliberately not touched:** `docs/playbook-adopting-sssf.md` still frames
+`skill_engineering` as "proposed, not built" in a Mermaid diagram — now
+inaccurate with 4 of 6 phases done. Left alone pending an explicit decision
+(the user actively navigates by that document and asked for careful,
+versioned edits if it's touched — not a drive-by during this phase).
 
 ---
 
@@ -329,6 +364,7 @@ across a roster, and this repo has already twice found that a change which
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.5 | 2026-08-31 | Phase 5 done — see its acceptance criteria for what shipped and how it was verified. |
 | 1.4 | 2026-08-31 | Phase 4 done — see its acceptance criteria for what shipped and how it was verified. |
 | 1.3 | 2026-08-31 | Phase 3 done — see its acceptance criteria for what shipped and how it was verified. |
 | 1.2 | 2026-08-31 | Phase 2 done — see its acceptance criteria for what shipped and how it was verified. |

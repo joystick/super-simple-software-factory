@@ -10,6 +10,8 @@ disposes.
 from __future__ import annotations
 
 import json
+import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
@@ -58,6 +60,71 @@ def load_config(path: str = "adws/adw_sssf_config/sssf.config.yaml") -> SSSFConf
     return SSSFConfig(**raw)
 
 
+def ignored_field_warnings(agent: AgentConfig) -> list[str]:
+    """Configured but silently-ignored-by-design fields, named — never
+    fatal, and never silent either. `harness_engineering` only takes effect
+    under `coding_agent: pi`; `skill_engineering` only takes effect under
+    `coding_agent: claude_code`. The other coding agent's own field is a
+    valid combination (a roster naming both, meant to be flipped between
+    agents later, say) so this warns rather than fails validate() — but it
+    warns, because a config field that does nothing with no signal is
+    exactly the failure mode this repo has already been bitten by.
+    """
+    warnings = []
+    if agent.coding_agent != "pi" and agent.harness_engineering:
+        warnings.append(
+            f"agent {agent.name!r}: harness_engineering is set but coding_agent is "
+            f"{agent.coding_agent!r} — harness_engineering only takes effect under "
+            f"coding_agent: pi and will be ignored")
+    if agent.coding_agent != "claude_code" and agent.skill_engineering:
+        warnings.append(
+            f"agent {agent.name!r}: skill_engineering is set but coding_agent is "
+            f"{agent.coding_agent!r} — skill_engineering only takes effect under "
+            f"coding_agent: claude_code and will be ignored")
+    return warnings
+
+
+@dataclass
+class VendoredSkillUsage:
+    path: str
+    agents: list[str] = field(default_factory=list)   # empty = vendored but unused
+
+
+@dataclass
+class SkillAudit:
+    vendored: list[VendoredSkillUsage]
+    # skill paths named by some agent that are NOT under the vendored dir —
+    # hand-authored files, or a typo pointing outside it. path -> agent names.
+    outside_vendor_dir: dict[str, list[str]]
+
+
+def audit_skills(cfg: SSSFConfig,
+                 skill_dir: str = "adws/adw_data/skill_engineering") -> SkillAudit:
+    """"Which skills are vendored, and which agents use them" — the Phase 5
+    audit, without reading YAML by hand. Every *.md under skill_dir is
+    listed (used or not); every skill_engineering path NOT under skill_dir
+    is reported separately, since that's a hand-authored file this audit
+    has no opinion about, not a vendoring gap.
+    """
+    # Keyed by resolved path so "adws/x/tdd.md" and "./adws/x/tdd.md" match
+    # the same file — a config author's harmless spelling choice must not
+    # read as a typo pointing outside the vendored directory.
+    usage: dict[Path, list[str]] = {}
+    for agent in cfg.agents:
+        for path in agent.skill_engineering:
+            usage.setdefault(Path(path).resolve(), []).append(agent.name)
+
+    dir_path = Path(skill_dir)
+    vendored_paths = sorted(dir_path.glob("*.md")) if dir_path.is_dir() else []
+    vendored = [VendoredSkillUsage(path=str(p), agents=usage.get(p.resolve(), []))
+               for p in vendored_paths]
+
+    vendored_resolved = {p.resolve() for p in vendored_paths}
+    outside = {str(path): names for path, names in usage.items()
+              if path not in vendored_resolved}
+    return SkillAudit(vendored=vendored, outside_vendor_dir=outside)
+
+
 def resolve(cfg: SSSFConfig, name: str) -> AgentConfig:
     for agent in cfg.agents:
         if agent.name == name:
@@ -94,6 +161,13 @@ def validate(cfg: SSSFConfig, required: list[str]) -> None:
             skill_engineering.check(agent.skill_engineering)
         except skill_engineering.SkillFileError as e:
             problems.append(f"agent {name!r}: {e}")
+        # Warn, never fail: the OTHER coding agent's field is a valid
+        # roster (someone may flip agents between pi/claude_code later),
+        # just one where this field currently does nothing. Printed here,
+        # not through run.console, because validate() runs before any Run
+        # or trace exists — there is nothing yet for this to drift from.
+        for warning in ignored_field_warnings(agent):
+            print(f"warning: {warning}", file=sys.stderr)
     if problems:
         raise SystemExit("config validation failed:\n- " + "\n- ".join(problems))
 
