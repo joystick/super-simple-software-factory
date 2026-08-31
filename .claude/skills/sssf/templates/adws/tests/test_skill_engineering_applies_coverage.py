@@ -42,9 +42,9 @@ ALLOWED_UNGATED = {
     ("agents.py", 257): "agent_start event payload is deliberately AS-DECLARED, not as-applied "
                         "(see the comment at that call site) — matches harness_engineering's "
                         "own always-declared behaviour one line above it",
-    ("tracer.py", 275): "the documented fallback when a caller omits the explicit override — "
+    ("tracer.py", 276): "the documented fallback when a caller omits the explicit override — "
                         "agents.py's one production caller always passes the gated value",
-    ("tracer.py", 269): "docstring prose describing the fallback above — not a code read",
+    ("tracer.py", 270): "docstring prose describing the fallback above — not a code read",
 }
 
 
