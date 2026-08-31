@@ -113,3 +113,27 @@ def test_check_raises_the_same_error_compose_would(tmp_path):
     with pytest.raises(skill_engineering.SkillFileError) as excinfo:
         skill_engineering.check([str(missing)])
     assert str(missing) in str(excinfo.value)
+
+
+# ── estimate_tokens() — Phase 3: cost visibility. A heuristic, not exact —
+#    good enough to warn on, never claimed as billed truth. ────────────────
+
+def test_estimate_tokens_is_zero_for_no_skills():
+    assert skill_engineering.estimate_tokens([]) == 0
+
+
+def test_estimate_tokens_is_positive_for_a_real_skill(tmp_path):
+    skill_file = tmp_path / "tdd.md"
+    skill_file.write_text("# TDD\n\n" + ("Red, green, refactor. " * 50))
+    assert skill_engineering.estimate_tokens([str(skill_file)]) > 0
+
+
+def test_estimate_tokens_is_monotonic_in_the_number_of_skills(tmp_path):
+    one = tmp_path / "one.md"
+    one.write_text("Red, green, refactor. " * 20)
+    two = tmp_path / "two.md"
+    two.write_text("Judge module depth. " * 20)
+
+    single = skill_engineering.estimate_tokens([str(one)])
+    double = skill_engineering.estimate_tokens([str(one), str(two)])
+    assert double > single

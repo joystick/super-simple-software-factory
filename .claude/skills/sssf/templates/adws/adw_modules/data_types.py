@@ -316,6 +316,12 @@ class AgentConfig(BaseModel):
     # stays at outcome gates only; this changes how the agent works, never
     # what is checked afterward.
     skill_engineering: list[str] = Field(default_factory=list)
+    # Soft per-agent ceiling on skill_engineering's estimated token cost.
+    # Overridable per agent for the same reason skill_engineering itself is:
+    # an agent that names more/fewer skills than the roster norm needs a
+    # budget that tracks ITS list, not one number for every agent regardless
+    # of what it's carrying. None = inherit defaults.skill_token_budget.
+    skill_token_budget: Optional[int] = None
     tools: Optional[list[str]] = None    # allowlist; None = all tools usable
     # What this agent may MODIFY in the repo, enforced in code after every call
     # (see adw_modules/permissions.py). `tools` cannot express this: `bash` runs
@@ -335,6 +341,12 @@ class ConfigDefaults(BaseModel):
     color: str = ""
     harness_engineering: list[str] = Field(default_factory=list)
     skill_engineering: list[str] = Field(default_factory=list)
+    # Soft ceiling on one agent's estimated skill_engineering token cost.
+    # None = no budget, no warning, ever. Exceeding it only warns — skills
+    # ride the system prompt and are re-sent on every internal turn, so the
+    # engineer should see that price at the moment they are paying it, but
+    # they may have decided the discipline is worth it. Never a hard fail.
+    skill_token_budget: Optional[int] = None
     tools: Optional[list[str]] = None    # roster-wide allowlist; None = all tools usable
     # Off-limits to every agent that has not named them in its own `writes`.
     # The factory's own code is the default: an agent must not be able to edit

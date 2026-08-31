@@ -8,6 +8,8 @@ so a CI log reads exactly like a terminal.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from rich.console import Console as RichConsole
 from rich.markup import escape
 from rich.panel import Panel
@@ -99,6 +101,21 @@ class Console:
     def agent_started(self, name: str, model: str, session_id: str) -> None:
         self._emit(f"  [magenta]▸[/magenta] {escape(name)} [dim]{escape(model)}[/dim]"
                    f"  [dim]session {escape(session_id)}[/dim]")
+
+    def skill_engineering_report(self, skill_paths: list[str], tokens_estimate: int,
+                                 budget: int | None) -> None:
+        """The discipline an agent is carrying, and its price — surfaced at the
+        moment the engineer is paying it, not buried in a trace they may never
+        open. Silent when no skills are attached: nothing to report."""
+        if not skill_paths:
+            return
+        names = ", ".join(Path(p).stem for p in skill_paths)
+        self._emit(f"    [dim]skill_engineering: {escape(names)}"
+                   f" (est. {tokens_estimate:,} tokens/turn)[/dim]")
+        if budget is not None and tokens_estimate > budget:
+            self._emit(f"    [yellow]⚠ skill_engineering est. {tokens_estimate:,} tokens exceeds "
+                       f"the {budget:,}-token soft budget — still running[/yellow]",
+                       level="warn")
 
     def agent_finished(self, name: str, tokens: int, cost: float) -> None:
         self._emit(f"  [dim]└ {escape(name)} used {tokens:,} tokens · ${cost:.4f}[/dim]")

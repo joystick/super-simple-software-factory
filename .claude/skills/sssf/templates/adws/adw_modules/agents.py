@@ -49,7 +49,8 @@ def load_config(path: str = "adws/adw_sssf_config/sssf.config.yaml") -> SSSFConf
     raw = yaml.safe_load(Path(path).read_text()) or {}
     defaults = raw.get("defaults", {}) or {}
     for agent in raw.get("agents", []) or []:
-        for key in ("coding_agent", "model", "thinking", "color", "tools", "writes"):
+        for key in ("coding_agent", "model", "thinking", "color", "tools", "writes",
+                    "skill_token_budget"):
             if key in defaults:
                 agent.setdefault(key, defaults[key])
         agent.setdefault("harness_engineering", defaults.get("harness_engineering", []))
@@ -113,6 +114,7 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
     }
     system_text = prompts.render(agent.prompt_engineering.system, variables)
     system_text = skill_engineering.compose(system_text, agent.skill_engineering)
+    skill_tokens_estimate = skill_engineering.estimate_tokens(agent.skill_engineering)
     user_text = prompts.render(agent.prompt_engineering.user, variables)
     prompts.save(agent_dir / "prompts", "system.md", system_text)
     prompts.save(agent_dir / "prompts", "user.md", user_text)
@@ -126,8 +128,12 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
                                           "coding_agent": agent.coding_agent,
                                           "purpose": agent.purpose,
                                           "tools": agent.tools,  # None = all tools
-                                          "harness_engineering": agent.harness_engineering}))
+                                          "harness_engineering": agent.harness_engineering,
+                                          "skill_engineering": agent.skill_engineering,
+                                          "skill_tokens_estimate": skill_tokens_estimate}))
     run.console.agent_started(agent.name, agent.model, session_id)
+    run.console.skill_engineering_report(agent.skill_engineering, skill_tokens_estimate,
+                                         agent.skill_token_budget)
 
     # Parse retries and gate corrections re-enter the SAME pi session, so the
     # last send is the one whose context occupancy is current — while spend is
@@ -221,7 +227,8 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
     context = latest or result
     run.tracer.agent_session_row(run.adw_id, agent, session_id,
                                  context_tokens=context.context_tokens,
-                                 context_window=context.context_window)
+                                 context_window=context.context_window,
+                                 skill_tokens_estimate=skill_tokens_estimate)
     run.save_agent_map(agent.name, {"session_id": session_id, "model": agent.model,
                                     "coding_agent": agent.coding_agent})
     run.tracer.event(EventRecord(adw_id=run.adw_id, phase_id=phase.phase_id,

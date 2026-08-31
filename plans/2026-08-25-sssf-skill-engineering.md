@@ -2,7 +2,7 @@
 title: SSSF Skill Engineering — Pocock protocols as node behaviour
 created: 2026-08-25
 status: in-progress
-version: 1.2
+version: 1.3
 updated: 2026-08-31
 ---
 
@@ -145,15 +145,32 @@ have decided the discipline is worth the money.
 
 ### Acceptance criteria
 
-- [ ] The `agent_start` event carries the list of skills injected
-- [ ] The agent-session row records the same, so history explains behaviour
-- [ ] The console reports skills and their estimated token cost at agent start,
+- [x] The `agent_start` event carries the list of skills injected
+- [x] The agent-session row records the same, so history explains behaviour
+- [x] The console reports skills and their estimated token cost at agent start,
       through `run.console` and never a bare `print()`
-- [ ] A configurable soft budget emits a warning when the composed prompt
+- [x] A configurable soft budget emits a warning when the composed prompt
       exceeds it, and does not fail the run
-- [ ] Token accounting is monotonic in the number of skills attached
-- [ ] A trace from a run with skills can be read back and answers "which
+- [x] Token accounting is monotonic in the number of skills attached
+- [x] A trace from a run with skills can be read back and answers "which
       protocols was this agent given"
+
+**Done 2026-08-31.** `skill_engineering.estimate_tokens()` (chars/4 heuristic,
+explicitly labelled "est." wherever a human reads it — a `/code-review`
+finding caught the first version presenting it as a bare number). Console
+gained `skill_engineering_report()`: silent when no skills, else reports
+names + estimate, warns (never raises) over budget. `agent_sessions` gained
+`skill_engineering_json`/`skill_tokens_estimate` columns via the existing
+additive-migration pattern. `skill_token_budget` is per-agent overridable
+(defaults to inheriting `defaults.skill_token_budget`) — a second
+`/code-review` finding caught the first version being defaults-only, which
+would have judged an agent against a budget that didn't track its own
+skill list. 13 new tests. Verified live: real `claude_code` call with a
+deliberately tiny budget (50 tokens) — console printed both the skill
+report and the over-budget warning, the run still succeeded, and both the
+`agent_start` event and the `agent_sessions` row in the real sqlite db
+were queried directly and confirmed correct (891-token estimate, `tdd.md`
+named in both).
 
 ---
 
@@ -270,6 +287,7 @@ across a roster, and this repo has already twice found that a change which
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.3 | 2026-08-31 | Phase 3 done — see its acceptance criteria for what shipped and how it was verified. |
 | 1.2 | 2026-08-31 | Phase 2 done — see its acceptance criteria for what shipped and how it was verified. |
 | 1.1 | 2026-08-31 | Phase 1 done — see its acceptance criteria for what shipped and how it was verified. |
 | 1.0 | 2026-08-25 | Initial plan. Six vertical slices from PRD v1.0; scope limited to the skill layer. |

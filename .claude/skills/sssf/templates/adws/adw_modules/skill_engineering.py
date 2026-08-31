@@ -53,6 +53,26 @@ def check(skill_paths: list[str]) -> None:
         _read(raw_path)
 
 
+CHARS_PER_TOKEN = 4   # rough, model-agnostic heuristic — good enough to warn
+                      # on, never presented as a billed count. See PRD: "an
+                      # estimated token count."
+
+
+def estimate_tokens(skill_paths: list[str]) -> int:
+    """Rough size of the composed skill text, in tokens. 0 for no skills.
+
+    Same file-reading rules as compose()/check() — raises SkillFileError on
+    a bad path. Called from agents.execute() only after agents.validate()
+    has already confirmed every path is good, so in practice this never
+    raises at that call site; it is exposed here (rather than folded into
+    compose()) so a caller can get a cost estimate without needing a real
+    system_text to compose against.
+    """
+    total_chars = sum(len(DELIMITER.format(name=name)) + len(body)
+                      for name, body in (_read(p) for p in skill_paths))
+    return total_chars // CHARS_PER_TOKEN
+
+
 def compose(system_text: str, skill_paths: list[str]) -> str:
     """The agent's system prompt, then each named skill's text in order.
 

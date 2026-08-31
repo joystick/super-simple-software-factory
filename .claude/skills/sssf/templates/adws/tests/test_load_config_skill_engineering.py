@@ -73,3 +73,45 @@ def test_absent_everywhere_means_no_skills(tmp_path):
               user: user.md
         """)))
     assert cfg.agents[0].skill_engineering == []
+
+
+# ── skill_token_budget — per-agent overridable, same merge rule as
+#    skill_engineering itself: an agent naming more/fewer skills than the
+#    roster norm needs a budget that tracks ITS list. ─────────────────────
+
+def test_agent_with_no_skill_token_budget_inherits_the_default(tmp_path):
+    cfg = agents.load_config(str(_write_config(tmp_path, """\
+        defaults:
+          skill_token_budget: 2000
+        agents:
+          - name: builder
+            prompt_engineering:
+              system: system.md
+              user: user.md
+        """)))
+    assert cfg.agents[0].skill_token_budget == 2000
+
+
+def test_agent_with_its_own_skill_token_budget_overrides_the_default(tmp_path):
+    cfg = agents.load_config(str(_write_config(tmp_path, """\
+        defaults:
+          skill_token_budget: 2000
+        agents:
+          - name: reviewer
+            skill_token_budget: 8000
+            prompt_engineering:
+              system: system.md
+              user: user.md
+        """)))
+    assert cfg.agents[0].skill_token_budget == 8000
+
+
+def test_absent_everywhere_means_no_budget(tmp_path):
+    cfg = agents.load_config(str(_write_config(tmp_path, """\
+        agents:
+          - name: builder
+            prompt_engineering:
+              system: system.md
+              user: user.md
+        """)))
+    assert cfg.agents[0].skill_token_budget is None
