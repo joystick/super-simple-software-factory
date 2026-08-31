@@ -53,6 +53,7 @@ def load_config(path: str = "adws/adw_sssf_config/sssf.config.yaml") -> SSSFConf
             if key in defaults:
                 agent.setdefault(key, defaults[key])
         agent.setdefault("harness_engineering", defaults.get("harness_engineering", []))
+        agent.setdefault("skill_engineering", defaults.get("skill_engineering", []))
     return SSSFConfig(**raw)
 
 

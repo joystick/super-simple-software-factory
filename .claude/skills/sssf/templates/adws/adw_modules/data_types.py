@@ -334,6 +334,7 @@ class ConfigDefaults(BaseModel):
     thinking: str = "medium"
     color: str = ""
     harness_engineering: list[str] = Field(default_factory=list)
+    skill_engineering: list[str] = Field(default_factory=list)
     tools: Optional[list[str]] = None    # roster-wide allowlist; None = all tools usable
     # Off-limits to every agent that has not named them in its own `writes`.
     # The factory's own code is the default: an agent must not be able to edit

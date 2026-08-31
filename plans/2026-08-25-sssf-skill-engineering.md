@@ -2,7 +2,7 @@
 title: SSSF Skill Engineering — Pocock protocols as node behaviour
 created: 2026-08-25
 status: in-progress
-version: 1.1
+version: 1.2
 updated: 2026-08-31
 ---
 
@@ -108,15 +108,23 @@ feature has two implementations and one of them will rot.
 
 ### Acceptance criteria
 
-- [ ] `defaults.skill_engineering` applies to every agent that omits its own
-- [ ] A per-agent list replaces the default rather than appending to it
-- [ ] Absent in both places means no skills and no behaviour change
-- [ ] Multiple skills appear in the listed order, never sorted
-- [ ] Each skill is separated by a delimiter that names it, so the model — and a
+- [x] `defaults.skill_engineering` applies to every agent that omits its own
+- [x] A per-agent list replaces the default rather than appending to it
+- [x] Absent in both places means no skills and no behaviour change
+- [x] Multiple skills appear in the listed order, never sorted
+- [x] Each skill is separated by a delimiter that names it, so the model — and a
       human reading the persisted prompt — can tell where one protocol ends
-- [ ] A repo-local, hand-authored skill file works identically to a vendored one
-- [ ] Config-merge behaviour is covered by tests at the level `validate()` is
+- [x] A repo-local, hand-authored skill file works identically to a vendored one
+- [x] Config-merge behaviour is covered by tests at the level `validate()` is
       already exercised
+
+**Done 2026-08-31.** One line in `load_config()` (mirrors the existing
+`harness_engineering` merge exactly) plus `ConfigDefaults.skill_engineering`.
+6 new tests: the four merge-rule cases (inherit, replace, explicit-empty-stays-
+empty, absent-everywhere) plus multi-skill ordering and a hand-authored-vs-
+vendored equivalence check. `/code-review`: no findings. Verified live against
+the real stamped config in a scratch install — `defaults.skill_engineering`
+correctly reached all 5 roster agents via `load_config()`.
 
 ---
 
@@ -262,5 +270,6 @@ across a roster, and this repo has already twice found that a change which
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.2 | 2026-08-31 | Phase 2 done — see its acceptance criteria for what shipped and how it was verified. |
 | 1.1 | 2026-08-31 | Phase 1 done — see its acceptance criteria for what shipped and how it was verified. |
 | 1.0 | 2026-08-25 | Initial plan. Six vertical slices from PRD v1.0; scope limited to the skill layer. |

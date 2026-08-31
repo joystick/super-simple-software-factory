@@ -32,6 +32,35 @@ def test_one_skill_is_appended_after_the_system_prompt(tmp_path):
     assert "tdd" in composed.split(system_text, 1)[1]
 
 
+def test_multiple_skills_compose_in_the_listed_order_not_sorted(tmp_path):
+    # Names chosen so alphabetical order would reverse the listed order —
+    # "zzz" would sort after "aaa", but the engineer listed it first.
+    first = tmp_path / "zzz-grill-me.md"
+    first.write_text("Grill the plan before it costs anything.")
+    second = tmp_path / "aaa-tdd.md"
+    second.write_text("Red, green, refactor.")
+
+    composed = skill_engineering.compose("System.", [str(first), str(second)])
+
+    grill_at = composed.index("Grill the plan")
+    tdd_at = composed.index("Red, green, refactor.")
+    assert grill_at < tdd_at, "skills must compose in listed order, not alphabetical"
+
+
+def test_a_hand_authored_local_skill_composes_identically_to_a_vendored_one(tmp_path):
+    # compose() has no concept of "vendored" vs. "local" — a plain Markdown
+    # file the engineer wrote themselves must work exactly the same way as
+    # one copied in by a vendoring script (that script doesn't exist until
+    # Phase 4; this proves compose() never needed to know the difference).
+    house_rule = tmp_path / "house-conventions.md"
+    house_rule.write_text("Every PR description states the why, not the what.")
+
+    composed = skill_engineering.compose("System.", [str(house_rule)])
+
+    assert "Every PR description states the why" in composed
+    assert "house-conventions" in composed.split("System.", 1)[1]
+
+
 def test_composition_is_deterministic(tmp_path):
     skill_file = tmp_path / "tdd.md"
     skill_file.write_text("# TDD\n\nRed, green, refactor.\n")
