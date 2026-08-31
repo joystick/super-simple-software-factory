@@ -95,3 +95,66 @@ def test_no_vendored_skills_and_no_agent_usage_is_an_empty_report(tmp_path):
 
     assert report.vendored == []
     assert report.outside_vendor_dir == {}
+
+
+# ── Found by round-4 adversarial review: audit_skills() reported every
+#    agent naming a skill as a "user" of it, with no applicability gate —
+#    the identical bug already fixed in execute()/console.py/tracer.py,
+#    just in the one call site nobody had a pi/agy test for. ─────────────
+
+def test_a_pi_agent_naming_a_skill_is_reported_as_ignored_not_a_user(tmp_path):
+    skill_dir = tmp_path / "skill_engineering"
+    skill_dir.mkdir()
+    (skill_dir / "tdd.md").write_text("# TDD")
+    path = str(skill_dir / "tdd.md")
+    cfg = SSSFConfig(agents=[
+        AgentConfig(name="pi_builder", coding_agent="pi",
+                   prompt_engineering=PromptEngineering(system="s.md", user="u.md"),
+                   skill_engineering=[path]),
+    ])
+
+    report = audit_skills(cfg, str(skill_dir))
+
+    assert len(report.vendored) == 1
+    assert report.vendored[0].agents == [], (
+        "a pi agent must not be reported as an active user — skill_engineering "
+        "never takes effect under pi, exactly like it never reached its request")
+    assert report.vendored[0].ignored_by == ["pi_builder"]
+
+
+def test_a_mix_of_applying_and_ignoring_agents_is_split_correctly(tmp_path):
+    skill_dir = tmp_path / "skill_engineering"
+    skill_dir.mkdir()
+    (skill_dir / "tdd.md").write_text("# TDD")
+    path = str(skill_dir / "tdd.md")
+    cfg = SSSFConfig(agents=[
+        _agent("builder", skill_engineering=[path]),   # claude_code — applies
+        AgentConfig(name="pi_builder", coding_agent="pi",
+                   prompt_engineering=PromptEngineering(system="s.md", user="u.md"),
+                   skill_engineering=[path]),           # pi — ignored
+    ])
+
+    report = audit_skills(cfg, str(skill_dir))
+
+    assert report.vendored[0].agents == ["builder"]
+    assert report.vendored[0].ignored_by == ["pi_builder"]
+
+
+def test_outside_vendor_dir_displays_the_path_as_the_agent_wrote_it(tmp_path, monkeypatch):
+    # Found alongside the above: the resolved (absolute) path was used as
+    # the dict key AND the display string, so a repo-relative path an
+    # agent actually wrote in config showed up as a full local filesystem
+    # path in the audit output — the exact privacy/portability class
+    # already fixed for vendor_skill.py's provenance headers, recurring
+    # in the one place display and matching used the same value.
+    monkeypatch.chdir(tmp_path)
+    skill_dir = tmp_path / "skill_engineering"
+    skill_dir.mkdir()
+    (tmp_path / "elsewhere").mkdir()
+    (tmp_path / "elsewhere" / "house.md").write_text("Every PR states the why.")
+    relative_as_written = "elsewhere/house.md"   # NOT the resolved absolute form
+    cfg = SSSFConfig(agents=[_agent("builder", skill_engineering=[relative_as_written])])
+
+    report = audit_skills(cfg, str(skill_dir))
+
+    assert report.outside_vendor_dir == {relative_as_written: ["builder"]}

@@ -36,7 +36,13 @@ def main(config: str = "adws/adw_sssf_config/sssf.config.yaml") -> int:
         print("vendored (adws/adw_data/skill_engineering/):")
         for item in report.vendored:
             used_by = ", ".join(item.agents) if item.agents else "(unused)"
-            print(f"  {item.path}  ->  {used_by}")
+            line = f"  {item.path}  ->  {used_by}"
+            if item.ignored_by:
+                # named it, but their coding_agent means it never applies —
+                # surfaced here, not silently dropped, same reasoning as
+                # agents.validate()'s own warning for the same mismatch.
+                line += f"  [ignored by: {', '.join(item.ignored_by)} — not claude_code]"
+            print(line)
 
     if report.outside_vendor_dir:
         print("\nnamed by an agent but NOT under the vendored dir (hand-authored, or check for a typo):")

@@ -2,7 +2,7 @@
 title: SSSF Skill Engineering — Pocock protocols as node behaviour
 created: 2026-08-25
 status: in-progress
-version: 1.6
+version: 1.7
 updated: 2026-08-31
 ---
 
@@ -433,6 +433,7 @@ it without the author's assumptions already loaded.
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.7 | 2026-08-31 | Round 4 review (a fresh independent pass, explicitly asked to hunt for a sibling of the same bug family before this branch touches main) found an 8th instance: `audit_skills()` — `just skills` — counted every agent naming a skill as an active user, with no `skill_engineering_applies()` gate, so a `pi`/`agy` agent showed up as "using" a skill it never actually receives. Also found `outside_vendor_dir` displaying resolved absolute paths instead of what the agent wrote — the same class of leak already fixed in `vendor_skill.py`'s provenance headers, recurring here. Fixed: `VendoredSkillUsage` now splits `agents` (applies) from `ignored_by` (named it, doesn't apply); `adw_skills.py` prints `[ignored by: ...]` rather than staying silent about it; `outside_vendor_dir` is keyed by the as-written path. 4 new tests (80 total). A round-5 review of this fix is expected before the branch merges. |
 | 1.6 | 2026-08-31 | Post-Phase-5 correction: independent adversarial review found and this session fixed 7 real bugs across two rounds (skill_engineering silently applying to pi/agy despite being told otherwise; three SKILL.md-naming-collision instances across compose/console/vendor; an absolute-path provenance leak; a stale help string; a trace row that over-claimed what was given to an agent). See the section above for the full account. |
 | 1.5 | 2026-08-31 | Phase 5 done — see its acceptance criteria for what shipped and how it was verified. |
 | 1.4 | 2026-08-31 | Phase 4 done — see its acceptance criteria for what shipped and how it was verified. |

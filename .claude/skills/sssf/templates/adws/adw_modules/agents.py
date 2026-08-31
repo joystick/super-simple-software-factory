@@ -103,14 +103,23 @@ def ignored_field_warnings(agent: AgentConfig) -> list[str]:
 @dataclass
 class VendoredSkillUsage:
     path: str
-    agents: list[str] = field(default_factory=list)   # empty = vendored but unused
+    agents: list[str] = field(default_factory=list)      # actually receive it
+    # named it, but skill_engineering_applies() is False for their
+    # coding_agent — found by adversarial review: without this split,
+    # a pi/agy agent showed up as an "active user" of a skill that
+    # execute() correctly never gives it, the identical operator-lied-to
+    # bug already fixed in execute()/console.py/tracer.py.
+    ignored_by: list[str] = field(default_factory=list)
 
 
 @dataclass
 class SkillAudit:
     vendored: list[VendoredSkillUsage]
     # skill paths named by some agent that are NOT under the vendored dir —
-    # hand-authored files, or a typo pointing outside it. path -> agent names.
+    # hand-authored files, or a typo pointing outside it. Keyed by the path
+    # exactly as the agent wrote it in config, not a resolved absolute form
+    # (same privacy/portability reasoning as vendor_skill.py's provenance
+    # headers) -> agent names.
     outside_vendor_dir: dict[str, list[str]]
 
 
@@ -124,20 +133,28 @@ def audit_skills(cfg: SSSFConfig,
     """
     # Keyed by resolved path so "adws/x/tdd.md" and "./adws/x/tdd.md" match
     # the same file — a config author's harmless spelling choice must not
-    # read as a typo pointing outside the vendored directory.
-    usage: dict[Path, list[str]] = {}
+    # read as a typo pointing outside the vendored directory. The raw,
+    # as-written string is kept alongside purely for display.
+    applies: dict[Path, list[str]] = {}
+    ignored: dict[Path, list[str]] = {}
+    raw_path_for: dict[Path, str] = {}
     for agent in cfg.agents:
-        for path in agent.skill_engineering:
-            usage.setdefault(Path(path).resolve(), []).append(agent.name)
+        for raw_path in agent.skill_engineering:
+            resolved = Path(raw_path).resolve()
+            raw_path_for.setdefault(resolved, raw_path)
+            target = applies if skill_engineering_applies(agent) else ignored
+            target.setdefault(resolved, []).append(agent.name)
 
     dir_path = Path(skill_dir)
     vendored_paths = sorted(dir_path.glob("*.md")) if dir_path.is_dir() else []
-    vendored = [VendoredSkillUsage(path=str(p), agents=usage.get(p.resolve(), []))
+    vendored = [VendoredSkillUsage(path=str(p), agents=applies.get(p.resolve(), []),
+                                   ignored_by=ignored.get(p.resolve(), []))
                for p in vendored_paths]
 
     vendored_resolved = {p.resolve() for p in vendored_paths}
-    outside = {str(path): names for path, names in usage.items()
-              if path not in vendored_resolved}
+    all_named = set(applies) | set(ignored)
+    outside = {raw_path_for[path]: applies.get(path, []) + ignored.get(path, [])
+              for path in all_named if path not in vendored_resolved}
     return SkillAudit(vendored=vendored, outside_vendor_dir=outside)
 
 
