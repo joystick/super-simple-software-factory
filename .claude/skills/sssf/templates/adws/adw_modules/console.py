@@ -15,6 +15,7 @@ from rich.markup import escape
 from rich.panel import Panel
 from rich.text import Text
 
+from . import skill_engineering
 from .data_types import EnvelopeBase, EventRecord, Phase
 
 KIND_COLOR = {"engineer": "cyan", "agent": "magenta", "code": "yellow"}
@@ -109,7 +110,7 @@ class Console:
         open. Silent when no skills are attached: nothing to report."""
         if not skill_paths:
             return
-        names = ", ".join(Path(p).stem for p in skill_paths)
+        names = ", ".join(skill_engineering.skill_name(Path(p)) for p in skill_paths)
         self._emit(f"    [dim]skill_engineering: {escape(names)}"
                    f" (est. {tokens_estimate:,} tokens/turn)[/dim]")
         if budget is not None and tokens_estimate > budget:

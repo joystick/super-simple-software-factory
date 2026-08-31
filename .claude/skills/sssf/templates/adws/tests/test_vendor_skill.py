@@ -30,9 +30,44 @@ def test_vendored_file_carries_source_path_date_and_hash(tmp_path):
     result = vendor_skill.vendor(source, dest_dir, today="2026-08-31")
 
     text = result.dest.read_text()
-    assert str(source) in text
     assert "2026-08-31" in text
     assert result.source_hash in text
+
+
+def test_a_source_under_home_is_stored_relative_to_home_not_as_an_absolute_path(
+        monkeypatch, tmp_path):
+    # Found by adversarial review: a committed provenance header with an
+    # absolute path bakes one machine's username into the repo, and
+    # --check on any other machine reports "source gone" for a source that
+    # is actually right there under THEIR home directory. Every real Pocock
+    # skill lives under ~/.claude/skills/ or similar — store relative to
+    # $HOME so the header is portable across machines that share that
+    # convention, which is the entire premise of this feature existing.
+    fake_home = tmp_path / "home" / "alexei"
+    (fake_home / ".claude" / "skills" / "tdd").mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(fake_home))
+    source = fake_home / ".claude" / "skills" / "tdd" / "SKILL.md"
+    source.write_text("# TDD\n\nRed, green, refactor.\n")
+    dest_dir = tmp_path / "vendored"
+
+    result = vendor_skill.vendor(source, dest_dir)
+
+    text = result.dest.read_text()
+    assert str(fake_home) not in text
+    assert "~/.claude/skills/tdd/SKILL.md" in text
+
+
+def test_a_source_outside_home_still_stores_an_absolute_path(tmp_path):
+    # No portable shorthand exists for a source outside $HOME — an absolute
+    # path here is the honest answer, not a regression.
+    source = tmp_path / "elsewhere" / "tdd.md"
+    source.parent.mkdir()
+    source.write_text("# TDD\n\nRed, green, refactor.\n")
+    dest_dir = tmp_path / "vendored"
+
+    result = vendor_skill.vendor(source, dest_dir)
+
+    assert str(source.resolve()) in result.dest.read_text()
 
 
 def test_vendored_name_defaults_to_the_source_stem(tmp_path):
@@ -104,6 +139,19 @@ def test_revendoring_changed_source_is_reported_as_a_real_change(tmp_path):
 
 def test_check_drift_reports_none_when_source_matches_the_stamped_hash(tmp_path):
     source = tmp_path / "tdd.md"
+    source.write_text("# TDD\n\nRed, green, refactor.\n")
+    dest_dir = tmp_path / "vendored"
+    result = vendor_skill.vendor(source, dest_dir)
+
+    drift = vendor_skill.check_drift(result.dest)
+    assert drift.drifted is False
+
+
+def test_check_drift_works_on_a_source_stored_relative_to_home(monkeypatch, tmp_path):
+    fake_home = tmp_path / "home" / "alexei"
+    (fake_home / ".claude" / "skills" / "tdd").mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(fake_home))
+    source = fake_home / ".claude" / "skills" / "tdd" / "SKILL.md"
     source.write_text("# TDD\n\nRed, green, refactor.\n")
     dest_dir = tmp_path / "vendored"
     result = vendor_skill.vendor(source, dest_dir)

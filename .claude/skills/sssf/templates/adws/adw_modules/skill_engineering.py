@@ -56,8 +56,29 @@ def _strip_provenance(text: str) -> str:
     return PROVENANCE_HEADER_RE.sub("", text, count=1)
 
 
+def skill_name(path: Path) -> str:
+    """The name used in the composition delimiter, in estimate_tokens()'s
+    accounting, and in console.py's cost report — every place a skill needs
+    a human-legible label. Public (no leading underscore) specifically so
+    console.py can reuse it rather than deriving its own: an earlier version
+    of this fix touched compose() and vendor_skill.py's naming but missed
+    the console report, which used a bare Path(p).stem and printed
+    "SKILL, SKILL" for two real, distinct skills. Adversarial review caught
+    that as a third instance of the same bug in one review pass, which is
+    exactly why this is now the one place the rule lives.
+
+    Every real Pocock skill file is literally named SKILL.md — identity
+    lives in the parent directory. Falling back to the bare file stem gives
+    two distinct skills the identical label, making both the composed
+    prompt and the console report unnavigable.
+    """
+    if path.stem.lower() == "skill":
+        return path.parent.name
+    return path.stem
+
+
 def _read(raw_path: str) -> tuple[str, str]:
-    """(stem, stripped body), or raise SkillFileError naming the path.
+    """(skill name, stripped body), or raise SkillFileError naming the path.
 
     Resolves relative to the process cwd — same convention as
     `AgentConfig.prompt_engineering`'s paths, which `agents.py` also reads
@@ -71,7 +92,7 @@ def _read(raw_path: str) -> tuple[str, str]:
     body = _strip_provenance(path.read_text()).strip()
     if not body:
         raise SkillFileError(f"skill file is empty: {raw_path}")
-    return path.stem, body
+    return skill_name(path), body
 
 
 def check(skill_paths: list[str]) -> None:

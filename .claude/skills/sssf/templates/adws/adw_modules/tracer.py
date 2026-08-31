@@ -254,19 +254,25 @@ class Tracer:
 
     def agent_session_row(self, adw_id: str, agent: AgentConfig, session_id: str,
                           context_tokens: int = 0, context_window: int = 0,
-                          skill_tokens_estimate: int = 0) -> None:
+                          skill_tokens_estimate: int = 0,
+                          skill_engineering: Optional[list[str]] = None) -> None:
         """The agent's config row is the source of truth for its label and color.
 
         Context is carried here rather than derived from events because the lane
         wants one number per agent — the latest — and a session that runs the
         same agent twice overwrites it, exactly like model and session_id.
 
-        skill_engineering_json snapshots agent.skill_engineering as it was
-        for THIS run — the roster can change between runs, so this answers
-        "which protocols was this agent given" for history, not "what does
-        the current config say".
+        skill_engineering_json records what was actually GIVEN to this
+        agent for THIS run — pass an explicit `skill_engineering` list when
+        the caller knows the field was configured but not applied (a
+        pi/agy agent, where skill_engineering never takes effect); omit it
+        to fall back to `agent.skill_engineering` as-is. Recording the
+        config's list unconditionally would answer "what does the config
+        say" rather than "which protocols was this agent given" — the
+        exact distinction this column exists to make, per Phase 3's design.
         """
         ts = now_iso()
+        applied_skills = agent.skill_engineering if skill_engineering is None else skill_engineering
         self.conn.execute(
             "INSERT INTO agent_sessions (adw_id, agent, coding_agent, model, color,"
             " session_id, context_tokens, context_window, skill_engineering_json,"
@@ -281,5 +287,5 @@ class Tracer:
             " last_used_at=excluded.last_used_at",
             (adw_id, agent.name, agent.coding_agent, agent.model, agent.color,
              session_id, context_tokens, context_window,
-             json.dumps(agent.skill_engineering), skill_tokens_estimate, ts, ts),
+             json.dumps(applied_skills), skill_tokens_estimate, ts, ts),
         )

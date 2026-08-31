@@ -187,6 +187,31 @@ def test_provenance_header_does_not_count_toward_the_token_estimate(tmp_path):
         skill_engineering.estimate_tokens([str(plain)])
 
 
+def test_two_real_shaped_skills_get_distinct_delimiters_not_both_named_skill(tmp_path):
+    # Found by adversarial review: vendor_skill.py's _default_name() was
+    # fixed to use the parent directory for a bare "SKILL.md" (every real
+    # Pocock skill file is named exactly that), but skill_engineering.py's
+    # _read() still used bare path.stem — so two real skills, hand-pointed
+    # at directly (a supported path: compose() has no concept of "vendored"
+    # vs "local"), would both delimit as "# --- skill: SKILL ---" and be
+    # unnavigable in the composed prompt. Every earlier fixture in this
+    # file used filenames like "tdd.md" that happened to already be
+    # distinct, masking this exactly the way the vendoring bug was masked.
+    tdd_dir = tmp_path / "tdd"
+    tdd_dir.mkdir()
+    (tdd_dir / "SKILL.md").write_text("Red, green, refactor.")
+    grill_dir = tmp_path / "grill-me"
+    grill_dir.mkdir()
+    (grill_dir / "SKILL.md").write_text("Ask before you build.")
+
+    composed = skill_engineering.compose(
+        "System.", [str(tdd_dir / "SKILL.md"), str(grill_dir / "SKILL.md")])
+
+    assert "# --- skill: tdd ---" in composed
+    assert "# --- skill: grill-me ---" in composed
+    assert composed.count("# --- skill: SKILL ---") == 0
+
+
 def test_a_file_with_no_provenance_header_is_unaffected(tmp_path):
     plain = tmp_path / "house.md"
     plain.write_text("Every PR states the why, not the what.")

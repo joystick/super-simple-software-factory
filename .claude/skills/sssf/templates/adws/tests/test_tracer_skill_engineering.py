@@ -65,3 +65,38 @@ def test_a_second_call_for_the_same_agent_overwrites_not_appends(tmp_path):
     assert len(rows) == 1
     assert json.loads(rows[0][0]) == ["adws/adw_data/skill_engineering/grill-me.md"]
     assert rows[0][1] == 200
+
+
+def test_an_explicit_skill_engineering_override_is_recorded_instead_of_the_configs(tmp_path):
+    # Found by adversarial review: agent_session_row previously always
+    # derived skill_engineering_json from agent.skill_engineering directly,
+    # even for a pi/agy agent where agents.execute() (correctly, after the
+    # same review) never actually composed or applied those skills. That
+    # meant the trace recorded skill paths as "given to this agent" when
+    # they were configured but explicitly NOT applied — the same
+    # field-configured-but-not-applied problem this whole phase exists to
+    # eliminate, just showing up one layer down in the trace.
+    tracer = _tracer(tmp_path)
+    agent = _agent(coding_agent="pi",
+                   skill_engineering=["adws/adw_data/skill_engineering/tdd.md"])
+
+    tracer.agent_session_row("adw1", agent, "session-1", skill_engineering=[])
+
+    row = tracer.conn.execute(
+        "SELECT skill_engineering_json FROM agent_sessions"
+        " WHERE adw_id=? AND agent=?", ("adw1", "builder")).fetchone()
+    assert json.loads(row[0]) == []
+
+
+def test_omitting_the_override_still_defaults_to_the_agents_own_list(tmp_path):
+    # Backward compatible: existing callers that don't pass the new param
+    # keep the old behaviour (record agent.skill_engineering as-is).
+    tracer = _tracer(tmp_path)
+    agent = _agent(skill_engineering=["adws/adw_data/skill_engineering/tdd.md"])
+
+    tracer.agent_session_row("adw1", agent, "session-1")
+
+    row = tracer.conn.execute(
+        "SELECT skill_engineering_json FROM agent_sessions"
+        " WHERE adw_id=? AND agent=?", ("adw1", "builder")).fetchone()
+    assert json.loads(row[0]) == ["adws/adw_data/skill_engineering/tdd.md"]

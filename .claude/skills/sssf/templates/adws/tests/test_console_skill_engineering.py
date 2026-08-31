@@ -67,3 +67,27 @@ def test_over_budget_warns_but_does_not_raise():
     assert len(warnings) == 1
     assert "5,000" in warnings[0].payload["message"]
     assert "500" in warnings[0].payload["message"]
+
+
+def test_two_real_shaped_skills_report_distinct_names_not_both_skill(tmp_path):
+    # Found by adversarial review: this method used bare Path(p).stem, the
+    # exact collision class fixed elsewhere (skill_engineering.py's
+    # _skill_name, vendor_skill.py's _default_name) for real skills that
+    # are always literally named SKILL.md — but this third call site was
+    # missed. Every earlier test here used a filename that already happened
+    # to be distinct, same masking pattern as before.
+    tdd_dir = tmp_path / "tdd"
+    tdd_dir.mkdir()
+    grill_dir = tmp_path / "grill-me"
+    grill_dir.mkdir()
+    tracer = _FakeTracer()
+    console = Console(tracer, adw_id="test")
+
+    console.skill_engineering_report(
+        [str(tdd_dir / "SKILL.md"), str(grill_dir / "SKILL.md")],
+        tokens_estimate=100, budget=None)
+
+    message = _messages(tracer)[0]
+    assert "tdd" in message
+    assert "grill-me" in message
+    assert "SKILL, SKILL" not in message

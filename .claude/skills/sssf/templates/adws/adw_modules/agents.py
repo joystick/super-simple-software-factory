@@ -60,15 +60,31 @@ def load_config(path: str = "adws/adw_sssf_config/sssf.config.yaml") -> SSSFConf
     return SSSFConfig(**raw)
 
 
+def skill_engineering_applies(agent: AgentConfig) -> bool:
+    """The single source of truth for whether skill_engineering takes
+    effect for this agent — used both by execute() to decide whether to
+    compose skills onto the system prompt, and by ignored_field_warnings()
+    to decide whether to warn that it won't. A prior version had these as
+    two independent checks; execute() composed unconditionally regardless
+    of coding_agent while the warning claimed pi/agy agents were unaffected
+    — so the warning was actively false, and pi/agy agents had skills
+    injected and billed with no signal that it was happening. One function,
+    called from both places, is what makes that specific bug impossible to
+    reintroduce silently.
+    """
+    return agent.coding_agent == "claude_code"
+
+
 def ignored_field_warnings(agent: AgentConfig) -> list[str]:
     """Configured but silently-ignored-by-design fields, named — never
     fatal, and never silent either. `harness_engineering` only takes effect
     under `coding_agent: pi`; `skill_engineering` only takes effect under
-    `coding_agent: claude_code`. The other coding agent's own field is a
-    valid combination (a roster naming both, meant to be flipped between
-    agents later, say) so this warns rather than fails validate() — but it
-    warns, because a config field that does nothing with no signal is
-    exactly the failure mode this repo has already been bitten by.
+    `coding_agent: claude_code` (see skill_engineering_applies). The other
+    coding agent's own field is a valid combination (a roster naming both,
+    meant to be flipped between agents later, say) so this warns rather
+    than fails validate() — but it warns, because a config field that does
+    nothing with no signal is exactly the failure mode this repo has
+    already been bitten by.
     """
     warnings = []
     if agent.coding_agent != "pi" and agent.harness_engineering:
@@ -76,7 +92,7 @@ def ignored_field_warnings(agent: AgentConfig) -> list[str]:
             f"agent {agent.name!r}: harness_engineering is set but coding_agent is "
             f"{agent.coding_agent!r} — harness_engineering only takes effect under "
             f"coding_agent: pi and will be ignored")
-    if agent.coding_agent != "claude_code" and agent.skill_engineering:
+    if not skill_engineering_applies(agent) and agent.skill_engineering:
         warnings.append(
             f"agent {agent.name!r}: skill_engineering is set but coding_agent is "
             f"{agent.coding_agent!r} — skill_engineering only takes effect under "
@@ -187,8 +203,16 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
         "context_handoff_dir": str(run.context_handoff_dir),
     }
     system_text = prompts.render(agent.prompt_engineering.system, variables)
-    system_text = skill_engineering.compose(system_text, agent.skill_engineering)
-    skill_tokens_estimate = skill_engineering.estimate_tokens(agent.skill_engineering)
+    # skill_engineering_applies() gates BOTH of these — composing (or even
+    # estimating the cost of) skills for a pi/agy agent would inject and
+    # bill for text that ignored_field_warnings() just told the operator
+    # does nothing. See skill_engineering_applies()'s own docstring for the
+    # bug this guard exists to make impossible to reintroduce.
+    if skill_engineering_applies(agent):
+        system_text = skill_engineering.compose(system_text, agent.skill_engineering)
+        skill_tokens_estimate = skill_engineering.estimate_tokens(agent.skill_engineering)
+    else:
+        skill_tokens_estimate = 0
     user_text = prompts.render(agent.prompt_engineering.user, variables)
     prompts.save(agent_dir / "prompts", "system.md", system_text)
     prompts.save(agent_dir / "prompts", "user.md", user_text)
@@ -206,8 +230,12 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
                                           "skill_engineering": agent.skill_engineering,
                                           "skill_tokens_estimate": skill_tokens_estimate}))
     run.console.agent_started(agent.name, agent.model, session_id)
-    run.console.skill_engineering_report(agent.skill_engineering, skill_tokens_estimate,
-                                         agent.skill_token_budget)
+    # Only report if it actually applied — else a pi/agy agent with
+    # skill_engineering set would show "(est. 0 tokens/turn)", implying
+    # active-but-free rather than not-applied-at-all.
+    if skill_engineering_applies(agent):
+        run.console.skill_engineering_report(agent.skill_engineering, skill_tokens_estimate,
+                                             agent.skill_token_budget)
 
     # Parse retries and gate corrections re-enter the SAME pi session, so the
     # last send is the one whose context occupancy is current — while spend is
@@ -302,7 +330,9 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
     run.tracer.agent_session_row(run.adw_id, agent, session_id,
                                  context_tokens=context.context_tokens,
                                  context_window=context.context_window,
-                                 skill_tokens_estimate=skill_tokens_estimate)
+                                 skill_tokens_estimate=skill_tokens_estimate,
+                                 skill_engineering=(agent.skill_engineering
+                                                    if skill_engineering_applies(agent) else []))
     run.save_agent_map(agent.name, {"session_id": session_id, "model": agent.model,
                                     "coding_agent": agent.coding_agent})
     run.tracer.event(EventRecord(adw_id=run.adw_id, phase_id=phase.phase_id,

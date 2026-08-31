@@ -46,6 +46,23 @@ def _hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def _display_source(source: Path) -> str:
+    """The path stamped into the provenance header. Relative to $HOME
+    (as "~/...") when the source is under it — the common case, since
+    every real Pocock skill lives under ~/.claude/skills/ or similar — so
+    the header stays portable to any machine that shares that convention
+    instead of baking in one person's exact home directory. Found by
+    adversarial review: the original always stored an absolute path,
+    which meant a committed vendored file leaked one machine's username
+    and reported permanent false drift on anyone else's."""
+    resolved = source.resolve()
+    home = Path.home().resolve()
+    try:
+        return f"~/{resolved.relative_to(home)}"
+    except ValueError:
+        return str(resolved)   # genuinely outside $HOME — no portable shorthand exists
+
+
 class HandAuthoredFileError(ValueError):
     """The destination exists and was not vendored by this tool (no
     provenance header) — refuse rather than silently overwrite it."""
@@ -98,7 +115,7 @@ def vendor(source: str | Path, dest_dir: str | Path, name: str | None = None,
 
     dest.parent.mkdir(parents=True, exist_ok=True)
     header = HEADER_TEMPLATE.format(
-        source=str(source.resolve()), today=today or date.today().isoformat(),
+        source=_display_source(source), today=today or date.today().isoformat(),
         source_hash=source_hash)
     dest.write_text(header + body)
     return VendorResult(dest=dest, source_hash=source_hash, changed=True)
@@ -121,7 +138,7 @@ def check_drift(vendored_path: str | Path) -> DriftResult:
         return DriftResult(drifted=False,
                            message=f"{vendored_path}: no provenance header (hand-authored, not vendored)")
 
-    source = Path(match.group("source"))
+    source = Path(match.group("source")).expanduser()
     if not source.is_file():
         return DriftResult(drifted=True, message=f"source gone: {source}")
 
@@ -137,7 +154,8 @@ def main() -> int:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("path", help="skill file to vendor, or (with --check) a vendored file")
     parser.add_argument("--as", dest="name", default=None,
-                        help="vendored filename stem (default: source's own stem)")
+                        help="vendored filename stem (default: the source's own stem, or "
+                             "its parent directory's name for a bare SKILL.md)")
     parser.add_argument("--dest-dir", default=DEFAULT_DEST_DIR)
     parser.add_argument("--check", action="store_true",
                         help="report drift for an already-vendored file instead of vendoring")

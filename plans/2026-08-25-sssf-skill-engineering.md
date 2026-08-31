@@ -2,7 +2,7 @@
 title: SSSF Skill Engineering — Pocock protocols as node behaviour
 created: 2026-08-25
 status: in-progress
-version: 1.5
+version: 1.6
 updated: 2026-08-31
 ---
 
@@ -360,10 +360,80 @@ across a roster, and this repo has already twice found that a change which
 - **Vendored skills drift** from upstream by design. Phase 4 reports drift; it
   never resolves it.
 
+## Post-Phase-5 correction: an independent adversarial review found real bugs
+
+After Phases 1–5 shipped, an independent opus subagent — given only the repo,
+the PRD, the plan, and instructions to be adversarial rather than affirming —
+was asked to critique the work. It found a serious bug this session's own
+five self-review passes (a code-review subagent, spawned each phase, sharing
+this session's own framing of the problem) had all missed:
+
+**`agents.execute()` composed skills onto the system prompt unconditionally,
+regardless of `coding_agent`** — while `ignored_field_warnings()` told the
+operator `skill_engineering` "only takes effect under `coding_agent:
+claude_code` and will be ignored" for `pi`/`agy` agents. Both statements
+were live in the same commit; only one could be true. `pi` and `agy` agents
+were actually having skills injected into `--system-prompt` and billed on
+every turn, while the tool told the operator it wasn't happening. Root cause,
+named by the reviewer: no test ever crossed the `agents.execute()` boundary —
+every test up to that point exercised `compose()` as a pure function or
+checked the warning's *text*, never what a `pi`/`agy` agent's actual request
+contained.
+
+Three more bugs in the same family, found in the same pass: `skill_engineering.py`'s
+composition-side naming still used bare `path.stem` even though `vendor_skill.py`'s
+vendoring-side naming was fixed for the real `SKILL.md`-everywhere convention
+in Phase 4 — the fix touched one sibling and not the other. `vendor_skill.py`'s
+provenance header stored an absolute, resolved source path, baking one
+machine's home directory into a committed file and causing `--check` to report
+false drift on anyone else's machine. And `--as`'s help text directly
+contradicted the code two lines below it.
+
+**Fixed, then reviewed again — which found the same failure mode two more
+times**, in call sites the first fix didn't touch: `console.py`'s cost report
+had its own independent `Path(p).stem`, and `tracer.py`'s `agent_session_row`
+recorded `agent.skill_engineering` unconditionally, so a `pi`/`agy` agent's
+trace row claimed a skill was "given" that `execute()` correctly never
+applied. A second review round, primed on what the first one found, caught
+both. A third review round, of that fix, found nothing.
+
+**What actually closed the gap:** not more self-review, but a new kind of
+test. `test_execute_skill_engineering.py` builds a real `Run`, a real
+`Tracer`, a real git repo, and calls the real `agents.execute()` —
+monkeypatching only the coding-agent modules' `run()` to capture the request
+instead of spawning a subprocess. Parametrized across all three
+`coding_agent` values, it asserts on what the request *actually contains*
+and what the trace *actually recorded*, not on what a pure function claims
+in isolation. The fix was verified by deliberately reverting it (`git stash`)
+and confirming the new test fails for `pi`/`agy` before restoring it —
+proving the test is a real regression guard, not a tautology.
+
+**Verified live, for real, against all three coding agents** — `pi` and `agy`
+are both installed and authenticated on this development machine, and every
+prior phase's "live verification" had used `claude_code` only, for cost and
+convenience. Three real calls were run (one per coding agent), each attached
+to the same vendored `tdd` skill; the actual persisted `system.md` for each
+was inspected directly: `claude_code`'s contains the skill body and its
+delimiter, `pi`'s and `agy`'s contain neither.
+
+77 tests total (up from 66 at the end of Phase 5).
+
+**The honest lesson, not just the fix:** a self-review process that shares
+the author's framing of the problem will not notice when the code
+contradicts that framing — it confirms the model of the system the author
+already has, not the system itself. Every earlier phase's test fixtures were
+also, independently, shaped to avoid exactly the collisions that occur in
+real use (distinct filenames when every real skill is named identically;
+`claude_code`-only live checks when two other coding agents exist and were
+installed the whole time). Neither the code nor the review process would
+have caught either failure mode without someone — or something — approaching
+it without the author's assumptions already loaded.
+
 ## Version history
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.6 | 2026-08-31 | Post-Phase-5 correction: independent adversarial review found and this session fixed 7 real bugs across two rounds (skill_engineering silently applying to pi/agy despite being told otherwise; three SKILL.md-naming-collision instances across compose/console/vendor; an absolute-path provenance leak; a stale help string; a trace row that over-claimed what was given to an agent). See the section above for the full account. |
 | 1.5 | 2026-08-31 | Phase 5 done — see its acceptance criteria for what shipped and how it was verified. |
 | 1.4 | 2026-08-31 | Phase 4 done — see its acceptance criteria for what shipped and how it was verified. |
 | 1.3 | 2026-08-31 | Phase 3 done — see its acceptance criteria for what shipped and how it was verified. |
