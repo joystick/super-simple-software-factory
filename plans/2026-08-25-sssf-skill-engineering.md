@@ -1,9 +1,9 @@
 ---
 title: SSSF Skill Engineering — Pocock protocols as node behaviour
 created: 2026-08-25
-status: planned
-version: 1.0
-updated: 2026-08-25
+status: in-progress
+version: 1.1
+updated: 2026-08-31
 ---
 
 # Plan: SSSF Skill Engineering
@@ -63,20 +63,32 @@ skills, trace events, cost reporting, the vendoring script.
 
 ### Acceptance criteria
 
-- [ ] `skill_engineering` on a single agent is parsed and reaches the code that
+- [x] `skill_engineering` on a single agent is parsed and reaches the code that
       builds the system prompt
-- [ ] The composed prompt is the agent's `system.md`, then a stable delimiter
+- [x] The composed prompt is the agent's `system.md`, then a stable delimiter
       naming the skill, then the skill body
-- [ ] The composed prompt is what `claude -p --system-prompt` receives
-- [ ] The exact composed text is written to the agent's session directory and is
+- [x] The composed prompt is what `claude -p --system-prompt` receives
+- [x] The exact composed text is written to the agent's session directory and is
       readable after the run
-- [ ] A roster naming a missing or empty skill file fails in `validate()`,
+- [x] A roster naming a missing or empty skill file fails in `validate()`,
       before any process spawns, with the agent name and the path in the message
-- [ ] An agent with no `skill_engineering` key composes a byte-identical prompt
+- [x] An agent with no `skill_engineering` key composes a byte-identical prompt
       to the current behaviour, proven by a test
-- [ ] Composition is deterministic: the same config yields the same string
-- [ ] Verified live on the real repo with one cheap agent call, and the injected
+- [x] Composition is deterministic: the same config yields the same string
+- [x] Verified live on the real repo with one cheap agent call, and the injected
       text is confirmed present in the session directory
+
+**Done 2026-08-31.** `adw_modules/skill_engineering.py` (new: `compose()`,
+`check()`), wired into `agents.py`'s `validate()`/`execute()`, schema in
+`data_types.py`. 14 unit tests (first-ever test suite for this repo's
+`adw_modules`; `pyproject.toml`/`uv.lock` added to run them via
+`uv run pytest`). Reviewed via `/code-review`; two findings both fixed —
+`validate()`'s fail-fast check now calls a dedicated `skill_engineering.check()`
+rather than reusing `compose()` with a throwaway argument, so the two paths
+can't silently diverge. Verified live: `tdd.md` vendored by hand onto a
+`scout` agent in a scratch install, one real `claude_code` call
+(`adw_prompt.py`, $0.0567), composed `system.md` confirmed to contain the
+skill's real body after the `# --- skill: tdd ---` delimiter.
 
 ---
 
@@ -250,4 +262,5 @@ across a roster, and this repo has already twice found that a change which
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.1 | 2026-08-31 | Phase 1 done — see its acceptance criteria for what shipped and how it was verified. |
 | 1.0 | 2026-08-25 | Initial plan. Six vertical slices from PRD v1.0; scope limited to the skill layer. |

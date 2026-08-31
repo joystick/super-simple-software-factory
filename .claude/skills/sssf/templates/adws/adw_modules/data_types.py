@@ -310,6 +310,12 @@ class AgentConfig(BaseModel):
     purpose: str = ""
     prompt_engineering: PromptEngineering
     harness_engineering: list[str] = Field(default_factory=list)
+    # Pocock-style workflow protocols (tdd, codebase-design, ...), vendored
+    # into the repo and named by path — composed onto this agent's system
+    # prompt at call time (see adw_modules/skill_engineering.py). Enforcement
+    # stays at outcome gates only; this changes how the agent works, never
+    # what is checked afterward.
+    skill_engineering: list[str] = Field(default_factory=list)
     tools: Optional[list[str]] = None    # allowlist; None = all tools usable
     # What this agent may MODIFY in the repo, enforced in code after every call
     # (see adw_modules/permissions.py). `tools` cannot express this: `bash` runs

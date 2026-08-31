@@ -1,0 +1,20 @@
+[project]
+name = "sssf-skill-dev"
+version = "0.1.0"
+description = "Dev-only project for testing the SSSF skill's own Python modules (adw_modules). Not stamped into target repos."
+requires-python = ">=3.11"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pydantic>=2",
+    "pyyaml",
+    "python-dotenv",
+    "rich",
+]
+
+[tool.pytest.ini_options]
+testpaths = [".claude/skills/sssf/templates/adws/tests"]
+pythonpath = [".claude/skills/sssf/templates/adws"]
+addopts = "-q"

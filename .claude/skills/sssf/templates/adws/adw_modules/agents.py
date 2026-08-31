@@ -15,7 +15,7 @@ from typing import Optional
 
 import yaml
 
-from . import agent_agy, agent_cc, agent_pi, permissions, prompts
+from . import agent_agy, agent_cc, agent_pi, permissions, prompts, skill_engineering
 from .data_types import (AgentCall, AgentConfig, EnvelopeBase, EventRecord,
                          GateCheck, GateReport, Phase, PiRequest, SSSFConfig,
                          UsageBreakdown)
@@ -86,6 +86,12 @@ def validate(cfg: SSSFConfig, required: list[str]) -> None:
             interface(agent).resolve_model(agent.model)
         except ValueError as e:
             problems.append(f"agent {name!r}: {e}")
+        # Fail before spawn on a missing/empty skill file — a typo in a
+        # roster is a config error, not something discovered mid-run.
+        try:
+            skill_engineering.check(agent.skill_engineering)
+        except skill_engineering.SkillFileError as e:
+            problems.append(f"agent {name!r}: {e}")
     if problems:
         raise SystemExit("config validation failed:\n- " + "\n- ".join(problems))
 
@@ -105,6 +111,7 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
         "context_handoff_dir": str(run.context_handoff_dir),
     }
     system_text = prompts.render(agent.prompt_engineering.system, variables)
+    system_text = skill_engineering.compose(system_text, agent.skill_engineering)
     user_text = prompts.render(agent.prompt_engineering.user, variables)
     prompts.save(agent_dir / "prompts", "system.md", system_text)
     prompts.save(agent_dir / "prompts", "user.md", user_text)
