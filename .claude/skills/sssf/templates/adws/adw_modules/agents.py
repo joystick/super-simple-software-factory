@@ -243,6 +243,16 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
                                           "coding_agent": agent.coding_agent,
                                           "purpose": agent.purpose,
                                           "tools": agent.tools,  # None = all tools
+                                          # Deliberately as-DECLARED, not as-applied — this
+                                          # event is the roster's own record of what the
+                                          # agent was configured with, same as harness_engineering
+                                          # right above it. What actually applied is
+                                          # skill_tokens_estimate (0 when it didn't) and the
+                                          # agent_sessions row, both gated on
+                                          # skill_engineering_applies(). Flagged by round-5
+                                          # adversarial review as worth a comment precisely so
+                                          # a future reader doesn't "fix" this into a ninth
+                                          # instance of the same bug.
                                           "harness_engineering": agent.harness_engineering,
                                           "skill_engineering": agent.skill_engineering,
                                           "skill_tokens_estimate": skill_tokens_estimate}))
