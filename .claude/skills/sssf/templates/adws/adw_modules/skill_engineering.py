@@ -15,13 +15,45 @@ silently change behaviour, and an unstable order would break prompt caching.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 DELIMITER = "\n\n# --- skill: {name} ---\n\n"
 
+# A vendored file (see vendor_skill.py) opens with exactly this HTML-comment
+# block — invisible in a rendered Markdown viewer, and easy to strip before
+# the text ever reaches a model. A hand-authored file has no such header, so
+# this simply doesn't match and the file is used as-is: compose() still has
+# no concept of "vendored" vs. "local", only "has a header" vs. "doesn't."
+#
+# Deliberately as strict as vendor_skill.py's own HEADER_RE (source/date/
+# sha256 lines, a real 64-hex-char hash), not a loose "any HTML comment
+# starting with sssf:vendored" match — a skill body that happens to
+# document this very header format in prose must not be mistaken for one
+# and stripped. The two regexes are defined independently (this module
+# ships standalone into every stamped repo; vendor_skill.py stays in the
+# skill source and is never stamped), so test_vendor_skill.py carries a
+# parity test asserting they agree on the same fixtures — that test is
+# the thing actually preventing silent divergence, not code sharing.
+PROVENANCE_HEADER_RE = re.compile(
+    r"\A<!--\s*sssf:vendored\n"
+    r"source:.*\n"
+    r"date:.*\n"
+    r"sha256:\s*[0-9a-f]{64}\n"
+    r"-->\s*",
+    re.MULTILINE,
+)
+
 
 class SkillFileError(ValueError):
     """A named skill_engineering path is missing, empty, or not a file."""
+
+
+def _strip_provenance(text: str) -> str:
+    """Remove a leading vendoring header, if present. A comment about where
+    a file came from is not an instruction to the model, and leaving it in
+    the prompt is both noise and a small correctness risk."""
+    return PROVENANCE_HEADER_RE.sub("", text, count=1)
 
 
 def _read(raw_path: str) -> tuple[str, str]:
@@ -36,7 +68,7 @@ def _read(raw_path: str) -> tuple[str, str]:
     path = Path(raw_path)
     if not path.is_file():
         raise SkillFileError(f"skill file not found: {raw_path}")
-    body = path.read_text().strip()
+    body = _strip_provenance(path.read_text()).strip()
     if not body:
         raise SkillFileError(f"skill file is empty: {raw_path}")
     return path.stem, body

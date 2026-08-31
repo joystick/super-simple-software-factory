@@ -2,7 +2,7 @@
 title: SSSF Skill Engineering — Pocock protocols as node behaviour
 created: 2026-08-25
 status: in-progress
-version: 1.3
+version: 1.4
 updated: 2026-08-31
 ---
 
@@ -194,14 +194,56 @@ prompt is both noise and a small correctness risk.
 
 ### Acceptance criteria
 
-- [ ] A single command vendors a named skill from a path the engineer supplies
-- [ ] The vendored file carries source path, date, and a content hash
-- [ ] Re-vendoring an unchanged skill is a no-op or a clearly reported no-change
-- [ ] Drift against the source is detectable and reported
-- [ ] The provenance header is stripped from the text that reaches the model,
+- [x] A single command vendors a named skill from a path the engineer supplies
+- [x] The vendored file carries source path, date, and a content hash
+- [x] Re-vendoring an unchanged skill is a no-op or a clearly reported no-change
+- [x] Drift against the source is detectable and reported
+- [x] The provenance header is stripped from the text that reaches the model,
       proven by a test
-- [ ] The vendored file is plain Markdown the engineer can edit in place
-- [ ] Nothing is auto-updated, ever
+- [x] The vendored file is plain Markdown the engineer can edit in place
+- [x] Nothing is auto-updated, ever
+
+**Done 2026-08-31.** `scripts/vendor_skill.py` — `vendor()`/`check_drift()`
+as a testable core behind a thin CLI, `--check` for drift, non-zero exit on
+drift for scripting. `skill_engineering.py`'s `_read()` strips the header
+automatically, so `compose()`/`check()`/`estimate_tokens()` all get it for
+free. 14 new tests.
+
+One real bug was caught only by live testing, not by the test suite, and is
+fixed in this diff: every actual Pocock skill file is literally named
+`SKILL.md` (identity lives in the parent directory —
+`~/.claude/skills/tdd/SKILL.md`), but the original default-naming logic used
+the source file's own stem, so it would have vendored every skill in a
+roster to the same destination and silently clobbered each other. All the
+hand-written test fixtures happened to use filenames that already matched
+the real skill name, masking it. Fixed with a parent-directory fallback for
+the literal `SKILL.md` case, plus a regression test using the real shape.
+
+`/code-review` found three more real issues, all fixed: (1) `vendor()` would
+silently overwrite a hand-authored file with no provenance header — now
+raises `HandAuthoredFileError` and touches nothing; (2) the CLI let that
+exception surface as a raw traceback instead of a clean message — now
+caught in `main()`; (3) the two provenance-header regexes
+(`vendor_skill.HEADER_RE` and `skill_engineering.PROVENANCE_HEADER_RE`) are
+necessarily defined independently — `skill_engineering.py` ships stamped
+into every target repo, `vendor_skill.py` stays in the skill source and
+never is — so a parity test now asserts they agree on real fixtures, and
+the header regex was tightened (exact source/date/sha256 shape, not a loose
+match) so a skill file that merely *documents* this feature in prose can't
+be mistaken for a real header and stripped.
+
+**Not fixed, considered:** `_default_name()` only special-cases the literal
+stem `"skill"`. Every real Pocock skill observed in this environment uses
+that one convention; generalizing to hypothetical others (`INSTRUCTIONS.md`,
+etc.) with no example to test against would be speculative.
+
+Verified live throughout, not just in tests: vendored the real
+`~/.claude/skills/tdd/SKILL.md`, confirmed re-vendor no-op, confirmed drift
+detection on a mutated scratch source, confirmed the hand-authored refusal
+leaves the original file byte-for-byte untouched, and ran one real
+`claude_code` call with the vendored skill attached — the persisted
+`system.md` had zero provenance-header matches and the real skill body
+present.
 
 ---
 
@@ -287,6 +329,7 @@ across a roster, and this repo has already twice found that a change which
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.4 | 2026-08-31 | Phase 4 done — see its acceptance criteria for what shipped and how it was verified. |
 | 1.3 | 2026-08-31 | Phase 3 done — see its acceptance criteria for what shipped and how it was verified. |
 | 1.2 | 2026-08-31 | Phase 2 done — see its acceptance criteria for what shipped and how it was verified. |
 | 1.1 | 2026-08-31 | Phase 1 done — see its acceptance criteria for what shipped and how it was verified. |

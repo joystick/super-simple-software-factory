@@ -137,3 +137,59 @@ def test_estimate_tokens_is_monotonic_in_the_number_of_skills(tmp_path):
     single = skill_engineering.estimate_tokens([str(one)])
     double = skill_engineering.estimate_tokens([str(one), str(two)])
     assert double > single
+
+
+# ── provenance stripping — Phase 4. A vendored file carries a header (see
+#    vendor_skill.py); it must never reach the model as if it were an
+#    instruction. A hand-authored file has no header, so nothing to strip —
+#    proving compose() still treats local and vendored files identically. ──
+
+VENDORED_FIXTURE = """\
+<!-- sssf:vendored
+source: /Users/alexei/.claude/skills/tdd/SKILL.md
+date: 2026-08-31
+sha256: 9f3a1b2c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6e7f8
+-->
+
+# TDD
+
+Red, green, refactor.
+"""
+
+
+def test_provenance_header_is_stripped_from_composed_text(tmp_path):
+    vendored = tmp_path / "tdd.md"
+    vendored.write_text(VENDORED_FIXTURE)
+
+    composed = skill_engineering.compose("System.", [str(vendored)])
+
+    assert "sssf:vendored" not in composed
+    assert "source:" not in composed
+    assert "sha256:" not in composed
+    assert "Red, green, refactor." in composed
+
+
+def test_provenance_header_does_not_count_toward_the_token_estimate(tmp_path):
+    # Same stem ("tdd") in both, in separate directories — DELIMITER embeds
+    # the filename stem, so different stems would shift the char count for
+    # a reason unrelated to what this test is actually checking.
+    vendored_dir = tmp_path / "vendored"
+    vendored_dir.mkdir()
+    vendored = vendored_dir / "tdd.md"
+    vendored.write_text(VENDORED_FIXTURE)
+
+    plain_dir = tmp_path / "plain"
+    plain_dir.mkdir()
+    plain = plain_dir / "tdd.md"
+    plain.write_text("# TDD\n\nRed, green, refactor.\n")
+
+    assert skill_engineering.estimate_tokens([str(vendored)]) == \
+        skill_engineering.estimate_tokens([str(plain)])
+
+
+def test_a_file_with_no_provenance_header_is_unaffected(tmp_path):
+    plain = tmp_path / "house.md"
+    plain.write_text("Every PR states the why, not the what.")
+
+    composed = skill_engineering.compose("System.", [str(plain)])
+    assert "Every PR states the why, not the what." in composed

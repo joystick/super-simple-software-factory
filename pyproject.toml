@@ -16,5 +16,5 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = [".claude/skills/sssf/templates/adws/tests"]
-pythonpath = [".claude/skills/sssf/templates/adws"]
+pythonpath = [".claude/skills/sssf/templates/adws", ".claude/skills/sssf/scripts"]
 addopts = "-q"
