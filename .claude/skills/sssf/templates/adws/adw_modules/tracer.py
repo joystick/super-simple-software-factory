@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
+from typing import Optional
 
 from .data_types import AgentConfig, EventRecord, GateReport, Phase
 from .utils import ensure_dir, new_id, now_iso
@@ -84,6 +85,8 @@ CREATE TABLE IF NOT EXISTS agent_sessions (
   session_id    TEXT,
   context_tokens INTEGER,           -- window occupancy after the agent's last turn
   context_window INTEGER,           -- the model's ceiling; 0/NULL = unknown
+  skill_engineering_json TEXT,       -- JSON list of skill_engineering paths this run used
+  skill_tokens_estimate INTEGER,    -- estimate_tokens() of the above; 0/NULL = none attached
   created_at    TEXT, last_used_at TEXT,
   PRIMARY KEY (adw_id, agent)
 );
@@ -96,7 +99,9 @@ MIGRATIONS = [("agent_sessions", "color", "TEXT"),
               ("sessions", "adw_name", "TEXT"),
               ("agent_sessions", "context_tokens", "INTEGER"),
               ("agent_sessions", "context_window", "INTEGER"),
-              ("sessions", "archived", "INTEGER DEFAULT 0")]
+              ("sessions", "archived", "INTEGER DEFAULT 0"),
+              ("agent_sessions", "skill_engineering_json", "TEXT"),
+              ("agent_sessions", "skill_tokens_estimate", "INTEGER")]
 
 
 class Tracer:
@@ -249,23 +254,39 @@ class Tracer:
         )
 
     def agent_session_row(self, adw_id: str, agent: AgentConfig, session_id: str,
-                          context_tokens: int = 0, context_window: int = 0) -> None:
+                          context_tokens: int = 0, context_window: int = 0,
+                          skill_tokens_estimate: int = 0,
+                          skill_engineering: Optional[list[str]] = None) -> None:
         """The agent's config row is the source of truth for its label and color.
 
         Context is carried here rather than derived from events because the lane
         wants one number per agent — the latest — and a session that runs the
         same agent twice overwrites it, exactly like model and session_id.
+
+        skill_engineering_json records what was actually GIVEN to this
+        agent for THIS run — pass an explicit `skill_engineering` list when
+        the caller knows the field was configured but not applied (a
+        pi/agy agent, where skill_engineering never takes effect); omit it
+        to fall back to `agent.skill_engineering` as-is. Recording the
+        config's list unconditionally would answer "what does the config
+        say" rather than "which protocols was this agent given" — the
+        exact distinction this column exists to make, per Phase 3's design.
         """
         ts = now_iso()
+        applied_skills = agent.skill_engineering if skill_engineering is None else skill_engineering
         self.conn.execute(
             "INSERT INTO agent_sessions (adw_id, agent, coding_agent, model, color,"
-            " session_id, context_tokens, context_window, created_at, last_used_at)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?)"
+            " session_id, context_tokens, context_window, skill_engineering_json,"
+            " skill_tokens_estimate, created_at, last_used_at)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
             " ON CONFLICT(adw_id, agent) DO UPDATE SET model=excluded.model,"
             " color=excluded.color, session_id=excluded.session_id,"
             " context_tokens=excluded.context_tokens,"
             " context_window=excluded.context_window,"
+            " skill_engineering_json=excluded.skill_engineering_json,"
+            " skill_tokens_estimate=excluded.skill_tokens_estimate,"
             " last_used_at=excluded.last_used_at",
             (adw_id, agent.name, agent.coding_agent, agent.model, agent.color,
-             session_id, context_tokens, context_window, ts, ts),
+             session_id, context_tokens, context_window,
+             json.dumps(applied_skills), skill_tokens_estimate, ts, ts),
         )

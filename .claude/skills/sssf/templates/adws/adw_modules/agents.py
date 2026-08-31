@@ -10,12 +10,14 @@ disposes.
 from __future__ import annotations
 
 import json
+import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
 import yaml
 
-from . import agent_agy, agent_cc, agent_pi, permissions, prompts
+from . import agent_agy, agent_cc, agent_pi, permissions, prompts, skill_engineering
 from .data_types import (AgentCall, AgentConfig, EnvelopeBase, EventRecord,
                          GateCheck, GateReport, Phase, PiRequest, SSSFConfig,
                          UsageBreakdown)
@@ -49,11 +51,111 @@ def load_config(path: str = "adws/adw_sssf_config/sssf.config.yaml") -> SSSFConf
     raw = yaml.safe_load(Path(path).read_text()) or {}
     defaults = raw.get("defaults", {}) or {}
     for agent in raw.get("agents", []) or []:
-        for key in ("coding_agent", "model", "thinking", "color", "tools", "writes"):
+        for key in ("coding_agent", "model", "thinking", "color", "tools", "writes",
+                    "skill_token_budget"):
             if key in defaults:
                 agent.setdefault(key, defaults[key])
         agent.setdefault("harness_engineering", defaults.get("harness_engineering", []))
+        agent.setdefault("skill_engineering", defaults.get("skill_engineering", []))
     return SSSFConfig(**raw)
+
+
+def skill_engineering_applies(agent: AgentConfig) -> bool:
+    """The single source of truth for whether skill_engineering takes
+    effect for this agent — used both by execute() to decide whether to
+    compose skills onto the system prompt, and by ignored_field_warnings()
+    to decide whether to warn that it won't. A prior version had these as
+    two independent checks; execute() composed unconditionally regardless
+    of coding_agent while the warning claimed pi/agy agents were unaffected
+    — so the warning was actively false, and pi/agy agents had skills
+    injected and billed with no signal that it was happening. One function,
+    called from both places, is what makes that specific bug impossible to
+    reintroduce silently.
+    """
+    return agent.coding_agent == "claude_code"
+
+
+def ignored_field_warnings(agent: AgentConfig) -> list[str]:
+    """Configured but silently-ignored-by-design fields, named — never
+    fatal, and never silent either. `harness_engineering` only takes effect
+    under `coding_agent: pi`; `skill_engineering` only takes effect under
+    `coding_agent: claude_code` (see skill_engineering_applies). The other
+    coding agent's own field is a valid combination (a roster naming both,
+    meant to be flipped between agents later, say) so this warns rather
+    than fails validate() — but it warns, because a config field that does
+    nothing with no signal is exactly the failure mode this repo has
+    already been bitten by.
+    """
+    warnings = []
+    if agent.coding_agent != "pi" and agent.harness_engineering:
+        warnings.append(
+            f"agent {agent.name!r}: harness_engineering is set but coding_agent is "
+            f"{agent.coding_agent!r} — harness_engineering only takes effect under "
+            f"coding_agent: pi and will be ignored")
+    if not skill_engineering_applies(agent) and agent.skill_engineering:
+        warnings.append(
+            f"agent {agent.name!r}: skill_engineering is set but coding_agent is "
+            f"{agent.coding_agent!r} — skill_engineering only takes effect under "
+            f"coding_agent: claude_code and will be ignored")
+    return warnings
+
+
+@dataclass
+class VendoredSkillUsage:
+    path: str
+    agents: list[str] = field(default_factory=list)      # actually receive it
+    # named it, but skill_engineering_applies() is False for their
+    # coding_agent — found by adversarial review: without this split,
+    # a pi/agy agent showed up as an "active user" of a skill that
+    # execute() correctly never gives it, the identical operator-lied-to
+    # bug already fixed in execute()/console.py/tracer.py.
+    ignored_by: list[str] = field(default_factory=list)
+
+
+@dataclass
+class SkillAudit:
+    vendored: list[VendoredSkillUsage]
+    # skill paths named by some agent that are NOT under the vendored dir —
+    # hand-authored files, or a typo pointing outside it. Keyed by the path
+    # exactly as the agent wrote it in config, not a resolved absolute form
+    # (same privacy/portability reasoning as vendor_skill.py's provenance
+    # headers) -> agent names.
+    outside_vendor_dir: dict[str, list[str]]
+
+
+def audit_skills(cfg: SSSFConfig,
+                 skill_dir: str = "adws/adw_data/skill_engineering") -> SkillAudit:
+    """"Which skills are vendored, and which agents use them" — the Phase 5
+    audit, without reading YAML by hand. Every *.md under skill_dir is
+    listed (used or not); every skill_engineering path NOT under skill_dir
+    is reported separately, since that's a hand-authored file this audit
+    has no opinion about, not a vendoring gap.
+    """
+    # Keyed by resolved path so "adws/x/tdd.md" and "./adws/x/tdd.md" match
+    # the same file — a config author's harmless spelling choice must not
+    # read as a typo pointing outside the vendored directory. The raw,
+    # as-written string is kept alongside purely for display.
+    applies: dict[Path, list[str]] = {}
+    ignored: dict[Path, list[str]] = {}
+    raw_path_for: dict[Path, str] = {}
+    for agent in cfg.agents:
+        for raw_path in agent.skill_engineering:
+            resolved = Path(raw_path).resolve()
+            raw_path_for.setdefault(resolved, raw_path)
+            target = applies if skill_engineering_applies(agent) else ignored
+            target.setdefault(resolved, []).append(agent.name)
+
+    dir_path = Path(skill_dir)
+    vendored_paths = sorted(dir_path.glob("*.md")) if dir_path.is_dir() else []
+    vendored = [VendoredSkillUsage(path=str(p), agents=applies.get(p.resolve(), []),
+                                   ignored_by=ignored.get(p.resolve(), []))
+               for p in vendored_paths]
+
+    vendored_resolved = {p.resolve() for p in vendored_paths}
+    all_named = set(applies) | set(ignored)
+    outside = {raw_path_for[path]: applies.get(path, []) + ignored.get(path, [])
+              for path in all_named if path not in vendored_resolved}
+    return SkillAudit(vendored=vendored, outside_vendor_dir=outside)
 
 
 def resolve(cfg: SSSFConfig, name: str) -> AgentConfig:
@@ -86,6 +188,19 @@ def validate(cfg: SSSFConfig, required: list[str]) -> None:
             interface(agent).resolve_model(agent.model)
         except ValueError as e:
             problems.append(f"agent {name!r}: {e}")
+        # Fail before spawn on a missing/empty skill file — a typo in a
+        # roster is a config error, not something discovered mid-run.
+        try:
+            skill_engineering.check(agent.skill_engineering)
+        except skill_engineering.SkillFileError as e:
+            problems.append(f"agent {name!r}: {e}")
+        # Warn, never fail: the OTHER coding agent's field is a valid
+        # roster (someone may flip agents between pi/claude_code later),
+        # just one where this field currently does nothing. Printed here,
+        # not through run.console, because validate() runs before any Run
+        # or trace exists — there is nothing yet for this to drift from.
+        for warning in ignored_field_warnings(agent):
+            print(f"warning: {warning}", file=sys.stderr)
     if problems:
         raise SystemExit("config validation failed:\n- " + "\n- ".join(problems))
 
@@ -105,6 +220,16 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
         "context_handoff_dir": str(run.context_handoff_dir),
     }
     system_text = prompts.render(agent.prompt_engineering.system, variables)
+    # skill_engineering_applies() gates BOTH of these — composing (or even
+    # estimating the cost of) skills for a pi/agy agent would inject and
+    # bill for text that ignored_field_warnings() just told the operator
+    # does nothing. See skill_engineering_applies()'s own docstring for the
+    # bug this guard exists to make impossible to reintroduce.
+    if skill_engineering_applies(agent):
+        system_text = skill_engineering.compose(system_text, agent.skill_engineering)
+        skill_tokens_estimate = skill_engineering.estimate_tokens(agent.skill_engineering)
+    else:
+        skill_tokens_estimate = 0
     user_text = prompts.render(agent.prompt_engineering.user, variables)
     prompts.save(agent_dir / "prompts", "system.md", system_text)
     prompts.save(agent_dir / "prompts", "user.md", user_text)
@@ -118,8 +243,26 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
                                           "coding_agent": agent.coding_agent,
                                           "purpose": agent.purpose,
                                           "tools": agent.tools,  # None = all tools
-                                          "harness_engineering": agent.harness_engineering}))
+                                          # Deliberately as-DECLARED, not as-applied — this
+                                          # event is the roster's own record of what the
+                                          # agent was configured with, same as harness_engineering
+                                          # right above it. What actually applied is
+                                          # skill_tokens_estimate (0 when it didn't) and the
+                                          # agent_sessions row, both gated on
+                                          # skill_engineering_applies(). Flagged by round-5
+                                          # adversarial review as worth a comment precisely so
+                                          # a future reader doesn't "fix" this into a ninth
+                                          # instance of the same bug.
+                                          "harness_engineering": agent.harness_engineering,
+                                          "skill_engineering": agent.skill_engineering,
+                                          "skill_tokens_estimate": skill_tokens_estimate}))
     run.console.agent_started(agent.name, agent.model, session_id)
+    # Only report if it actually applied — else a pi/agy agent with
+    # skill_engineering set would show "(est. 0 tokens/turn)", implying
+    # active-but-free rather than not-applied-at-all.
+    if skill_engineering_applies(agent):
+        run.console.skill_engineering_report(agent.skill_engineering, skill_tokens_estimate,
+                                             agent.skill_token_budget)
 
     # Parse retries and gate corrections re-enter the SAME pi session, so the
     # last send is the one whose context occupancy is current — while spend is
@@ -213,7 +356,10 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
     context = latest or result
     run.tracer.agent_session_row(run.adw_id, agent, session_id,
                                  context_tokens=context.context_tokens,
-                                 context_window=context.context_window)
+                                 context_window=context.context_window,
+                                 skill_tokens_estimate=skill_tokens_estimate,
+                                 skill_engineering=(agent.skill_engineering
+                                                    if skill_engineering_applies(agent) else []))
     run.save_agent_map(agent.name, {"session_id": session_id, "model": agent.model,
                                     "coding_agent": agent.coding_agent})
     run.tracer.event(EventRecord(adw_id=run.adw_id, phase_id=phase.phase_id,

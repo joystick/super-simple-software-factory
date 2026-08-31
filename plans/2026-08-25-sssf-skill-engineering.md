@@ -1,9 +1,9 @@
 ---
 title: SSSF Skill Engineering — Pocock protocols as node behaviour
 created: 2026-08-25
-status: planned
-version: 1.0
-updated: 2026-08-25
+status: done
+version: 2.0
+updated: 2026-08-31
 ---
 
 # Plan: SSSF Skill Engineering
@@ -63,20 +63,32 @@ skills, trace events, cost reporting, the vendoring script.
 
 ### Acceptance criteria
 
-- [ ] `skill_engineering` on a single agent is parsed and reaches the code that
+- [x] `skill_engineering` on a single agent is parsed and reaches the code that
       builds the system prompt
-- [ ] The composed prompt is the agent's `system.md`, then a stable delimiter
+- [x] The composed prompt is the agent's `system.md`, then a stable delimiter
       naming the skill, then the skill body
-- [ ] The composed prompt is what `claude -p --system-prompt` receives
-- [ ] The exact composed text is written to the agent's session directory and is
+- [x] The composed prompt is what `claude -p --system-prompt` receives
+- [x] The exact composed text is written to the agent's session directory and is
       readable after the run
-- [ ] A roster naming a missing or empty skill file fails in `validate()`,
+- [x] A roster naming a missing or empty skill file fails in `validate()`,
       before any process spawns, with the agent name and the path in the message
-- [ ] An agent with no `skill_engineering` key composes a byte-identical prompt
+- [x] An agent with no `skill_engineering` key composes a byte-identical prompt
       to the current behaviour, proven by a test
-- [ ] Composition is deterministic: the same config yields the same string
-- [ ] Verified live on the real repo with one cheap agent call, and the injected
+- [x] Composition is deterministic: the same config yields the same string
+- [x] Verified live on the real repo with one cheap agent call, and the injected
       text is confirmed present in the session directory
+
+**Done 2026-08-31.** `adw_modules/skill_engineering.py` (new: `compose()`,
+`check()`), wired into `agents.py`'s `validate()`/`execute()`, schema in
+`data_types.py`. 14 unit tests (first-ever test suite for this repo's
+`adw_modules`; `pyproject.toml`/`uv.lock` added to run them via
+`uv run pytest`). Reviewed via `/code-review`; two findings both fixed —
+`validate()`'s fail-fast check now calls a dedicated `skill_engineering.check()`
+rather than reusing `compose()` with a throwaway argument, so the two paths
+can't silently diverge. Verified live: `tdd.md` vendored by hand onto a
+`scout` agent in a scratch install, one real `claude_code` call
+(`adw_prompt.py`, $0.0567), composed `system.md` confirmed to contain the
+skill's real body after the `# --- skill: tdd ---` delimiter.
 
 ---
 
@@ -96,15 +108,23 @@ feature has two implementations and one of them will rot.
 
 ### Acceptance criteria
 
-- [ ] `defaults.skill_engineering` applies to every agent that omits its own
-- [ ] A per-agent list replaces the default rather than appending to it
-- [ ] Absent in both places means no skills and no behaviour change
-- [ ] Multiple skills appear in the listed order, never sorted
-- [ ] Each skill is separated by a delimiter that names it, so the model — and a
+- [x] `defaults.skill_engineering` applies to every agent that omits its own
+- [x] A per-agent list replaces the default rather than appending to it
+- [x] Absent in both places means no skills and no behaviour change
+- [x] Multiple skills appear in the listed order, never sorted
+- [x] Each skill is separated by a delimiter that names it, so the model — and a
       human reading the persisted prompt — can tell where one protocol ends
-- [ ] A repo-local, hand-authored skill file works identically to a vendored one
-- [ ] Config-merge behaviour is covered by tests at the level `validate()` is
+- [x] A repo-local, hand-authored skill file works identically to a vendored one
+- [x] Config-merge behaviour is covered by tests at the level `validate()` is
       already exercised
+
+**Done 2026-08-31.** One line in `load_config()` (mirrors the existing
+`harness_engineering` merge exactly) plus `ConfigDefaults.skill_engineering`.
+6 new tests: the four merge-rule cases (inherit, replace, explicit-empty-stays-
+empty, absent-everywhere) plus multi-skill ordering and a hand-authored-vs-
+vendored equivalence check. `/code-review`: no findings. Verified live against
+the real stamped config in a scratch install — `defaults.skill_engineering`
+correctly reached all 5 roster agents via `load_config()`.
 
 ---
 
@@ -125,15 +145,32 @@ have decided the discipline is worth the money.
 
 ### Acceptance criteria
 
-- [ ] The `agent_start` event carries the list of skills injected
-- [ ] The agent-session row records the same, so history explains behaviour
-- [ ] The console reports skills and their estimated token cost at agent start,
+- [x] The `agent_start` event carries the list of skills injected
+- [x] The agent-session row records the same, so history explains behaviour
+- [x] The console reports skills and their estimated token cost at agent start,
       through `run.console` and never a bare `print()`
-- [ ] A configurable soft budget emits a warning when the composed prompt
+- [x] A configurable soft budget emits a warning when the composed prompt
       exceeds it, and does not fail the run
-- [ ] Token accounting is monotonic in the number of skills attached
-- [ ] A trace from a run with skills can be read back and answers "which
+- [x] Token accounting is monotonic in the number of skills attached
+- [x] A trace from a run with skills can be read back and answers "which
       protocols was this agent given"
+
+**Done 2026-08-31.** `skill_engineering.estimate_tokens()` (chars/4 heuristic,
+explicitly labelled "est." wherever a human reads it — a `/code-review`
+finding caught the first version presenting it as a bare number). Console
+gained `skill_engineering_report()`: silent when no skills, else reports
+names + estimate, warns (never raises) over budget. `agent_sessions` gained
+`skill_engineering_json`/`skill_tokens_estimate` columns via the existing
+additive-migration pattern. `skill_token_budget` is per-agent overridable
+(defaults to inheriting `defaults.skill_token_budget`) — a second
+`/code-review` finding caught the first version being defaults-only, which
+would have judged an agent against a budget that didn't track its own
+skill list. 13 new tests. Verified live: real `claude_code` call with a
+deliberately tiny budget (50 tokens) — console printed both the skill
+report and the over-budget warning, the run still succeeded, and both the
+`agent_start` event and the `agent_sessions` row in the real sqlite db
+were queried directly and confirmed correct (891-token estimate, `tdd.md`
+named in both).
 
 ---
 
@@ -157,14 +194,56 @@ prompt is both noise and a small correctness risk.
 
 ### Acceptance criteria
 
-- [ ] A single command vendors a named skill from a path the engineer supplies
-- [ ] The vendored file carries source path, date, and a content hash
-- [ ] Re-vendoring an unchanged skill is a no-op or a clearly reported no-change
-- [ ] Drift against the source is detectable and reported
-- [ ] The provenance header is stripped from the text that reaches the model,
+- [x] A single command vendors a named skill from a path the engineer supplies
+- [x] The vendored file carries source path, date, and a content hash
+- [x] Re-vendoring an unchanged skill is a no-op or a clearly reported no-change
+- [x] Drift against the source is detectable and reported
+- [x] The provenance header is stripped from the text that reaches the model,
       proven by a test
-- [ ] The vendored file is plain Markdown the engineer can edit in place
-- [ ] Nothing is auto-updated, ever
+- [x] The vendored file is plain Markdown the engineer can edit in place
+- [x] Nothing is auto-updated, ever
+
+**Done 2026-08-31.** `scripts/vendor_skill.py` — `vendor()`/`check_drift()`
+as a testable core behind a thin CLI, `--check` for drift, non-zero exit on
+drift for scripting. `skill_engineering.py`'s `_read()` strips the header
+automatically, so `compose()`/`check()`/`estimate_tokens()` all get it for
+free. 14 new tests.
+
+One real bug was caught only by live testing, not by the test suite, and is
+fixed in this diff: every actual Pocock skill file is literally named
+`SKILL.md` (identity lives in the parent directory —
+`~/.claude/skills/tdd/SKILL.md`), but the original default-naming logic used
+the source file's own stem, so it would have vendored every skill in a
+roster to the same destination and silently clobbered each other. All the
+hand-written test fixtures happened to use filenames that already matched
+the real skill name, masking it. Fixed with a parent-directory fallback for
+the literal `SKILL.md` case, plus a regression test using the real shape.
+
+`/code-review` found three more real issues, all fixed: (1) `vendor()` would
+silently overwrite a hand-authored file with no provenance header — now
+raises `HandAuthoredFileError` and touches nothing; (2) the CLI let that
+exception surface as a raw traceback instead of a clean message — now
+caught in `main()`; (3) the two provenance-header regexes
+(`vendor_skill.HEADER_RE` and `skill_engineering.PROVENANCE_HEADER_RE`) are
+necessarily defined independently — `skill_engineering.py` ships stamped
+into every target repo, `vendor_skill.py` stays in the skill source and
+never is — so a parity test now asserts they agree on real fixtures, and
+the header regex was tightened (exact source/date/sha256 shape, not a loose
+match) so a skill file that merely *documents* this feature in prose can't
+be mistaken for a real header and stripped.
+
+**Not fixed, considered:** `_default_name()` only special-cases the literal
+stem `"skill"`. Every real Pocock skill observed in this environment uses
+that one convention; generalizing to hypothetical others (`INSTRUCTIONS.md`,
+etc.) with no example to test against would be speculative.
+
+Verified live throughout, not just in tests: vendored the real
+`~/.claude/skills/tdd/SKILL.md`, confirmed re-vendor no-op, confirmed drift
+detection on a mutated scratch source, confirmed the hand-authored refusal
+leaves the original file byte-for-byte untouched, and ran one real
+`claude_code` call with the vendored skill attached — the persisted
+`system.md` had zero provenance-header matches and the real skill body
+present.
 
 ---
 
@@ -185,17 +264,52 @@ without reading YAML.
 
 ### Acceptance criteria
 
-- [ ] `references/config.md` documents `skill_engineering`, the merge rule,
+- [x] `references/config.md` documents `skill_engineering`, the merge rule,
       composition order, precedence, and the cost implication
-- [ ] A cookbook covers vendoring and attaching a skill end to end
-- [ ] `skill_engineering` under `pi` and `harness_engineering` under
+- [x] A cookbook covers vendoring and attaching a skill end to end
+- [x] `skill_engineering` under `pi` and `harness_engineering` under
       `claude_code` are both documented as ignored, and both warn at validation
-- [ ] Recommended pairings are documented — builder + `tdd`, reviewer +
+- [x] Recommended pairings are documented — builder + `tdd`, reviewer +
       `codebase-design`, planner + a grilling protocol, fix-loop builder +
       `diagnosing-bugs` — and none is enabled by default
-- [ ] A `just` recipe lists vendored skills and the agents that use them
-- [ ] The template roster and the skill's own templates stay consistent with the
+- [x] A `just` recipe lists vendored skills and the agents that use them
+- [x] The template roster and the skill's own templates stay consistent with the
       repo copy, so a fresh install does not reintroduce stale claims
+
+**Done 2026-08-31.** `ignored_field_warnings()` (pure) + `audit_skills()`
+(pure except one `Path.glob`) in `agents.py`; `validate()` prints warnings
+to stderr — deliberately not through `run.console`, since `validate()` runs
+before any `Run`/tracer exists in all 12 `adws/adw_*.py` entrypoints, so
+there is nothing yet for a warning to drift from. `adw_skills.py` + `just
+skills` back the audit. `references/config.md` gained a full "Skill
+engineering" section and updated its now-stale "harness_engineering...
+silently, with no warning" line; also fixed an adjacent stale claim
+("Both implement the same surface" → "All three") left over from `agy`
+landing in an earlier phase this session. New cookbook:
+`cookbooks/attach_a_skill.md`, linked from `SKILL.md`'s routing table.
+
+/code-review found one real issue, fixed: `audit_skills()` compared raw
+path strings, so a config author writing `./adws/.../tdd.md` instead of
+the exact form `Path.glob()` returns would misreport a real vendored file
+as "outside the vendor dir" — a false-positive typo warning. Fixed by
+comparing resolved paths. A second flagged item (whether
+`skill_token_budget` is actually consumed anywhere) was a false alarm —
+that wiring landed in Phase 3, outside this diff; confirmed still present
+in the reviewed code.
+
+19 new tests (66 total). Verified live: `just skills` correctly showed an
+unused vendored skill and one used by two agents; `validate()` called
+directly against a real roster with a `pi` agent carrying
+`skill_engineering` printed the warning on stderr without raising;
+`just skills` re-verified against a deliberately `./`-noised config path
+after the path-normalization fix, matched correctly with no false
+"outside vendor dir" report.
+
+**Deliberately not touched:** `docs/playbook-adopting-sssf.md` still frames
+`skill_engineering` as "proposed, not built" in a Mermaid diagram — now
+inaccurate with 4 of 6 phases done. Left alone pending an explicit decision
+(the user actively navigates by that document and asked for careful,
+versioned edits if it's touched — not a drive-by during this phase).
 
 ---
 
@@ -220,12 +334,71 @@ across a roster, and this repo has already twice found that a change which
 
 ### Acceptance criteria
 
-- [ ] Two runs from an identical baseline, differing only in `skill_engineering`
-- [ ] Both diffs, both traces, and both costs captured
-- [ ] A written comparison: what changed in the work, and what it cost per turn
-- [ ] An explicit recommendation on whether the default roster should adopt any
+- [x] Two runs from an identical baseline, differing only in `skill_engineering`
+- [x] Both diffs, both traces, and both costs captured
+- [x] A written comparison: what changed in the work, and what it cost per turn
+- [x] An explicit recommendation on whether the default roster should adopt any
       pairing, with the evidence behind it
-- [ ] The repo is left clean; any scratch commits or branches are removed
+- [x] The repo is left clean; any scratch commits or branches are removed
+
+**Done 2026-08-31.** Setup: `sssf-play`'s real cart-pricing app (`app/pricing.py`,
+`tests/test_pricing.py`, 51 passing tests) copied into a scratch repo, this
+branch's `install.py` stamped onto it, `tdd.md` vendored, one baseline commit.
+Two identical copies made from that commit — `phase6-nosk` (unchanged) and
+`phase6-tdd` (`skill_engineering: [tdd.md]` attached to `builder` only, nothing
+else touched) — so both runs started from byte-identical code. Same request,
+one `uv run adws/adw_build.py "<request>"` each (build-phase only, no planner,
+to isolate the builder's behaviour):
+
+> Add a `min_subtotal_cents` field (default 0) to `CouponDiscount`. The coupon
+> should only apply if the cart's subtotal is >= `min_subtotal_cents`;
+> otherwise `apply()` returns `None` even when the code matches. Existing
+> coupons must keep working unchanged. Update the tests.
+
+**Cost.** Baseline: 217,827 tokens, $0.2967, 58s. With `tdd.md`: 271,987
+tokens, $0.3447, 107s — **+16% cost, ~2x wall time.** Some of that gap is a
+confound, not discipline: the `tdd` run burned three extra `bash` calls
+discovering the right pytest invocation (`python -m pytest` failed, bare
+`pytest` failed, `uv run pytest` finally worked) and spawned a sub-agent to
+re-read the pricing files — neither is what the skill's text is actually
+about, and a cleaner environment probe would likely close some of that gap.
+
+**What changed in the code.** Both runs added the field, both wired the
+threshold check into `apply()`, both suites pass (57 tests baseline-run, 56
+tdd-run, both green). The one real behavioural difference: **only the
+`tdd`-attached run added input validation** —
+`if self.min_subtotal_cents < 0: raise PricingError(...)` — with a
+corresponding test (`test_coupon_discount_rejects_negative_min_subtotal`).
+The baseline run never considered the negative-threshold case at all, in
+code or in tests. Both runs independently wrote an exact-boundary test
+(`subtotal == min_subtotal_cents` applies) — that instinct wasn't unique to
+`tdd`, this codebase's own doc comments about clamps and boundaries are
+apparently absorbed either way.
+
+**What did NOT change.** Neither run exhibited an actual red-green loop —
+`adw_build.py`'s single agent phase has no checkpoint between "test fails"
+and "test passes," so both wrote implementation and tests via the same Edit
+calls and verified with one `pytest` pass at the end. Attaching `tdd.md`
+did not turn a one-shot phase into a TDD phase; it changed the shape of what
+came out of that one shot, not the process visible in the trace.
+
+**Recommendation:** Cautiously positive, not yet a default. One trial is one
+trial — the PRD's own risk section names exactly this ("a change which
+'obviously' worked did nothing measurable" has already happened twice in
+this repo's history) and one run cannot rule that out here. What tips this
+past a coin flip: the difference found is specific and structural (an input
+validation guard + its test, not just more prose or more hedging), matching
+what `tdd.md`'s actual text argues for. Suggested next step before adopting
+`builder` + `tdd` roster-wide: repeat this same comparison on 2–3 more
+requests of different shapes (a refactor, a bug fix, not just a new-field
+addition) before trusting the pattern generalizes — the cost delta is small
+enough (~$0.05 per trial here) that a handful more trials is cheap insurance
+against a single lucky/unlucky run.
+
+Scratch repos (`phase6-base`, `phase6-nosk`, `phase6-tdd`) were created under
+the session's scratchpad directory, never inside this repo, and were deleted
+after this comparison was written up — nothing was left in this repo's
+working tree or history.
 
 ---
 
@@ -246,8 +419,86 @@ across a roster, and this repo has already twice found that a change which
 - **Vendored skills drift** from upstream by design. Phase 4 reports drift; it
   never resolves it.
 
+## Post-Phase-5 correction: an independent adversarial review found real bugs
+
+After Phases 1–5 shipped, an independent opus subagent — given only the repo,
+the PRD, the plan, and instructions to be adversarial rather than affirming —
+was asked to critique the work. It found a serious bug this session's own
+five self-review passes (a code-review subagent, spawned each phase, sharing
+this session's own framing of the problem) had all missed:
+
+**`agents.execute()` composed skills onto the system prompt unconditionally,
+regardless of `coding_agent`** — while `ignored_field_warnings()` told the
+operator `skill_engineering` "only takes effect under `coding_agent:
+claude_code` and will be ignored" for `pi`/`agy` agents. Both statements
+were live in the same commit; only one could be true. `pi` and `agy` agents
+were actually having skills injected into `--system-prompt` and billed on
+every turn, while the tool told the operator it wasn't happening. Root cause,
+named by the reviewer: no test ever crossed the `agents.execute()` boundary —
+every test up to that point exercised `compose()` as a pure function or
+checked the warning's *text*, never what a `pi`/`agy` agent's actual request
+contained.
+
+Three more bugs in the same family, found in the same pass: `skill_engineering.py`'s
+composition-side naming still used bare `path.stem` even though `vendor_skill.py`'s
+vendoring-side naming was fixed for the real `SKILL.md`-everywhere convention
+in Phase 4 — the fix touched one sibling and not the other. `vendor_skill.py`'s
+provenance header stored an absolute, resolved source path, baking one
+machine's home directory into a committed file and causing `--check` to report
+false drift on anyone else's machine. And `--as`'s help text directly
+contradicted the code two lines below it.
+
+**Fixed, then reviewed again — which found the same failure mode two more
+times**, in call sites the first fix didn't touch: `console.py`'s cost report
+had its own independent `Path(p).stem`, and `tracer.py`'s `agent_session_row`
+recorded `agent.skill_engineering` unconditionally, so a `pi`/`agy` agent's
+trace row claimed a skill was "given" that `execute()` correctly never
+applied. A second review round, primed on what the first one found, caught
+both. A third review round, of that fix, found nothing.
+
+**What actually closed the gap:** not more self-review, but a new kind of
+test. `test_execute_skill_engineering.py` builds a real `Run`, a real
+`Tracer`, a real git repo, and calls the real `agents.execute()` —
+monkeypatching only the coding-agent modules' `run()` to capture the request
+instead of spawning a subprocess. Parametrized across all three
+`coding_agent` values, it asserts on what the request *actually contains*
+and what the trace *actually recorded*, not on what a pure function claims
+in isolation. The fix was verified by deliberately reverting it (`git stash`)
+and confirming the new test fails for `pi`/`agy` before restoring it —
+proving the test is a real regression guard, not a tautology.
+
+**Verified live, for real, against all three coding agents** — `pi` and `agy`
+are both installed and authenticated on this development machine, and every
+prior phase's "live verification" had used `claude_code` only, for cost and
+convenience. Three real calls were run (one per coding agent), each attached
+to the same vendored `tdd` skill; the actual persisted `system.md` for each
+was inspected directly: `claude_code`'s contains the skill body and its
+delimiter, `pi`'s and `agy`'s contain neither.
+
+77 tests total (up from 66 at the end of Phase 5).
+
+**The honest lesson, not just the fix:** a self-review process that shares
+the author's framing of the problem will not notice when the code
+contradicts that framing — it confirms the model of the system the author
+already has, not the system itself. Every earlier phase's test fixtures were
+also, independently, shaped to avoid exactly the collisions that occur in
+real use (distinct filenames when every real skill is named identically;
+`claude_code`-only live checks when two other coding agents exist and were
+installed the whole time). Neither the code nor the review process would
+have caught either failure mode without someone — or something — approaching
+it without the author's assumptions already loaded.
+
 ## Version history
 
 | Version | Date | Changes |
 |---|---|---|
+| 2.0 | 2026-08-31 | **Plan complete — all six phases done, status: done.** Phase 6 (manual acceptance): built `sssf-play`'s real cart-pricing app into a scratch repo on this branch's stamped factory, ran the identical small feature request twice via `adw_build.py` — once baseline, once with `tdd.md` on `builder` — from a byte-identical starting commit. Result: +16% cost, ~2x wall time (partly a tool-discovery confound, not the skill itself); both runs' tests pass; the one real behavioural difference is the `tdd`-attached run added an input-validation guard (negative threshold) and its test that the baseline run never considered. Recommendation: cautiously positive, not yet a roster default — one trial, repeat on 2-3 more request shapes before adopting `builder` + `tdd` broadly. Scratch repos deleted after write-up, nothing left in this repo. |
+| 1.8 | 2026-08-31 | Round 5 review (of the round-4 fix) found nothing that blocks merge — one low-severity, unconsumed asymmetry (the `agent_start` trace event records `skill_engineering` as-declared, not as-applied, same as `harness_engineering` beside it; now has a comment explaining that's deliberate) and a benign path-display edge case. The reviewer's structural recommendation was taken: `test_skill_engineering_applies_coverage.py` scans every read of `agent.skill_engineering` across the package and fails on any that's neither near a `skill_engineering_applies()` check nor on a small, reasoned allowlist — converting five rounds of manual adversarial review into a permanent regression guard. Verified the guard is real by injecting a fake ungated read and confirming it fails, then removing it. Also: `docs/manual-skill-engineering.md` (v1.0), a standalone user manual for the feature, rendered to PDF for comparison against `docs/playbook-adopting-sssf.pdf`. 82 tests total. **Branch considered ready for main**, pending the operator's own review. |
+| 1.7 | 2026-08-31 | Round 4 review (a fresh independent pass, explicitly asked to hunt for a sibling of the same bug family before this branch touches main) found an 8th instance: `audit_skills()` — `just skills` — counted every agent naming a skill as an active user, with no `skill_engineering_applies()` gate, so a `pi`/`agy` agent showed up as "using" a skill it never actually receives. Also found `outside_vendor_dir` displaying resolved absolute paths instead of what the agent wrote — the same class of leak already fixed in `vendor_skill.py`'s provenance headers, recurring here. Fixed: `VendoredSkillUsage` now splits `agents` (applies) from `ignored_by` (named it, doesn't apply); `adw_skills.py` prints `[ignored by: ...]` rather than staying silent about it; `outside_vendor_dir` is keyed by the as-written path. 4 new tests (80 total). A round-5 review of this fix is expected before the branch merges. |
+| 1.6 | 2026-08-31 | Post-Phase-5 correction: independent adversarial review found and this session fixed 7 real bugs across two rounds (skill_engineering silently applying to pi/agy despite being told otherwise; three SKILL.md-naming-collision instances across compose/console/vendor; an absolute-path provenance leak; a stale help string; a trace row that over-claimed what was given to an agent). See the section above for the full account. |
+| 1.5 | 2026-08-31 | Phase 5 done — see its acceptance criteria for what shipped and how it was verified. |
+| 1.4 | 2026-08-31 | Phase 4 done — see its acceptance criteria for what shipped and how it was verified. |
+| 1.3 | 2026-08-31 | Phase 3 done — see its acceptance criteria for what shipped and how it was verified. |
+| 1.2 | 2026-08-31 | Phase 2 done — see its acceptance criteria for what shipped and how it was verified. |
+| 1.1 | 2026-08-31 | Phase 1 done — see its acceptance criteria for what shipped and how it was verified. |
 | 1.0 | 2026-08-25 | Initial plan. Six vertical slices from PRD v1.0; scope limited to the skill layer. |
