@@ -1,8 +1,8 @@
 ---
 title: SSSF Skill Engineering — Pocock protocols as node behaviour
 created: 2026-08-25
-status: in-progress
-version: 1.8
+status: done
+version: 2.0
 updated: 2026-08-31
 ---
 
@@ -334,12 +334,71 @@ across a roster, and this repo has already twice found that a change which
 
 ### Acceptance criteria
 
-- [ ] Two runs from an identical baseline, differing only in `skill_engineering`
-- [ ] Both diffs, both traces, and both costs captured
-- [ ] A written comparison: what changed in the work, and what it cost per turn
-- [ ] An explicit recommendation on whether the default roster should adopt any
+- [x] Two runs from an identical baseline, differing only in `skill_engineering`
+- [x] Both diffs, both traces, and both costs captured
+- [x] A written comparison: what changed in the work, and what it cost per turn
+- [x] An explicit recommendation on whether the default roster should adopt any
       pairing, with the evidence behind it
-- [ ] The repo is left clean; any scratch commits or branches are removed
+- [x] The repo is left clean; any scratch commits or branches are removed
+
+**Done 2026-08-31.** Setup: `sssf-play`'s real cart-pricing app (`app/pricing.py`,
+`tests/test_pricing.py`, 51 passing tests) copied into a scratch repo, this
+branch's `install.py` stamped onto it, `tdd.md` vendored, one baseline commit.
+Two identical copies made from that commit — `phase6-nosk` (unchanged) and
+`phase6-tdd` (`skill_engineering: [tdd.md]` attached to `builder` only, nothing
+else touched) — so both runs started from byte-identical code. Same request,
+one `uv run adws/adw_build.py "<request>"` each (build-phase only, no planner,
+to isolate the builder's behaviour):
+
+> Add a `min_subtotal_cents` field (default 0) to `CouponDiscount`. The coupon
+> should only apply if the cart's subtotal is >= `min_subtotal_cents`;
+> otherwise `apply()` returns `None` even when the code matches. Existing
+> coupons must keep working unchanged. Update the tests.
+
+**Cost.** Baseline: 217,827 tokens, $0.2967, 58s. With `tdd.md`: 271,987
+tokens, $0.3447, 107s — **+16% cost, ~2x wall time.** Some of that gap is a
+confound, not discipline: the `tdd` run burned three extra `bash` calls
+discovering the right pytest invocation (`python -m pytest` failed, bare
+`pytest` failed, `uv run pytest` finally worked) and spawned a sub-agent to
+re-read the pricing files — neither is what the skill's text is actually
+about, and a cleaner environment probe would likely close some of that gap.
+
+**What changed in the code.** Both runs added the field, both wired the
+threshold check into `apply()`, both suites pass (57 tests baseline-run, 56
+tdd-run, both green). The one real behavioural difference: **only the
+`tdd`-attached run added input validation** —
+`if self.min_subtotal_cents < 0: raise PricingError(...)` — with a
+corresponding test (`test_coupon_discount_rejects_negative_min_subtotal`).
+The baseline run never considered the negative-threshold case at all, in
+code or in tests. Both runs independently wrote an exact-boundary test
+(`subtotal == min_subtotal_cents` applies) — that instinct wasn't unique to
+`tdd`, this codebase's own doc comments about clamps and boundaries are
+apparently absorbed either way.
+
+**What did NOT change.** Neither run exhibited an actual red-green loop —
+`adw_build.py`'s single agent phase has no checkpoint between "test fails"
+and "test passes," so both wrote implementation and tests via the same Edit
+calls and verified with one `pytest` pass at the end. Attaching `tdd.md`
+did not turn a one-shot phase into a TDD phase; it changed the shape of what
+came out of that one shot, not the process visible in the trace.
+
+**Recommendation:** Cautiously positive, not yet a default. One trial is one
+trial — the PRD's own risk section names exactly this ("a change which
+'obviously' worked did nothing measurable" has already happened twice in
+this repo's history) and one run cannot rule that out here. What tips this
+past a coin flip: the difference found is specific and structural (an input
+validation guard + its test, not just more prose or more hedging), matching
+what `tdd.md`'s actual text argues for. Suggested next step before adopting
+`builder` + `tdd` roster-wide: repeat this same comparison on 2–3 more
+requests of different shapes (a refactor, a bug fix, not just a new-field
+addition) before trusting the pattern generalizes — the cost delta is small
+enough (~$0.05 per trial here) that a handful more trials is cheap insurance
+against a single lucky/unlucky run.
+
+Scratch repos (`phase6-base`, `phase6-nosk`, `phase6-tdd`) were created under
+the session's scratchpad directory, never inside this repo, and were deleted
+after this comparison was written up — nothing was left in this repo's
+working tree or history.
 
 ---
 
@@ -433,6 +492,7 @@ it without the author's assumptions already loaded.
 
 | Version | Date | Changes |
 |---|---|---|
+| 2.0 | 2026-08-31 | **Plan complete — all six phases done, status: done.** Phase 6 (manual acceptance): built `sssf-play`'s real cart-pricing app into a scratch repo on this branch's stamped factory, ran the identical small feature request twice via `adw_build.py` — once baseline, once with `tdd.md` on `builder` — from a byte-identical starting commit. Result: +16% cost, ~2x wall time (partly a tool-discovery confound, not the skill itself); both runs' tests pass; the one real behavioural difference is the `tdd`-attached run added an input-validation guard (negative threshold) and its test that the baseline run never considered. Recommendation: cautiously positive, not yet a roster default — one trial, repeat on 2-3 more request shapes before adopting `builder` + `tdd` broadly. Scratch repos deleted after write-up, nothing left in this repo. |
 | 1.8 | 2026-08-31 | Round 5 review (of the round-4 fix) found nothing that blocks merge — one low-severity, unconsumed asymmetry (the `agent_start` trace event records `skill_engineering` as-declared, not as-applied, same as `harness_engineering` beside it; now has a comment explaining that's deliberate) and a benign path-display edge case. The reviewer's structural recommendation was taken: `test_skill_engineering_applies_coverage.py` scans every read of `agent.skill_engineering` across the package and fails on any that's neither near a `skill_engineering_applies()` check nor on a small, reasoned allowlist — converting five rounds of manual adversarial review into a permanent regression guard. Verified the guard is real by injecting a fake ungated read and confirming it fails, then removing it. Also: `docs/manual-skill-engineering.md` (v1.0), a standalone user manual for the feature, rendered to PDF for comparison against `docs/playbook-adopting-sssf.pdf`. 82 tests total. **Branch considered ready for main**, pending the operator's own review. |
 | 1.7 | 2026-08-31 | Round 4 review (a fresh independent pass, explicitly asked to hunt for a sibling of the same bug family before this branch touches main) found an 8th instance: `audit_skills()` — `just skills` — counted every agent naming a skill as an active user, with no `skill_engineering_applies()` gate, so a `pi`/`agy` agent showed up as "using" a skill it never actually receives. Also found `outside_vendor_dir` displaying resolved absolute paths instead of what the agent wrote — the same class of leak already fixed in `vendor_skill.py`'s provenance headers, recurring here. Fixed: `VendoredSkillUsage` now splits `agents` (applies) from `ignored_by` (named it, doesn't apply); `adw_skills.py` prints `[ignored by: ...]` rather than staying silent about it; `outside_vendor_dir` is keyed by the as-written path. 4 new tests (80 total). A round-5 review of this fix is expected before the branch merges. |
 | 1.6 | 2026-08-31 | Post-Phase-5 correction: independent adversarial review found and this session fixed 7 real bugs across two rounds (skill_engineering silently applying to pi/agy despite being told otherwise; three SKILL.md-naming-collision instances across compose/console/vendor; an absolute-path provenance leak; a stale help string; a trace row that over-claimed what was given to an agent). See the section above for the full account. |
