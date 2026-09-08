@@ -63,6 +63,32 @@ def resolve_prompt(arg: str) -> str:
     return arg
 
 
+def load_plan_from_file(path: str) -> PlanOutput:
+    """Build a PlanOutput from an already-written plan file, for --skip-plan.
+
+    Used when a plan has already been read and approved (the ADW's own
+    planner phase always writes to specs/<adw_id>_*.md) and re-running the
+    planner would just burn tokens re-deriving the same document. The file
+    becomes the plan's sole artifact, so downstream gates (artifacts_exist,
+    files_non_empty) still check something real rather than being skipped.
+    """
+    from .data_types import PlanOutput
+
+    p = Path(path)
+    if not p.is_file():
+        raise FileNotFoundError(f"--skip-plan file not found: {path}")
+    text = p.read_text()
+    if not text.strip():
+        raise ValueError(f"--skip-plan file is empty: {path}")
+    first_line = next((line.strip("# ").strip() for line in text.splitlines() if line.strip()), path)
+    return PlanOutput(
+        status="success",
+        summary=f"Loaded existing plan: {first_line}",
+        artifacts=[str(p)],
+        notes_for_next_agent="Plan was loaded from an existing file (--skip-plan), not freshly generated.",
+    )
+
+
 def engineer_name() -> str:
     name = os.environ.get("ENGINEER_NAME", "").strip()
     if name:
