@@ -1,6 +1,6 @@
 ---
 title: "Adoption playbook — putting SSSF to work on real code"
-version: 3.0
+version: 3.1
 updated: 2026-09-08
 status: active
 ---
@@ -142,9 +142,10 @@ before spec-writing, spec-writing before slicing.
 Do this interactively in Claude Code, where your installed skills are available:
 
 ```
-/grill-me        interrogate your own intent against the scout findings from
+/grill-with-docs interrogate your own intent against the scout findings from
                  A1 — what actually breaks today, what must not change, what
-                 you are assuming about the existing design.
+                 you are assuming about the existing design. Writes the
+                 resolved vocabulary to CONTEXT.md/docs/adr/ as you go.
 /write-a-prd     synthesise that conversation into a spec.
 /prd-to-plan     break the spec into slices, each independently shippable.
 ```
@@ -158,7 +159,7 @@ downstream of your thinking, not a replacement for it.
 flowchart LR
     Job{What are you<br/>trying to do?}
 
-    Job -->|Architecture| A1["/grill-me → /write-a-prd<br/>→ /prd-to-plan"]
+    Job -->|Architecture| A1["/grill-with-docs → /write-a-prd<br/>→ /prd-to-plan"]
     A1 --> A2["just plan (one slice)"]
     A2 --> A3[["READ the spec<br/>cheap checkpoint"]]
     A3 --> A4{Understood<br/>your design?}
@@ -252,7 +253,7 @@ specs.
 flowchart LR
     subgraph I["INTERACTIVE Claude Code — skills ARE available"]
         direction TB
-        P1["/grill-me<br/>interrogate first"] --> P2["/write-a-prd<br/>synthesise the spec"] --> P3["/prd-to-plan<br/>slice the spec"]
+        P1["/grill-with-docs<br/>interrogate first"] --> P2["/write-a-prd<br/>synthesise the spec"] --> P3["/prd-to-plan<br/>slice the spec"]
     end
     subgraph S["SSSF — headless, only vendored skills are visible"]
         direction TB
@@ -274,9 +275,11 @@ Do this part **interactively** in Claude Code, where your installed skills are
 available. The order matters, and it is the reverse of what most people assume:
 
 ```
-/grill-me        interrogate relentlessly, round after round, until nothing
+/grill-with-docs interrogate relentlessly, round after round, until nothing
                  important is left silently assumed. This happens BEFORE any
                  spec exists — it is how you reach shared understanding.
+                 Writes the resolved vocabulary to CONTEXT.md/docs/adr/ as
+                 you go, so it survives past this conversation.
 /write-a-prd     synthesise that conversation into a structured spec.
                  No interrogation here; it already happened.
 /prd-to-plan     break the spec into slices, each independently shippable and
@@ -564,6 +567,7 @@ Everything in the standing checklist above, plus:
 
 | Version | Date | Changes |
 |---|---|---|
+| 3.1 | 2026-09-08 | Replaced every `/grill-me` reference (A4, A5, B1) with `/grill-with-docs`. `grill-me` is a bare alias for the `grilling` interview with no artifact output; `grill-with-docs` composes the same interview with `domain-modeling`, writing resolved vocabulary to `CONTEXT.md`/`docs/adr/`. Part C's AFK mechanism depends on that vocabulary existing on disk for scout/planner to read — `grill-me` alone can't produce it, so the playbook now names one interview skill throughout, and it's the AFK-sufficient one. |
 | 3.0 | 2026-09-08 | Added Part C — going dark: relocates `write-a-prd`/`wayfinder`'s interactive interview to a human-supervised bootstrap phase (`/grill-with-docs`, writes `CONTEXT.md`/`docs/adr/`, committed before the headless loop starts) so the AFK loop never needs to prompt live; adds glossary → knowledge-source → structural-search discovery to scout before planning, so plans scope to the delta instead of re-implementing what exists. Generalized from a same-session design pass on a real project (`weather-report`'s `docs/agents/dark-factory-protocol.md`), which stays as that project's concrete instance of this part. |
 | 2.1 | 2026-08-31 | Removed the last cost figures so the measure-it-yourself stance is consistent. Reframed gate predictions as conditional instructions. Propagated the grill → spec → slice order into Part A as a new A4 step. Unified naming on `/grill-me`, `/write-a-prd`, `/prd-to-plan` and on "slice" as the work unit. Moved rule zero early in the entry diagram to match the prose. Added verification pointers for every mechanism claim, a worked grilled-vs-ungrilled spec example, and made the `--setting-sources` note self-contained. |
 | 2.0 | 2026-08-31 | Rewrote as a general adoption playbook: removed session- and repo-specific anecdotes and cost figures in favour of measure-it-yourself guidance. Corrected the Part B interactive workflow order (grill → spec → plan) and each step's purpose. Rewrote "Where the two layers sit" to describe skill_engineering as shipped — vendoring command, `skill_engineering:` config key, `claude_code`-only, per-run cost visibility. |
