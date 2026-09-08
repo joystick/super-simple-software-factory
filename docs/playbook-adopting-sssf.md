@@ -1,7 +1,7 @@
 ---
 title: "Adoption playbook — putting SSSF to work on real code"
-version: 2.1
-updated: 2026-08-31
+version: 3.0
+updated: 2026-09-08
 status: active
 ---
 
@@ -436,6 +436,122 @@ How it works. Each claim below is documented behaviour you can verify in
   agent makes, and the run reports it in the session record `just sessions`
   reads. Attach protocols you want, not every protocol you own.
 
+## Part C — going dark: bootstrap vocabulary once, then let the loop run headless
+
+Parts A and B get you to `just sdlc` running safely. This part is what "dark
+factory" adds on top: minimal human intervention *across many features*, not
+just within one run. Two problems block that, and both have the same shape —
+something a human normally supplies mid-conversation has to be supplied
+*before* the headless loop starts instead, or the loop stalls or guesses.
+
+```mermaid
+flowchart TD
+    Req([New feature request]) --> Check{Does .okf/ or<br/>CONTEXT.md already<br/>name these terms?}
+    Check -->|Yes| Skip[Skip straight to<br/>scout — no human step]
+    Check -->|No, or unsure| Boot["/grill-with-docs<br/>(you, interactively,<br/>in your own harness)"]
+    Boot --> Write[Writes CONTEXT.md /<br/>docs/adr/ — durable,<br/>not just prose in a PRD]
+    Write --> Commit[["Commit before starting<br/>the headless loop"]]
+    Commit --> Skip
+    Skip --> Scout["scout: glossary → OKF →<br/>ast-grep, in that order"]
+    Scout --> Plan["planner: scope to the<br/>delta only, composed skills<br/>never attempt a live prompt"]
+    Plan --> Rest([Build → gates → review → document])
+
+    style Boot fill:#e0e7ff,stroke:#4338ca,color:#000
+    style Commit fill:#fde68a,stroke:#b45309,stroke-width:3px,color:#000
+    style Rest fill:#bbf7d0,stroke:#15803d,color:#000
+```
+
+### Problem 1 — the interview `write-a-prd` wants doesn't have anyone to answer it
+
+`write-a-prd` (and `wayfinder`'s "ask the user how to proceed" fallback) are
+written for an interactive session — a human on the other end who answers
+back. Vendored under `skill_engineering:` and run by a headless `claude_code`
+node, there is no one there. Best case the model role-plays both sides and you
+get a low-fidelity PRD with none of the interview's real value; worst case it
+tries to prompt and the run hangs waiting for input that never comes.
+
+**Do not delete the interview — relocate it.** The interview is genuinely how
+a project converges on shared vocabulary (what does "cancellation" mean here,
+is "account" the Customer or the User), and that can't be skipped just because
+a run is unattended. Split it into two phases that run in different modes:
+
+- **Bootstrap, human-supervised, outside the headless loop.** When a feature
+  introduces domain concepts your project hasn't named yet, run
+  `/grill-with-docs` yourself — interactively, in whichever harness you're in.
+  It composes `grilling` (the relentless interview) with `domain-modeling`
+  (writes the resolved vocabulary into `CONTEXT.md`/`docs/adr/` — durable and
+  citable, not prose trapped in one PRD). Approve it, then **commit
+  `CONTEXT.md`/`docs/adr/` before starting `just sdlc`** — scout and planner
+  read them from the working tree, not from any live session. Skipping the
+  commit makes the whole bootstrap step invisible to the pipeline.
+- **AFK, headless, the common case.** If the request only composes concepts
+  `CONTEXT.md` already names, skip bootstrap entirely — there's nothing left
+  to interview about. `write-a-prd` runs unmodified (do not edit the vendored
+  copy) and degrades to pure PRD-formatting from already-agreed vocabulary.
+  Add this to your `skill_engineering`-attached agent's own `system.md` (not
+  the vendored skill file) so it knows what to do when the composed skill text
+  below it says "ask the user":
+
+  - `wayfinder` finds no fog → continue directly into `write-a-prd`, don't
+    stop and ask how to proceed.
+  - `write-a-prd` never prompts. If it hits a genuine ambiguity `CONTEXT.md`
+    can't resolve, it says so in the plan and in `notes_for_next_agent`,
+    proposes a best-guess term explicitly labeled provisional, and flags that
+    a human should run the bootstrap interview before the plan is final —
+    it does not guess silently and does not attempt to prompt.
+  - `prd-to-plan`'s "ask the user to paste it" branch never applies in-loop —
+    the PRD is always already in context from the prior step in the same
+    composed prompt.
+
+`grill-with-docs` should stay **out of `skill_engineering/`** — its
+`disable-model-invocation: true` is load-bearing, not an oversight. Vendoring
+it risks it landing in an agent's composed prompt and firing headless despite
+that flag, which is exactly the failure this split exists to prevent.
+
+### Problem 2 — nothing stops a plan from re-implementing what already exists
+
+Neither `prompt_engineering/` nor any shipped `skill_engineering/` skill tells
+scout or the planner to check what's already built before scoping new work.
+Left unfixed, every feature costs a full plan-and-build cycle even when 80% of
+it already exists — the opposite of minimal diff.
+
+Add two lookups to **scout's `system.md`**, before any other search:
+
+1. **Glossary first**, if `CONTEXT.md`/`docs/adr/` exist (see Problem 1) —
+   note any request term missing or conflicting; that's a signal for the
+   planner, not something scout resolves itself.
+2. **A structured knowledge source second**, if your project maintains one —
+   an OKF-style knowledge bundle, a `CONTEXT.md`-linked concept map, or
+   similar. Report what's *already implemented* and how, cited by concept
+   path, not line numbers, which drift.
+3. **A structural code search third** (e.g. `ast-grep`) to confirm the
+   knowledge source's claims against actual code. Documentation can lag;
+   ground truth doesn't. When they disagree, trust the code and flag the doc
+   as stale.
+
+Then in **planner's `system.md`**: read scout's findings first, and scope the
+plan to the delta only — anything scout already marked implemented is
+explicitly out of scope, not silently re-touched.
+
+None of this needs a new SSSF agent role or a new `skill_engineering` entry —
+`ast-grep` and a knowledge-source lookup are tool-usage patterns baked into
+scout's own instructions, the same way `writes` and `protected_files` already
+are. They don't belong in the same composition list as `wayfinder`/
+`write-a-prd`/`prd-to-plan`/`tdd`, which are planning methodologies.
+
+### Definition of done, extended
+
+Everything in the standing checklist above, plus:
+
+- [ ] If bootstrap ran, `CONTEXT.md`/`docs/adr/` are committed and predate the
+      `just sdlc` run that used them.
+- [ ] The plan explicitly excludes anything scout marked as already
+      implemented — check `specs/<adw_id>_*.md` names what it's *not* doing,
+      not just what it is.
+- [ ] Your knowledge source (OKF, concept map, whatever you use) got updated
+      by the documenter stage if the feature changed anything it describes —
+      otherwise the next feature's discovery step is reading stale claims.
+
 ## What this playbook does not claim
 
 - That agent output needs no review. Agents fabricate confidently, including
@@ -450,6 +566,7 @@ How it works. Each claim below is documented behaviour you can verify in
 
 | Version | Date | Changes |
 |---|---|---|
+| 3.0 | 2026-09-08 | Added Part C — going dark: relocates `write-a-prd`/`wayfinder`'s interactive interview to a human-supervised bootstrap phase (`/grill-with-docs`, writes `CONTEXT.md`/`docs/adr/`, committed before the headless loop starts) so the AFK loop never needs to prompt live; adds glossary → knowledge-source → structural-search discovery to scout before planning, so plans scope to the delta instead of re-implementing what exists. Generalized from a same-session design pass on a real project (`weather-report`'s `docs/agents/dark-factory-protocol.md`), which stays as that project's concrete instance of this part. |
 | 2.1 | 2026-08-31 | Removed the last cost figures so the measure-it-yourself stance is consistent. Reframed gate predictions as conditional instructions. Propagated the grill → spec → slice order into Part A as a new A4 step. Unified naming on `/grill-me`, `/write-a-prd`, `/prd-to-plan` and on "slice" as the work unit. Moved rule zero early in the entry diagram to match the prose. Added verification pointers for every mechanism claim, a worked grilled-vs-ungrilled spec example, and made the `--setting-sources` note self-contained. |
 | 2.0 | 2026-08-31 | Rewrote as a general adoption playbook: removed session- and repo-specific anecdotes and cost figures in favour of measure-it-yourself guidance. Corrected the Part B interactive workflow order (grill → spec → plan) and each step's purpose. Rewrote "Where the two layers sit" to describe skill_engineering as shipped — vendoring command, `skill_engineering:` config key, `claude_code`-only, per-run cost visibility. |
 | 1.1 | 2026-08-25 | Added five Mermaid diagrams: the entry fork, the gate-verification loop, the four-jobs decision tree, the interactive-vs-headless split, and where the two layers sit today versus after skill_engineering. |
