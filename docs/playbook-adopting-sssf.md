@@ -446,15 +446,13 @@ something a human normally supplies mid-conversation has to be supplied
 
 ```mermaid
 flowchart TD
-    Req([New feature request]) --> Check{Does .okf/ or<br/>CONTEXT.md already<br/>name these terms?}
-    Check -->|Yes| Skip[Skip straight to<br/>scout — no human step]
-    Check -->|No, or unsure| Boot["/grill-with-docs<br/>(you, interactively,<br/>in your own harness)"]
-    Boot --> Write[Writes CONTEXT.md /<br/>docs/adr/ — durable,<br/>not just prose in a PRD]
-    Write --> Commit[["Commit before starting<br/>the headless loop"]]
+    Req([New feature request]) --> Check{Does .okf/ or CONTEXT.md<br/>already name these terms?}
+    Check -->|Yes| Skip[Skip straight to scout<br/>— no human step]
+    Check -->|No, or unsure| Boot["/grill-with-docs — you, interactively,<br/>in your own harness. Writes CONTEXT.md/docs/adr/"]
+    Boot --> Commit[["Commit before starting<br/>the headless loop"]]
     Commit --> Skip
-    Skip --> Scout["scout: glossary → OKF →<br/>ast-grep, in that order"]
-    Scout --> Plan["planner: scope to the<br/>delta only, composed skills<br/>never attempt a live prompt"]
-    Plan --> Rest([Build → gates → review → document])
+    Skip --> ScoutPlan["scout: glossary → OKF → ast-grep, in that order<br/>planner: scope to the delta only — composed<br/>skills never attempt a live prompt"]
+    ScoutPlan --> Rest([Build → gates → review → document])
 
     style Boot fill:#e0e7ff,stroke:#4338ca,color:#000
     style Commit fill:#fde68a,stroke:#b45309,stroke-width:3px,color:#000
