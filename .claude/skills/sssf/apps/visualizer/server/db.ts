@@ -74,7 +74,13 @@ export class SssfDb {
     }
     this.path = path;
     this.sessionsDir = resolve(dirname(path), "sessions");
-    this.db = new Database(path, { readonly: true });
+    // Open read-write (but never create). We only ever run SELECTs on this handle
+    // (archiving uses its own connection), so it stays a reader — but a *read-only*
+    // open of a WAL-mode db can't create the -shm shared-memory index when the
+    // -wal/-shm files are absent (a cleanly-checkpointed db), and SQLite then fails
+    // with SQLITE_CANTOPEN "unable to open database file". Read-write opens the shm
+    // reliably; WAL still allows concurrent readers, so the tracer isn't blocked.
+    this.db = new Database(path, { readwrite: true, create: false });
 
     // WAL is set by the tracer when it creates the db; a readonly connection
     // cannot change it, so we assert rather than set, and always take the

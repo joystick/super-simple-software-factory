@@ -1,7 +1,7 @@
 ---
 title: "Handoff — where this work stands and how to pick it up"
-version: 1.0
-updated: 2026-08-27
+version: 1.2
+updated: 2026-09-08
 status: active
 ---
 
@@ -35,10 +35,25 @@ copied between repos by hand — they drift unless synced. `quality.py` is the o
 ```
 sssf-play   main 5f107b6   51 tests · lint · typecheck   tag: experiment/opus-planner
 pricing-ts  main bb18859   77 tests · lint · typecheck   tag: experiment/agy-vs-claude-claude-side
-fork        main 16285ce
+fork        main   up to date with origin (skill_engineering merged, --skip-plan ported)
 ```
 
 All clean, all committed, single branch each.
+
+## Fork skill fixes (2026-08-30, committed 2026-09-08) — made while dogfooding the skill in a real project
+
+Both surfaced while running `just obs` from a downstream Expo project (`~/Projects/training/opencode-expo`)
+that installs this skill. Sat uncommitted for over a week; reviewed and committed 2026-09-08:
+
+- **`.claude/skills/sssf/scripts/install.py`** — `install` did not vendor the visualizer app, so
+  `just obs` in a target repo had no server to run. Added `SKILL_ROOT` + a `SKIP_NAMES` set
+  (`__pycache__`, `node_modules`, `dist`, `.turbo`) and now copy `apps/visualizer` into the target
+  plus the matching `.gitignore` entries.
+- **`.claude/skills/sssf/apps/visualizer/server/db.ts`** — opened `sssf.db` `{ readonly: true }`,
+  which throws `CANTOPEN` on a **WAL** database (WAL needs to touch `-wal`/`-shm`). Changed to
+  `{ readwrite: true, create: false }` — opens the existing WAL db without creating a new one.
+
+`just obs` (Vue/bun visualizer at `.claude/skills/sssf/apps/visualizer`) works after these.
 
 ## What exists now that did not before
 
@@ -48,11 +63,15 @@ All clean, all committed, single branch each.
 - **Two `/teach` courses**: `learn/` here (operating SSSF; objective 1 done, objective 2
   next) and `pricing-ts/` (TypeScript; all four objectives done).
 - **A head-to-head** between `agy` and `claude` — `docs/head-to-head-agy-vs-claude.md`.
-- **A PRD and plan** for `skill_engineering`, unbuilt — `docs/prd-skill-engineering.md`.
+- **`skill_engineering` — built.** Landed upstream in the fork (6 phases + 4 rounds of
+  adversarial review, `skill_engineering.py`/`vendor_skill.py`/`adw_skills.py`), pulled into
+  this repo 2026-09-08. Reviewed post-pull — findings filed, none blocking (missing test
+  coverage on an unrelated small `load_plan_from_file` addition, and an unvalidated `--as`
+  path-traversal case in `vendor_skill.py`, both low severity).
 
 ## Open
 
-**Nothing is blocked.** Three things were deliberately left:
+**Nothing is blocked.** Two things were deliberately left:
 
 1. **The dead-gate demo** (~£1). Break `pricing-ts`'s test gate to an `echo`, plant a known
    bug, run a real `just sdlc` on an unrelated feature, watch the factory commit the bug and
@@ -62,8 +81,6 @@ All clean, all committed, single branch each.
    history.
 2. **`learn/` objective 2** — reading a trace, and what `sssf.db` structurally cannot tell
    you.
-3. **`skill_engineering`** — specified and planned, not built. SSSF agents run with
-   `--setting-sources ''` and therefore cannot see installed skills; verified by probe.
 
 ## Things that will bite if forgotten
 
@@ -88,3 +105,5 @@ The guard invisible through the public entry point. The gate table that was simp
 | Version | Date | Changes |
 |---|---|---|
 | 1.0 | 2026-08-27 | Initial handoff. |
+| 1.1 | 2026-08-30 | Recorded two uncommitted fork skill fixes (`install.py` visualizer-vendoring, `db.ts` WAL read-write) found while dogfooding `just obs` downstream. |
+| 1.2 | 2026-09-08 | Committed and pushed the two fork skill fixes. Pulled 21 upstream commits, including `skill_engineering` (now built) and the adoption-playbook rework; reviewed, findings filed. |

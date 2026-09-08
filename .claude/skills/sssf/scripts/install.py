@@ -8,7 +8,8 @@ Usage:
     uv run <skill>/scripts/install.py [--force]
 
 Stamps: adws/ (modules + starter ADWs), adws/adw_data/prompt_engineering/
-(4 starter agents), adws/adw_sssf_config/sssf.config.yaml, .env.sample,
+(4 starter agents), adws/adw_sssf_config/sssf.config.yaml, .env.sample, justfile,
+the vendored observability app (.claude/skills/sssf/apps/visualizer, for `just obs`),
 .gitignore entries.
 Existing files are skipped unless --force.
 """
@@ -18,12 +19,20 @@ import shutil
 import sys
 from pathlib import Path
 
-TEMPLATES = Path(__file__).resolve().parent.parent / "templates"
+SKILL_ROOT = Path(__file__).resolve().parent.parent
+TEMPLATES = SKILL_ROOT / "templates"
+
+# Directories never worth copying into a target: build artifacts and caches the
+# recipes regenerate (`just obs` runs `bun install`). Applied to every copy.
+SKIP_NAMES = frozenset({"__pycache__", "node_modules", "dist", ".turbo"})
 
 GITIGNORE_ENTRIES = [
     "adws/adw_data/sessions/",
     "adws/adw_data/sssf.db*",
     ".env",
+    # The vendored observability app (`just obs`) rebuilds these locally.
+    ".claude/skills/sssf/apps/visualizer/node_modules/",
+    ".claude/skills/sssf/apps/visualizer/dist/",
     # The ADWs are Python, so importing adw_modules writes bytecode next to it.
     # Chains that end in a commit phase call `git add -A`, so without this a
     # stamped repo commits its own .pyc files — 15 of them showed up in the
@@ -53,7 +62,7 @@ def stamp(src: Path, dest: Path, force: bool, stamped: list, skipped: list,
           root: Path, reset_owned: bool, preserved: list) -> None:
     if src.is_dir():
         for child in sorted(src.iterdir()):
-            if child.name == "__pycache__":
+            if child.name in SKIP_NAMES:
                 continue
             stamp(child, dest / child.name, force, stamped, skipped,
                   root, reset_owned, preserved)
@@ -112,6 +121,13 @@ def main() -> int:
     # plus the run banner tell you to use them, so a stamped repo has to have
     # them. Skipped like any other file if the repo already has a justfile.
     put(TEMPLATES / "justfile", root / "justfile")
+    # The observability UI (`just obs`) is a bun app that lives in the skill. Vendor it
+    # into the target so the recipe's `.claude/skills/sssf/apps/visualizer` path resolves
+    # without depending on where the skill itself is installed (a plugin cache path can
+    # move on upgrade). node_modules/dist are excluded via SKIP_NAMES — `just obs` runs
+    # `bun install` to populate them.
+    put(SKILL_ROOT / "apps" / "visualizer",
+        root / ".claude" / "skills" / "sssf" / "apps" / "visualizer")
     ensure_gitignore(root, stamped)
 
     print(f"sssf installed into {root}")
