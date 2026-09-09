@@ -1,7 +1,7 @@
 ---
 title: "Handoff — where this work stands and how to pick it up"
-version: 1.3
-updated: 2026-09-08
+version: 1.4
+updated: 2026-09-09
 status: active
 ---
 
@@ -77,7 +77,7 @@ that installs this skill. Sat uncommitted for over a week; reviewed and committe
 
 ## Open
 
-**Nothing is blocked.** Two things were deliberately left:
+**Nothing is blocked.** Three things were deliberately left:
 
 1. **The dead-gate demo** (~£1). Break `pricing-ts`'s test gate to an `echo`, plant a known
    bug, run a real `just sdlc` on an unrelated feature, watch the factory commit the bug and
@@ -87,6 +87,32 @@ that installs this skill. Sat uncommitted for over a week; reviewed and committe
    history.
 2. **`learn/` objective 2** — reading a trace, and what `sssf.db` structurally cannot tell
    you.
+3. **`adw_watch.py` doesn't work in every target repo — found trying to point it at
+   `opencode-expo`.** Two independent problems, both real:
+   - **Assumes a git repo unconditionally.** `commit_watcher_state()` (added `032b25f`,
+     2026-09-09 — the "commits its own claim/resolve/fail writes" fix) shells out to
+     `git status`/`git commit` after every claim/resolve/fail with no guard. `opencode-expo`
+     is deliberately **not** a git repo (its own ADR 0003) — running the watcher there as-is
+     would error on the first claim. `run_once`'s own dirty-tree refusal
+     (`git_helper.is_repo() and git_helper.is_dirty()`) already shows the right pattern
+     (`is_repo()` gates it) — `commit_watcher_state` needs the same gate, and the
+     non-git case needs a defined behavior (skip committing entirely? refuse to run at all,
+     same as the GitHub/GitLab-tracker refusal in `detect_tracker`?) — a real design
+     decision, not just a missing `if`.
+   - **Tracker-shape mismatch.** `discover_issues()`'s frontier scan expects
+     `.scratch/<feature>/issues/NN-slug.md` (a numbered-file subdirectory — the shape Part D's
+     "Filing" section, `2513c46`, documents). `opencode-expo`'s own
+     `docs/agents/issue-tracker.md` (predates Part D) uses one file per feature,
+     `.scratch/<feature>/issue.md` — no `issues/` subdir, no `NN-` numbering, no
+     `Blocked by:` convention. The watcher would silently find nothing there, not error —
+     worse than the git problem, because it looks like an empty queue instead of a
+     shape mismatch.
+   Neither is fixed. Not attempted live against `opencode-expo` — that project's next ticket
+   was picked and dispatched manually (`adw_plan_build_test.py` directly) instead, once this
+   surfaced. Fixing this needs: (a) decide the non-git behavior for `commit_watcher_state`/
+   `detect_tracker`, (b) decide whether `discover_issues()` should also recognize the
+   single-`issue.md` shape, or whether that's a tracker-migration problem for the target repo
+   instead (`docs/agents/issue-tracker.md` there would need updating either way).
 
 ## Things that will bite if forgotten
 
@@ -114,3 +140,4 @@ The guard invisible through the public entry point. The gate table that was simp
 | 1.1 | 2026-08-30 | Recorded two uncommitted fork skill fixes (`install.py` visualizer-vendoring, `db.ts` WAL read-write) found while dogfooding `just obs` downstream. |
 | 1.2 | 2026-09-08 | Committed and pushed the two fork skill fixes. Pulled 21 upstream commits, including `skill_engineering` (now built) and the adoption-playbook rework; reviewed, findings filed. |
 | 1.3 | 2026-09-08 | Fixed both review findings from 1.2: `vendor_skill.py`'s `--as` path-traversal case, and missing test coverage on `load_plan_from_file`. |
+| 1.4 | 2026-09-09 | Filed a new Open item: `adw_watch.py` (`just sssf`, built today) doesn't work against every target repo — found trying to point it at `opencode-expo`. Assumes a git repo unconditionally (breaks against a deliberately git-free target, ADR 0003 there) and its frontier scan's `issues/NN-slug.md` shape doesn't match that repo's older single-`issue.md` tracker convention. Not fixed; `opencode-expo`'s next ticket dispatched manually instead. |
