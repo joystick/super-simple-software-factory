@@ -1,7 +1,7 @@
 ---
 title: "Adoption playbook — putting SSSF to work on real code"
-version: 3.1
-updated: 2026-09-08
+version: 4.0
+updated: 2026-09-09
 status: active
 ---
 
@@ -553,6 +553,109 @@ Everything in the standing checklist above, plus:
       by the documenter stage if the feature changed anything it describes —
       otherwise the next feature's discovery step is reading stale claims.
 
+## Part D — the queue: from `ready-for-agent` to shipped
+
+Part C gets one feature through the headless loop unattended. This part is
+what turns that into a standing queue: an engineer files or triages work
+whenever they want, and something — `just sssf`, watching — picks it up and
+ships it without anyone manually running `just sdlc` per item.
+
+```mermaid
+flowchart TD
+    Idea["/grill-with-docs or<br/>/improve-codebase-architecture<br/>(engineer, interactive: ideate)"] --> Filed[Issue filed —<br/>needs-triage]
+    Filed --> Triage["/triage<br/>(engineer, interactive: JUDGE —<br/>feasibility, compatibility, compliance,<br/>security, redundancy, .out-of-scope/)"]
+    Triage -->|Rejected or already exists| Wontfix([wontfix])
+    Triage -->|Needs a human| ReadyHuman([ready-for-human])
+    Triage -->|Approved, agent brief posted| Ready[["ready-for-agent"]]
+    Ready --> Watch["just sssf<br/>(headless: scan → frontier → claim)"]
+    Watch --> Sdlc["just sdlc &lt;agent brief&gt;<br/>(Part C's loop, unattended)"]
+    Sdlc -->|Success| Resolve[Resolve: close issue,<br/>append session/commit pointer]
+    Sdlc -->|Failure| Flip[["Flip to ready-for-human<br/>with a comment — never<br/>retry silently"]]
+
+    style Triage fill:#e0e7ff,stroke:#4338ca,color:#000
+    style Ready fill:#fde68a,stroke:#b45309,stroke-width:3px,color:#000
+    style Flip fill:#fecaca,stroke:#b91c1c,stroke-width:2px,color:#000
+    style Resolve fill:#bbf7d0,stroke:#15803d,color:#000
+```
+
+### The judgment call stays interactive, on purpose
+
+It's tempting to have `just sssf` itself analyze a raw issue's feasibility,
+compatibility with what's already live, and compliance/security against
+`CLAUDE.md`/`AGENTS.md`, `CONTEXT.md`, your knowledge source, and `docs/`/plan
+files — then decide whether to build it. Don't: that recreates the exact
+failure Part C already fixed once. `write-a-prd`'s interview had no one to
+answer it headless; an unattended loop making its own security/compliance
+judgment calls has no one to catch it when it's wrong, either.
+
+The `triage` skill (if installed) already does this analysis — feasibility,
+redundancy against existing implementation, `.out-of-scope/` prior-rejection
+checks, compliance — but it is explicitly interactive: it waits for maintainer
+direction at every step and never runs unattended. Its terminal state for
+approved work, `ready-for-agent`, means a durable **agent brief** has been
+posted to the issue. That's the same pattern as `grill-with-docs`: the
+judgment happens once, by a human, and only the *result* — not the judgment
+process — becomes something a headless loop can safely consume later.
+
+So: **`just sssf` only ever picks up issues already in `ready-for-agent`
+state.** Everything that decides whether something is safe, compatible, and
+compliant to build happens upstream of that label, interactively. Scout and
+planner's Part C wiring (glossary/OKF/ast-grep discovery, delta-scoping) still
+runs inside every `just sdlc` call underneath this — defense-in-depth, not a
+substitute for the triage gate.
+
+### The queue mechanism already exists — reuse it
+
+Don't build a new work-item format. `docs/agents/issue-tracker.md`'s
+"Wayfinding operations" section (written by `/setup-matt-pocock-skills`, see
+Part A/B) already defines everything a queue needs: a **map** + numbered
+**child** files, a `Blocked by:` line, a **frontier** rule ("scan for files
+that are open, unblocked, and unclaimed; first by number wins"), and
+**claim**/**resolve** semantics. That's dependency-ordered work-item tracking,
+full stop — built for a human working research tickets, but the mechanism
+doesn't care who's claiming. `just sssf` reuses it verbatim: same frontier
+scan, same claim-before-work, same resolve-after-work, just performed by an
+agent instead of a human.
+
+This also closes a real gap: a `prd-to-plan` plan's individual **phases**
+(Part A5/B1) have no atomic, independently-pickable file of their own by
+default — only the feature's `spec.md` does. For a queue to claim work safely,
+each phase needs its own issue file, with a `Blocked by:` line expressing
+phase ordering (Phase 2 blocked by Phase 1) the same way a wayfinder ticket
+blocks on another.
+
+### What `just sssf` does, concretely
+
+A polling loop, tracker-aware (reads `docs/agents/issue-tracker.md` to know
+whether issues live on GitHub or under `.scratch/`):
+
+1. **Scan** for `ready-for-agent` issues — `gh issue list --label ready-for-agent`
+   or grep `Status: ready-for-agent` across `.scratch/*/issues/*.md`.
+2. **Frontier**: filter to unblocked (every `Blocked by:` target already
+   resolved) and unclaimed; oldest/lowest-numbered first.
+3. **Claim**: set `Status: claimed` before touching anything else — same as
+   wayfinder, so two concurrent `just sssf` runs never double-pick.
+4. **Dispatch**: extract the agent brief, run `just sdlc "<brief>"`.
+5. **Resolve**: on success, close the issue and append a pointer (session id,
+   commit, cost) — mirroring wayfinder's "append a context pointer to the
+   map." On failure, flip to `ready-for-human` with a comment explaining what
+   broke. Never retry silently — a loop that keeps re-attempting the same
+   failure burns money without anyone finding out until later.
+6. **Loop** on an interval, or — more composable — run once-and-exit, invoked
+   periodically by `cron`/`launchd`/CI outside SSSF's own scope, rather than
+   the factory growing its own daemon.
+
+### Definition of done, extended again
+
+Everything in Part C's definition of done, plus:
+
+- [ ] Every issue `just sssf` picked up was in `ready-for-agent` state when it
+      claimed it — never a raw or `needs-triage` issue.
+- [ ] A failed run is `ready-for-human` with a comment explaining what broke,
+      not silently retried or left `claimed` forever.
+- [ ] Each `prd-to-plan` phase intended for the queue has its own issue file
+      with `Blocked by:` expressing phase order, not just a shared `plan.md`.
+
 ## What this playbook does not claim
 
 - That agent output needs no review. Agents fabricate confidently, including
@@ -562,11 +665,15 @@ Everything in the standing checklist above, plus:
   gates judge the outcome, not the process. That distinction is the point.
 - That any cost figure transfers to your repo. Language, suite size, and repo
   shape dominate. Measure your own on a throwaway branch before budgeting.
+- That `just sssf` (Part D) exists as shipped code. It's a design, reasoned
+  through against the tracker mechanisms this playbook already documents —
+  build it before pointing a scheduler at a repo expecting it.
 
 ## Version history
 
 | Version | Date | Changes |
 |---|---|---|
+| 4.0 | 2026-09-09 | Added Part D — the queue: turns Part C's single unattended run into a standing queue. Keeps feasibility/compatibility/compliance/security judgment interactive via the `triage` skill (terminal state `ready-for-agent` posts a durable agent brief, same bootstrap-then-headless pattern as `grill-with-docs`); `just sssf` only ever claims already-`ready-for-agent` work. Reuses wayfinder's existing map/child/frontier/claim/resolve mechanism as the queue rather than inventing a new one, and flags the gap it exposes: `prd-to-plan` phases need their own issue files with `Blocked by:` to be queue-pickable. Design only, not yet built. |
 | 3.1 | 2026-09-08 | Replaced every `/grill-me` reference (A4, A5, B1) with `/grill-with-docs`. `grill-me` is a bare alias for the `grilling` interview with no artifact output; `grill-with-docs` composes the same interview with `domain-modeling`, writing resolved vocabulary to `CONTEXT.md`/`docs/adr/`. Part C's AFK mechanism depends on that vocabulary existing on disk for scout/planner to read — `grill-me` alone can't produce it, so the playbook now names one interview skill throughout, and it's the AFK-sufficient one. |
 | 3.0 | 2026-09-08 | Added Part C — going dark: relocates `write-a-prd`/`wayfinder`'s interactive interview to a human-supervised bootstrap phase (`/grill-with-docs`, writes `CONTEXT.md`/`docs/adr/`, committed before the headless loop starts) so the AFK loop never needs to prompt live; adds glossary → knowledge-source → structural-search discovery to scout before planning, so plans scope to the delta instead of re-implementing what exists. Generalized from a same-session design pass on a real project (`weather-report`'s `docs/agents/dark-factory-protocol.md`), which stays as that project's concrete instance of this part. |
 | 2.1 | 2026-08-31 | Removed the last cost figures so the measure-it-yourself stance is consistent. Reframed gate predictions as conditional instructions. Propagated the grill → spec → slice order into Part A as a new A4 step. Unified naming on `/grill-me`, `/write-a-prd`, `/prd-to-plan` and on "slice" as the work unit. Moved rule zero early in the entry diagram to match the prose. Added verification pointers for every mechanism claim, a worked grilled-vs-ungrilled spec example, and made the `--setting-sources` note self-contained. |
