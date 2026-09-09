@@ -149,12 +149,29 @@ def test_append_comment_adds_a_comments_section_once(tmp_path):
     assert "second note" in text
 
 
-# ── dispatch (adw_plan_build_test.main mocked -- no real agent calls) ─────
+# ── dispatch (adw_plan_build_test.main AND git_helper both mocked -- no ────
+# real agent calls, and critically no real git commands: dispatch() now
+# commits its own state, and these tests don't chdir into tmp_path, so an
+# unmocked git_helper would run against whatever repo pytest itself is
+# invoked from.
+
+def mock_git(monkeypatch):
+    """Fake git_helper: always "dirty" (so commit_watcher_state always
+    attempts a commit) and commit_all just records calls instead of running
+    real git. Returns the list of recorded commit messages."""
+    commits = []
+    monkeypatch.setattr(adw_watch.git_helper, "is_dirty", lambda: True)
+    monkeypatch.setattr(adw_watch.git_helper, "is_repo", lambda: True)
+    monkeypatch.setattr(adw_watch.git_helper, "commit_all",
+                        lambda msg: commits.append(msg) or "abc1234")
+    return commits
+
 
 def test_dispatch_resolves_the_issue_on_success(tmp_path, monkeypatch):
     issues_dir = tmp_path / "feature" / "issues"
     path = make_issue(issues_dir, "01-a", "ready-for-agent")
     issue = adw_watch.discover_issues(tmp_path)[0]
+    commits = mock_git(monkeypatch)
 
     monkeypatch.setattr(adw_watch.adw_plan_build_test, "main", lambda *a, **kw: 0)
 
@@ -163,12 +180,16 @@ def test_dispatch_resolves_the_issue_on_success(tmp_path, monkeypatch):
     assert ok is True
     assert "Status: resolved" in path.read_text()
     assert adw_id in path.read_text()
+    assert len(commits) == 2  # claim, then resolve
+    assert "claim" in commits[0]
+    assert "resolve" in commits[1]
 
 
 def test_dispatch_flips_to_ready_for_human_on_a_nonzero_exit(tmp_path, monkeypatch):
     issues_dir = tmp_path / "feature" / "issues"
     path = make_issue(issues_dir, "01-a", "ready-for-agent")
     issue = adw_watch.discover_issues(tmp_path)[0]
+    mock_git(monkeypatch)
 
     monkeypatch.setattr(adw_watch.adw_plan_build_test, "main", lambda *a, **kw: 1)
 
@@ -184,6 +205,7 @@ def test_dispatch_flips_to_ready_for_human_on_a_crash_not_a_watcher_crash(tmp_pa
     issues_dir = tmp_path / "feature" / "issues"
     path = make_issue(issues_dir, "01-a", "ready-for-agent")
     issue = adw_watch.discover_issues(tmp_path)[0]
+    mock_git(monkeypatch)
 
     def boom(*a, **kw):
         raise RuntimeError("agent exploded")
@@ -201,6 +223,7 @@ def test_dispatch_claims_before_running_so_a_crash_never_leaves_it_ready(tmp_pat
     issues_dir = tmp_path / "feature" / "issues"
     path = make_issue(issues_dir, "01-a", "ready-for-agent")
     issue = adw_watch.discover_issues(tmp_path)[0]
+    mock_git(monkeypatch)
 
     seen_status_at_call_time = {}
 
@@ -212,6 +235,16 @@ def test_dispatch_claims_before_running_so_a_crash_never_leaves_it_ready(tmp_pat
     adw_watch.dispatch(issue, "adws/adw_sssf_config/sssf.config.yaml")
 
     assert "Status: claimed" in seen_status_at_call_time["status"]
+
+
+def test_commit_watcher_state_skips_commit_when_nothing_changed(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(adw_watch.git_helper, "is_dirty", lambda: False)
+    monkeypatch.setattr(adw_watch.git_helper, "commit_all", lambda msg: calls.append(msg))
+
+    adw_watch.commit_watcher_state("should not fire")
+
+    assert calls == []
 
 
 # ── detect_tracker ───────────────────────────────────────────────────────
@@ -265,4 +298,36 @@ def test_main_returns_0_when_work_was_dispatched(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(adw_watch.adw_plan_build_test, "main", lambda *a, **kw: 0)
 
+    # not a real repo -- dispatch()'s own commits must not hit real git.
+    # is_dirty()'s first call is run_once's own scan-time guard (must see
+    # clean, or it refuses to claim); every call after that is a
+    # commit_watcher_state check post-write (must see dirty, or it skips).
+    monkeypatch.setattr(adw_watch.git_helper, "is_repo", lambda: True)
+    calls = {"n": 0}
+
+    def is_dirty():
+        calls["n"] += 1
+        return calls["n"] > 1
+
+    monkeypatch.setattr(adw_watch.git_helper, "is_dirty", is_dirty)
+    monkeypatch.setattr(adw_watch.git_helper, "commit_all", lambda msg: "abc1234")
+
     assert adw_watch.main(".scratch", "adws/adw_sssf_config/sssf.config.yaml", once=True, interval=1) == 0
+
+
+# ── dirty-tree guard ─────────────────────────────────────────────────────
+
+def test_run_once_refuses_to_claim_against_a_dirty_tree(tmp_path, monkeypatch):
+    scratch = tmp_path / ".scratch"
+    make_issue(scratch / "feature" / "issues", "01-a", "ready-for-agent")
+    monkeypatch.setattr(adw_watch.git_helper, "is_repo", lambda: True)
+    monkeypatch.setattr(adw_watch.git_helper, "is_dirty", lambda: True)
+    calls = []
+    monkeypatch.setattr(adw_watch.adw_plan_build_test, "main",
+                        lambda *a, **kw: calls.append(1) or 0)
+
+    found = adw_watch.run_once(scratch, "adws/adw_sssf_config/sssf.config.yaml")
+
+    assert found is False
+    assert calls == []  # never even reached dispatch
+    assert "Status: ready-for-agent" in (scratch / "feature" / "issues" / "01-a.md").read_text()

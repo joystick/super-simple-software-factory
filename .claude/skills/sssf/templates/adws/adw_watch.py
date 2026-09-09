@@ -31,6 +31,14 @@ same convention as `.scratch/<effort>/issues/NN-<slug>.md` ticket files
 wayfinder already uses. A failed run flips back to `ready-for-human` (a
 triage state) rather than sitting `claimed` forever, so a person sees it.
 
+Every status write (claim, resolve, or fail) is committed immediately -- the
+ADW's own commit phase fires mid-run, before this script's final write, so
+without this the last status transition would sit uncommitted after every
+run. Because claiming commits, `run_once` refuses to claim anything against
+a dirty working tree: an unrelated in-progress change sitting there would get
+swept into that commit, same `git add -A` gotcha every ADW commit phase
+carries.
+
 --once runs a single scan-claim-dispatch-resolve cycle then exits: 0 if work
 was found and dispatched (regardless of outcome -- check the issue's new
 Status to know which), 1 if the queue was empty, 2 if the tracker isn't
@@ -48,7 +56,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import adw_plan_build_test
-from adw_modules import utils
+from adw_modules import git_helper, utils
 
 STATUS_RE = re.compile(r"^Status:\s*(\S+)", re.MULTILINE)
 BLOCKED_BY_RE = re.compile(r"^Blocked by:\s*(.+)$", re.MULTILINE)
@@ -148,11 +156,26 @@ def append_comment(path: Path, note: str) -> None:
     path.write_text(text + f"\n\n{note}\n")
 
 
+def commit_watcher_state(message: str) -> None:
+    """Commit the watcher's own claim/resolve writes to the issue file.
+
+    The ADW's own commit phase (inside adw_plan_build_test.main) fires mid-run,
+    before dispatch() writes the final Status: -- so without this, that final
+    write sits uncommitted after every run, needing a manual follow-up commit.
+    is_dirty() guards against there being nothing to commit (e.g. a crash
+    before set_status ran)."""
+    if git_helper.is_dirty():
+        sha = git_helper.commit_all(message)
+        print(f"just sssf: committed watcher state ({sha}): {message}")
+
+
 def dispatch(issue: Issue, config: str) -> tuple[bool, str]:
     """Claim, run the full SDLC chain with this issue's own body as the
     prompt, then resolve or flip to ready-for-human. Returns (succeeded, adw_id).
     """
     set_status(issue.path, CLAIMED)
+    commit_watcher_state(f"just sssf: claim {issue.path}")
+
     adw_id = utils.new_id()
     prompt = utils.resolve_prompt(str(issue.path))
     try:
@@ -160,11 +183,13 @@ def dispatch(issue: Issue, config: str) -> tuple[bool, str]:
     except Exception as exc:  # a crash here is a failed run, not a watcher crash
         set_status(issue.path, FAILED_STATE)
         append_comment(issue.path, f"> *just sssf: session `{adw_id}` crashed: {exc}*")
+        commit_watcher_state(f"just sssf: session {adw_id} crashed -- flipped to ready-for-human")
         return False, adw_id
 
     if exit_code == 0:
         set_status(issue.path, RESOLVED)
         append_comment(issue.path, f"> *just sssf: resolved by session `{adw_id}`.*")
+        commit_watcher_state(f"just sssf: resolve {issue.path} (session {adw_id})")
         return True, adw_id
 
     set_status(issue.path, FAILED_STATE)
@@ -173,6 +198,7 @@ def dispatch(issue: Issue, config: str) -> tuple[bool, str]:
         f"> *just sssf: session `{adw_id}` failed (exit {exit_code}). "
         f"Flipped to ready-for-human -- see `just phases {adw_id}` for what broke.*",
     )
+    commit_watcher_state(f"just sssf: session {adw_id} failed -- flipped to ready-for-human")
     return False, adw_id
 
 
@@ -193,6 +219,16 @@ def detect_tracker(root: Path) -> str:
 def run_once(scratch_dir: Path, config: str) -> bool:
     """One scan-claim-dispatch-resolve cycle. Returns True if work was found
     and dispatched (regardless of outcome), False if the queue was empty."""
+    # Claiming now commits (see commit_watcher_state) -- a dirty tree at scan
+    # time would get swept into that commit, same "git add -A stages the
+    # entire working tree" gotcha every ADW commit phase carries. Refuse
+    # rather than silently commit someone else's unrelated in-progress work.
+    if git_helper.is_repo() and git_helper.is_dirty():
+        print("just sssf: working tree is dirty -- refusing to claim anything "
+              "until it's clean (claiming commits, and would sweep in whatever "
+              "else is sitting there)")
+        return False
+
     issues = discover_issues(scratch_dir)
     next_issue = frontier(issues)
     if next_issue is None:
