@@ -68,6 +68,13 @@ simple-sdlc *ARGS:
 skills:
     uv run adws/adw_skills.py --config {{config}}
 
+# dark-factory queue: claim the next ready-for-agent issue and run sdlc on it.
+# Only ever claims work already triaged to ready-for-agent -- see the
+# adoption playbook's Part D. --once for cron/launchd; omit for a standing
+# loop: just sssf --interval 300
+sssf *ARGS:
+    uv run adws/adw_watch.py --config {{config}} "$@"
+
 # ── watch it ────────────────────────────────────────────────────────────────
 # Reads never block a running workflow, the db is WAL. Poll as hard as you like.
 
