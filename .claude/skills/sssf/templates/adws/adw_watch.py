@@ -2,7 +2,7 @@
 # /// script
 # dependencies = ["pydantic", "python-dotenv", "pyyaml", "rich"]
 # ///
-"""ADW Watch -- `just sssf`: scan the issue tracker for ready-for-agent work,
+"""ADW Watch -- `just watch`: scan the issue tracker for ready-for-agent work,
 claim the frontier, and dispatch it through the full SDLC chain.
 
 Usage:
@@ -166,7 +166,7 @@ def commit_watcher_state(message: str) -> None:
     before set_status ran)."""
     if git_helper.is_dirty():
         sha = git_helper.commit_all(message)
-        print(f"just sssf: committed watcher state ({sha}): {message}")
+        print(f"just watch: committed watcher state ({sha}): {message}")
 
 
 def dispatch(issue: Issue, config: str) -> tuple[bool, str]:
@@ -174,7 +174,7 @@ def dispatch(issue: Issue, config: str) -> tuple[bool, str]:
     prompt, then resolve or flip to ready-for-human. Returns (succeeded, adw_id).
     """
     set_status(issue.path, CLAIMED)
-    commit_watcher_state(f"just sssf: claim {issue.path}")
+    commit_watcher_state(f"just watch: claim {issue.path}")
 
     adw_id = utils.new_id()
     prompt = utils.resolve_prompt(str(issue.path))
@@ -182,23 +182,23 @@ def dispatch(issue: Issue, config: str) -> tuple[bool, str]:
         exit_code = adw_plan_build_test.main(prompt, config=config, adw_id=adw_id)
     except Exception as exc:  # a crash here is a failed run, not a watcher crash
         set_status(issue.path, FAILED_STATE)
-        append_comment(issue.path, f"> *just sssf: session `{adw_id}` crashed: {exc}*")
-        commit_watcher_state(f"just sssf: session {adw_id} crashed -- flipped to ready-for-human")
+        append_comment(issue.path, f"> *just watch: session `{adw_id}` crashed: {exc}*")
+        commit_watcher_state(f"just watch: session {adw_id} crashed -- flipped to ready-for-human")
         return False, adw_id
 
     if exit_code == 0:
         set_status(issue.path, RESOLVED)
-        append_comment(issue.path, f"> *just sssf: resolved by session `{adw_id}`.*")
-        commit_watcher_state(f"just sssf: resolve {issue.path} (session {adw_id})")
+        append_comment(issue.path, f"> *just watch: resolved by session `{adw_id}`.*")
+        commit_watcher_state(f"just watch: resolve {issue.path} (session {adw_id})")
         return True, adw_id
 
     set_status(issue.path, FAILED_STATE)
     append_comment(
         issue.path,
-        f"> *just sssf: session `{adw_id}` failed (exit {exit_code}). "
+        f"> *just watch: session `{adw_id}` failed (exit {exit_code}). "
         f"Flipped to ready-for-human -- see `just phases {adw_id}` for what broke.*",
     )
-    commit_watcher_state(f"just sssf: session {adw_id} failed -- flipped to ready-for-human")
+    commit_watcher_state(f"just watch: session {adw_id} failed -- flipped to ready-for-human")
     return False, adw_id
 
 
@@ -224,7 +224,7 @@ def run_once(scratch_dir: Path, config: str) -> bool:
     # entire working tree" gotcha every ADW commit phase carries. Refuse
     # rather than silently commit someone else's unrelated in-progress work.
     if git_helper.is_repo() and git_helper.is_dirty():
-        print("just sssf: working tree is dirty -- refusing to claim anything "
+        print("just watch: working tree is dirty -- refusing to claim anything "
               "until it's clean (claiming commits, and would sweep in whatever "
               "else is sitting there)")
         return False
@@ -232,11 +232,11 @@ def run_once(scratch_dir: Path, config: str) -> bool:
     issues = discover_issues(scratch_dir)
     next_issue = frontier(issues)
     if next_issue is None:
-        print("just sssf: queue empty -- nothing ready-for-agent and unblocked")
+        print("just watch: queue empty -- nothing ready-for-agent and unblocked")
         return False
-    print(f"just sssf: claiming {next_issue.path}")
+    print(f"just watch: claiming {next_issue.path}")
     ok, adw_id = dispatch(next_issue, config)
-    print(f"just sssf: session {adw_id} {'succeeded' if ok else 'FAILED'} -- {next_issue.path}")
+    print(f"just watch: session {adw_id} {'succeeded' if ok else 'FAILED'} -- {next_issue.path}")
     return True
 
 
@@ -245,7 +245,7 @@ def main(scratch_dir: str, config: str, once: bool, interval: int) -> int:
     tracker = detect_tracker(root)
     if tracker != "local":
         print(
-            f"just sssf: {tracker} issue tracker detected -- not implemented yet. "
+            f"just watch: {tracker} issue tracker detected -- not implemented yet. "
             "This watcher only supports the local-markdown tracker "
             "(docs/agents/issue-tracker.md). See Part D of the adoption playbook.",
             file=sys.stderr,

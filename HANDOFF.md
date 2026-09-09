@@ -1,6 +1,6 @@
 ---
 title: "Handoff — where this work stands and how to pick it up"
-version: 1.5
+version: 1.6
 updated: 2026-09-09
 status: active
 ---
@@ -74,6 +74,22 @@ that installs this skill. Sat uncommitted for over a week; reviewed and committe
   (if absolute) discard it outright. Added `test_vendor_skill.py` coverage for the guard,
   plus a new `test_utils.py` covering `load_plan_from_file`'s summary extraction and both
   its error paths. Full suite green (99 passed) after the changes.
+- **Two more fixes ported back from a downstream adoption** (`opencode-expo`, which went
+  through its own ADR-governed git-init cutover 2026-09-09 — the first real target repo to
+  actually exercise `adw_watch.py`'s git-dependent code against a live history):
+  - `git_helper.py`'s `_git()` did a full `.strip()` on subprocess output — silently ate
+    the leading space off only the *first* line of multi-line porcelain output (git's
+    status codes are leading-whitespace-significant: `" M path"` vs a corrupted `"M path"`
+    shifted `changed_files()`'s fixed `line[3:]` slice into the filename itself). Never
+    reachable before a target repo had real git history to run these functions against.
+    Fixed to `.rstrip()` — trailing-only, never eats meaningful leading whitespace.
+  - `just sssf` renamed to `just watch`, matching its script (`adw_watch.py`) — 6 of 8
+    recipes in this justfile mirror their script name directly; this one didn't need to be
+    the second deliberate exception `sdlc` already legitimately is. Every prescriptive
+    reference in the playbook's Part D updated; the two changelog rows describing what was
+    literally built and named at the time (4.0/4.1) were deliberately left saying `just
+    sssf` — accurate history, not something to retroactively rewrite.
+  Both verified: full suite green (126 passed) after porting.
 
 ## Open
 
@@ -173,3 +189,4 @@ The guard invisible through the public entry point. The gate table that was simp
 | 1.3 | 2026-09-08 | Fixed both review findings from 1.2: `vendor_skill.py`'s `--as` path-traversal case, and missing test coverage on `load_plan_from_file`. |
 | 1.4 | 2026-09-09 | Filed a new Open item: `adw_watch.py` (`just sssf`, built today) doesn't work against every target repo — found trying to point it at `opencode-expo`. Assumes a git repo unconditionally (breaks against a deliberately git-free target, ADR 0003 there) and its frontier scan's `issues/NN-slug.md` shape doesn't match that repo's older single-`issue.md` tracker convention. Not fixed; `opencode-expo`'s next ticket dispatched manually instead. |
 | 1.5 | 2026-09-09 | Filed a new Open item: the vendored `code-review` skill (`opencode-expo`) was deliberately left unwired from `reviewer` after assessment — it assumes interactivity + sub-agent orchestration `reviewer`'s tools can't support, contradicts `reviewer`'s own "not your job: style opinions" charter, and its human-readable report format mismatches the `ReviewOutput`/JSON contract `adw_simple_sdlc.py`'s revision loop consumes programmatically. `wayfinder`/`write-a-prd`/`prd-to-plan`/`tdd` remain wired to `planner`, unaffected. Flags a possible playbook follow-up (does the target agent's contract survive composition, not just "ask the user") — not written yet. |
+| 1.6 | 2026-09-09 | Ported two fixes back from `opencode-expo` after it became the first target repo to actually run `adw_watch.py`'s git-dependent code against a real, live git history: a real bug in `git_helper.py`'s `_git()` (a full `.strip()` corrupted the first path in multi-line porcelain output — fixed to `.rstrip()`), and `just sssf` renamed to `just watch` to match its script name. Playbook bumped to 4.3 with a new changelog row; historical 4.0/4.1 rows deliberately left saying `just sssf`, matching what was actually named at the time. Full suite green (126 passed). |

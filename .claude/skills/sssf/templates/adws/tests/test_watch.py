@@ -1,4 +1,4 @@
-"""adw_watch.py -- `just sssf`: the headless half of the dark-factory queue.
+"""adw_watch.py -- `just watch`: the headless half of the dark-factory queue.
 
 Only ever claims issues already carrying Status: ready-for-agent. The
 feasibility/compatibility/compliance/security judgment that gets an issue

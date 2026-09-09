@@ -10,7 +10,15 @@ def _git(*args: str) -> str:
     result = subprocess.run(["git", *args], capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(f"git {' '.join(args)} failed: {result.stderr.strip()}")
-    return result.stdout.strip()
+    # rstrip only, never a full strip: git porcelain output (status, diff --numstat)
+    # is leading-whitespace-significant — " M path" vs "M  path" are different status
+    # codes. A bare .strip() ate the leading space off only the FIRST line of
+    # multi-line output (whitespace at the very start/end of the whole string, not
+    # per-line), which shifted changed_files()'s fixed line[3:] slice by one
+    # character and corrupted the first path. Found live, 2026-09-09, once this
+    # repo actually had a git history to run these functions against for the first
+    # time — never reachable before that.
+    return result.stdout.rstrip()
 
 
 def current_branch() -> str:

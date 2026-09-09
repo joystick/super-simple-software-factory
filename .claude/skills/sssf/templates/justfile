@@ -71,8 +71,8 @@ skills:
 # dark-factory queue: claim the next ready-for-agent issue and run sdlc on it.
 # Only ever claims work already triaged to ready-for-agent -- see the
 # adoption playbook's Part D. --once for cron/launchd; omit for a standing
-# loop: just sssf --interval 300
-sssf *ARGS:
+# loop: just watch --interval 300
+watch *ARGS:
     uv run adws/adw_watch.py --config {{config}} "$@"
 
 # ── watch it ────────────────────────────────────────────────────────────────

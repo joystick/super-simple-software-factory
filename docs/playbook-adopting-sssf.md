@@ -1,6 +1,6 @@
 ---
 title: "Adoption playbook — putting SSSF to work on real code"
-version: 4.2
+version: 4.3
 updated: 2026-09-09
 status: active
 ---
@@ -557,7 +557,7 @@ Everything in the standing checklist above, plus:
 
 Part C gets one feature through the headless loop unattended. This part is
 what turns that into a standing queue: an engineer files or triages work
-whenever they want, and something — `just sssf`, watching — picks it up and
+whenever they want, and something — `just watch`, watching — picks it up and
 ships it without anyone manually running `just sdlc` per item.
 
 ```mermaid
@@ -568,7 +568,7 @@ flowchart TD
     Triage -->|Rejected or already exists| Wontfix([wontfix])
     Triage -->|Needs a human| ReadyHuman([ready-for-human])
     Triage -->|Approved, agent brief posted| Ready[["ready-for-agent"]]
-    Ready --> Watch["just sssf<br/>(headless: scan → frontier → claim)"]
+    Ready --> Watch["just watch<br/>(headless: scan → frontier → claim)"]
     Watch --> Sdlc["just sdlc &lt;agent brief&gt;<br/>(Part C's loop, unattended)"]
     Sdlc -->|Success| Resolve[Resolve: close issue,<br/>append session/commit pointer]
     Sdlc -->|Failure| Flip[["Flip to ready-for-human<br/>with a comment — never<br/>retry silently"]]
@@ -599,7 +599,7 @@ write it.
   scoped per feature, not global — a `Blocked by: 01` in one feature never
   refers to another feature's `01`.
 
-**What the file must contain** — this is what `/triage` and `just sssf` both
+**What the file must contain** — this is what `/triage` and `just watch` both
 actually parse, not just prose for a human:
 
 ```md
@@ -619,14 +619,14 @@ CONTEXT.md terms or ADRs it touches.
 - `Blocked by: NN, NN` — optional, only if it depends on another ticket
   already in the same feature's `issues/` dir.
 
-**Then commit it.** `/triage` and `just sssf` read from the working tree, not
+**Then commit it.** `/triage` and `just watch` read from the working tree, not
 from your conversation — an uncommitted file is invisible to a fresh session,
 same reasoning as committing `CONTEXT.md`/ADRs before the headless loop
 starts.
 
 ### The judgment call stays interactive, on purpose
 
-It's tempting to have `just sssf` itself analyze a raw issue's feasibility,
+It's tempting to have `just watch` itself analyze a raw issue's feasibility,
 compatibility with what's already live, and compliance/security against
 `CLAUDE.md`/`AGENTS.md`, `CONTEXT.md`, your knowledge source, and `docs/`/plan
 files — then decide whether to build it. Don't: that recreates the exact
@@ -643,7 +643,7 @@ posted to the issue. That's the same pattern as `grill-with-docs`: the
 judgment happens once, by a human, and only the *result* — not the judgment
 process — becomes something a headless loop can safely consume later.
 
-So: **`just sssf` only ever picks up issues already in `ready-for-agent`
+So: **`just watch` only ever picks up issues already in `ready-for-agent`
 state.** Everything that decides whether something is safe, compatible, and
 compliant to build happens upstream of that label, interactively. Scout and
 planner's Part C wiring (glossary/OKF/ast-grep discovery, delta-scoping) still
@@ -659,7 +659,7 @@ Part A/B) already defines everything a queue needs: a **map** + numbered
 that are open, unblocked, and unclaimed; first by number wins"), and
 **claim**/**resolve** semantics. That's dependency-ordered work-item tracking,
 full stop — built for a human working research tickets, but the mechanism
-doesn't care who's claiming. `just sssf` reuses it verbatim: same frontier
+doesn't care who's claiming. `just watch` reuses it verbatim: same frontier
 scan, same claim-before-work, same resolve-after-work, just performed by an
 agent instead of a human.
 
@@ -670,7 +670,7 @@ each phase needs its own issue file, with a `Blocked by:` line expressing
 phase ordering (Phase 2 blocked by Phase 1) the same way a wayfinder ticket
 blocks on another.
 
-### What `just sssf` does, concretely
+### What `just watch` does, concretely
 
 A polling loop, tracker-aware (reads `docs/agents/issue-tracker.md` to know
 whether issues live on GitHub or under `.scratch/`):
@@ -680,7 +680,7 @@ whether issues live on GitHub or under `.scratch/`):
 2. **Frontier**: filter to unblocked (every `Blocked by:` target already
    resolved) and unclaimed; oldest/lowest-numbered first.
 3. **Claim**: set `Status: claimed` before touching anything else — same as
-   wayfinder, so two concurrent `just sssf` runs never double-pick.
+   wayfinder, so two concurrent `just watch` runs never double-pick.
 4. **Dispatch**: extract the agent brief, run `just sdlc "<brief>"`.
 5. **Resolve**: on success, close the issue and append a pointer (session id,
    commit, cost) — mirroring wayfinder's "append a context pointer to the
@@ -695,7 +695,7 @@ whether issues live on GitHub or under `.scratch/`):
 
 Everything in Part C's definition of done, plus:
 
-- [ ] Every issue `just sssf` picked up was in `ready-for-agent` state when it
+- [ ] Every issue `just watch` picked up was in `ready-for-agent` state when it
       claimed it — never a raw or `needs-triage` issue.
 - [ ] A failed run is `ready-for-human` with a comment explaining what broke,
       not silently retried or left `claimed` forever.
@@ -711,7 +711,7 @@ Everything in Part C's definition of done, plus:
   gates judge the outcome, not the process. That distinction is the point.
 - That any cost figure transfers to your repo. Language, suite size, and repo
   shape dominate. Measure your own on a throwaway branch before budgeting.
-- That `just sssf` (Part D) has claimed and shipped a real issue end to end
+- That `just watch` (Part D) has claimed and shipped a real issue end to end
   yet. It's shipped (`adws/adw_watch.py`, stamped by `install.py` like every
   other ADW), tested (frontier/blocking/claim/resolve logic, dispatch success
   and failure paths, tracker detection — `tests/test_watch.py`), and its
@@ -722,6 +722,7 @@ Everything in Part C's definition of done, plus:
 
 | Version | Date | Changes |
 |---|---|---|
+| 4.3 | 2026-09-09 | Renamed the `just sssf` recipe to `just watch`, matching its script (`adw_watch.py`) — found via a downstream adoption (`opencode-expo`) questioning the mismatch: 6 of 8 recipes mirror their script name directly, and this one didn't need to be the exception `sdlc` legitimately is (that one names the workflow's meaning, not its script). Updated the recipe, `adw_watch.py`'s own runtime log-line prefixes, `test_watch.py`, and every prescriptive (non-changelog) reference in this playbook's Part D prose and diagram. Also ported back a real bug fix found downstream: `git_helper.py`'s `_git()` did a full `.strip()` on subprocess output, which silently ate the leading space off only the *first* line of multi-line porcelain output (git status codes are leading-whitespace-significant) — corrupting `changed_files()`'s first result. Never reachable before a target repo actually had git history to run these functions against; fixed to `.rstrip()`. |
 | 4.2 | 2026-09-09 | Named the filing step Part D's diagram had glossed over: neither `grill-with-docs` nor `improve-codebase-architecture` writes an issue — someone has to manually create `.scratch/<feature>/spec.md` or `issues/NN-slug.md` with a parseable `Status: needs-triage` line before `/triage` can see it. Added a "Filing" subsection with the exact required shape and a new diagram node. |
 | 4.1 | 2026-09-09 | Built Part D's `just sssf` for real: `adws/adw_watch.py` (stamped like every other ADW) plus 24 tests covering frontier/blocking/claim/resolve/dispatch/tracker-detection. Updated "What this playbook does not claim" — it's shipped and tested, just not yet run against a real live queue end to end. |
 | 4.0 | 2026-09-09 | Added Part D — the queue: turns Part C's single unattended run into a standing queue. Keeps feasibility/compatibility/compliance/security judgment interactive via the `triage` skill (terminal state `ready-for-agent` posts a durable agent brief, same bootstrap-then-headless pattern as `grill-with-docs`); `just sssf` only ever claims already-`ready-for-agent` work. Reuses wayfinder's existing map/child/frontier/claim/resolve mechanism as the queue rather than inventing a new one, and flags the gap it exposes: `prd-to-plan` phases need their own issue files with `Blocked by:` to be queue-pickable. Design only, not yet built. |
