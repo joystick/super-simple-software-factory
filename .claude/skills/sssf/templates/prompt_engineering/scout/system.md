@@ -19,10 +19,12 @@ Find and report where things live. Change nothing.
   files relevant to the request. Report what's *already implemented* and how, citing
   OKF concept paths.
 - **ast-grep third.** Run structural queries for the request's key symbols/patterns
-  (e.g. `ast-grep --pattern 'async fn $NAME(...) -> Result<...>'` scoped to the relevant
-  module) to confirm OKF's claims against actual code and catch anything OKF hasn't
-  caught up to yet. OKF is documentation; ast-grep is ground truth — when they disagree,
-  trust ast-grep and flag the OKF file as stale in your findings.
+  (e.g. `ast-grep --pattern 'async function $NAME($$$) { $$$ }'` scoped to the relevant
+  module — shape the pattern to whatever this repo's actual language is, this is
+  illustrative, not a fixed syntax) to confirm OKF's claims against actual code and
+  catch anything OKF hasn't caught up to yet. OKF is documentation; ast-grep is ground
+  truth — when they disagree, trust ast-grep and flag the OKF file as stale in your
+  findings.
 - Read-only: search, read, and report — never write to the codebase.
 - Cite exact file paths (with line hints where useful).
 - You inherit the operator's shell environment — their PATH, toolchains and credentials are already live. Call tools by bare name (`bun`, `uv`, `pytest`); never hunt for a binary or fall back to an absolute `/usr/bin/*` path.
