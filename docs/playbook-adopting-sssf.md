@@ -1,6 +1,6 @@
 ---
 title: "Adoption playbook — putting SSSF to work on real code"
-version: 4.1
+version: 4.2
 updated: 2026-09-09
 status: active
 ---
@@ -562,7 +562,8 @@ ships it without anyone manually running `just sdlc` per item.
 
 ```mermaid
 flowchart TD
-    Idea["/grill-with-docs or<br/>/improve-codebase-architecture<br/>(engineer, interactive: ideate)"] --> Filed[Issue filed —<br/>needs-triage]
+    Idea["/grill-with-docs or<br/>/improve-codebase-architecture<br/>(engineer, interactive: ideate)"] --> File[["File it — engineer writes<br/>.scratch/&lt;feature&gt;/spec.md or<br/>issues/NN-slug.md, Status: needs-triage.<br/>No skill does this step yet."]]
+    File --> Filed[Committed —<br/>needs-triage]
     Filed --> Triage["/triage<br/>(engineer, interactive: JUDGE —<br/>feasibility, compatibility, compliance,<br/>security, redundancy, .out-of-scope/)"]
     Triage -->|Rejected or already exists| Wontfix([wontfix])
     Triage -->|Needs a human| ReadyHuman([ready-for-human])
@@ -572,11 +573,56 @@ flowchart TD
     Sdlc -->|Success| Resolve[Resolve: close issue,<br/>append session/commit pointer]
     Sdlc -->|Failure| Flip[["Flip to ready-for-human<br/>with a comment — never<br/>retry silently"]]
 
+    style File fill:#fde68a,stroke:#b45309,stroke-width:3px,color:#000
     style Triage fill:#e0e7ff,stroke:#4338ca,color:#000
     style Ready fill:#fde68a,stroke:#b45309,stroke-width:3px,color:#000
     style Flip fill:#fecaca,stroke:#b91c1c,stroke-width:2px,color:#000
     style Resolve fill:#bbf7d0,stroke:#15803d,color:#000
 ```
+
+### Filing: the step no skill does yet
+
+`grill-with-docs` (`grilling` + `domain-modeling`) and
+`improve-codebase-architecture`'s grilling loop both end at updated
+`CONTEXT.md`/`docs/adr/` — **neither writes an issue.** Something still has
+to turn "we settled on this" into a file `/triage` can see. Right now that's
+a manual step: you (or an assisting agent, in the same interactive session)
+write it.
+
+**Pick the shape**, per `docs/agents/issue-tracker.md`'s own convention:
+
+- **New feature** → `.scratch/<feature-slug>/spec.md` — a PRD (problem,
+  solution, user stories), if the idea is substantial enough to be its own
+  feature.
+- **Addition to an existing feature** → `.scratch/<existing-feature-slug>/issues/NN-<slug>.md`,
+  `NN` the next free number in that feature's `issues/` dir. Numbers are
+  scoped per feature, not global — a `Blocked by: 01` in one feature never
+  refers to another feature's `01`.
+
+**What the file must contain** — this is what `/triage` and `just sssf` both
+actually parse, not just prose for a human:
+
+```md
+# Short title
+
+Status: needs-triage
+
+Whatever the grilling settled on — the decision, the reasoning, any
+CONTEXT.md terms or ADRs it touches.
+```
+
+- `# Title` — a heading.
+- `Status: needs-triage` — exact shape (`Status:` + one of the five canonical
+  triage states). `adw_watch.py`'s frontier logic and `/triage`'s state
+  machine both key off this line; get the string wrong and both silently
+  ignore the file.
+- `Blocked by: NN, NN` — optional, only if it depends on another ticket
+  already in the same feature's `issues/` dir.
+
+**Then commit it.** `/triage` and `just sssf` read from the working tree, not
+from your conversation — an uncommitted file is invisible to a fresh session,
+same reasoning as committing `CONTEXT.md`/ADRs before the headless loop
+starts.
 
 ### The judgment call stays interactive, on purpose
 
@@ -676,6 +722,7 @@ Everything in Part C's definition of done, plus:
 
 | Version | Date | Changes |
 |---|---|---|
+| 4.2 | 2026-09-09 | Named the filing step Part D's diagram had glossed over: neither `grill-with-docs` nor `improve-codebase-architecture` writes an issue — someone has to manually create `.scratch/<feature>/spec.md` or `issues/NN-slug.md` with a parseable `Status: needs-triage` line before `/triage` can see it. Added a "Filing" subsection with the exact required shape and a new diagram node. |
 | 4.1 | 2026-09-09 | Built Part D's `just sssf` for real: `adws/adw_watch.py` (stamped like every other ADW) plus 24 tests covering frontier/blocking/claim/resolve/dispatch/tracker-detection. Updated "What this playbook does not claim" — it's shipped and tested, just not yet run against a real live queue end to end. |
 | 4.0 | 2026-09-09 | Added Part D — the queue: turns Part C's single unattended run into a standing queue. Keeps feasibility/compatibility/compliance/security judgment interactive via the `triage` skill (terminal state `ready-for-agent` posts a durable agent brief, same bootstrap-then-headless pattern as `grill-with-docs`); `just sssf` only ever claims already-`ready-for-agent` work. Reuses wayfinder's existing map/child/frontier/claim/resolve mechanism as the queue rather than inventing a new one, and flags the gap it exposes: `prd-to-plan` phases need their own issue files with `Blocked by:` to be queue-pickable. Design only, not yet built. |
 | 3.1 | 2026-09-08 | Replaced every `/grill-me` reference (A4, A5, B1) with `/grill-with-docs`. `grill-me` is a bare alias for the `grilling` interview with no artifact output; `grill-with-docs` composes the same interview with `domain-modeling`, writing resolved vocabulary to `CONTEXT.md`/`docs/adr/`. Part C's AFK mechanism depends on that vocabulary existing on disk for scout/planner to read — `grill-me` alone can't produce it, so the playbook now names one interview skill throughout, and it's the AFK-sufficient one. |
