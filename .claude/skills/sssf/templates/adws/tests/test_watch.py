@@ -149,7 +149,7 @@ def test_append_comment_adds_a_comments_section_once(tmp_path):
     assert "second note" in text
 
 
-# ── dispatch (adw_plan_build_test.main AND git_helper both mocked -- no ────
+# ── dispatch (adw_simple_sdlc.main AND git_helper both mocked -- no ────
 # real agent calls, and critically no real git commands: dispatch() now
 # commits its own state, and these tests don't chdir into tmp_path, so an
 # unmocked git_helper would run against whatever repo pytest itself is
@@ -173,7 +173,7 @@ def test_dispatch_resolves_the_issue_on_success(tmp_path, monkeypatch):
     issue = adw_watch.discover_issues(tmp_path)[0]
     commits = mock_git(monkeypatch)
 
-    monkeypatch.setattr(adw_watch.adw_plan_build_test, "main", lambda *a, **kw: 0)
+    monkeypatch.setattr(adw_watch.adw_simple_sdlc, "main", lambda *a, **kw: 0)
 
     ok, adw_id = adw_watch.dispatch(issue, "adws/adw_sssf_config/sssf.config.yaml")
 
@@ -191,7 +191,7 @@ def test_dispatch_flips_to_ready_for_human_on_a_nonzero_exit(tmp_path, monkeypat
     issue = adw_watch.discover_issues(tmp_path)[0]
     mock_git(monkeypatch)
 
-    monkeypatch.setattr(adw_watch.adw_plan_build_test, "main", lambda *a, **kw: 1)
+    monkeypatch.setattr(adw_watch.adw_simple_sdlc, "main", lambda *a, **kw: 1)
 
     ok, adw_id = adw_watch.dispatch(issue, "adws/adw_sssf_config/sssf.config.yaml")
 
@@ -210,7 +210,7 @@ def test_dispatch_flips_to_ready_for_human_on_a_crash_not_a_watcher_crash(tmp_pa
     def boom(*a, **kw):
         raise RuntimeError("agent exploded")
 
-    monkeypatch.setattr(adw_watch.adw_plan_build_test, "main", boom)
+    monkeypatch.setattr(adw_watch.adw_simple_sdlc, "main", boom)
 
     ok, adw_id = adw_watch.dispatch(issue, "adws/adw_sssf_config/sssf.config.yaml")
 
@@ -231,7 +231,7 @@ def test_dispatch_claims_before_running_so_a_crash_never_leaves_it_ready(tmp_pat
         seen_status_at_call_time["status"] = path.read_text()
         return 0
 
-    monkeypatch.setattr(adw_watch.adw_plan_build_test, "main", spy)
+    monkeypatch.setattr(adw_watch.adw_simple_sdlc, "main", spy)
     adw_watch.dispatch(issue, "adws/adw_sssf_config/sssf.config.yaml")
 
     assert "Status: claimed" in seen_status_at_call_time["status"]
@@ -296,7 +296,7 @@ def test_main_returns_0_when_work_was_dispatched(tmp_path, monkeypatch):
     scratch = tmp_path / ".scratch"
     make_issue(scratch / "feature" / "issues", "01-a", "ready-for-agent")
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(adw_watch.adw_plan_build_test, "main", lambda *a, **kw: 0)
+    monkeypatch.setattr(adw_watch.adw_simple_sdlc, "main", lambda *a, **kw: 0)
 
     # not a real repo -- dispatch()'s own commits must not hit real git.
     # is_dirty()'s first call is run_once's own scan-time guard (must see
@@ -323,7 +323,7 @@ def test_run_once_refuses_to_claim_against_a_dirty_tree(tmp_path, monkeypatch):
     monkeypatch.setattr(adw_watch.git_helper, "is_repo", lambda: True)
     monkeypatch.setattr(adw_watch.git_helper, "is_dirty", lambda: True)
     calls = []
-    monkeypatch.setattr(adw_watch.adw_plan_build_test, "main",
+    monkeypatch.setattr(adw_watch.adw_simple_sdlc, "main",
                         lambda *a, **kw: calls.append(1) or 0)
 
     found = adw_watch.run_once(scratch, "adws/adw_sssf_config/sssf.config.yaml")

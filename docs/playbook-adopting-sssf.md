@@ -1,7 +1,7 @@
 ---
 title: "Adoption playbook — putting SSSF to work on real code"
-version: 4.3
-updated: 2026-09-09
+version: 4.4
+updated: 2026-09-10
 status: active
 ---
 
@@ -681,7 +681,12 @@ whether issues live on GitHub or under `.scratch/`):
    resolved) and unclaimed; oldest/lowest-numbered first.
 3. **Claim**: set `Status: claimed` before touching anything else — same as
    wayfinder, so two concurrent `just watch` runs never double-pick.
-4. **Dispatch**: extract the agent brief, run `just sdlc "<brief>"`.
+4. **Dispatch**: extract the agent brief, run the full SDLC chain on it —
+   `adw_simple_sdlc.py` (`planner -> builder -> reviewer -> revision loop ->
+   documenter -> commit`), not the lighter `plan_build_test` chain `just
+   sdlc` wraps. An unattended dispatch has nothing else checking it besides
+   the test gate passing, so it gets the review/revision loop a supervised
+   manual run could otherwise skip.
 5. **Resolve**: on success, close the issue and append a pointer (session id,
    commit, cost) — mirroring wayfinder's "append a context pointer to the
    map." On failure, flip to `ready-for-human` with a comment explaining what
@@ -711,17 +716,23 @@ Everything in Part C's definition of done, plus:
   gates judge the outcome, not the process. That distinction is the point.
 - That any cost figure transfers to your repo. Language, suite size, and repo
   shape dominate. Measure your own on a throwaway branch before budgeting.
-- That `just watch` (Part D) has claimed and shipped a real issue end to end
-  yet. It's shipped (`adws/adw_watch.py`, stamped by `install.py` like every
-  other ADW), tested (frontier/blocking/claim/resolve logic, dispatch success
-  and failure paths, tracker detection — `tests/test_watch.py`), and its
-  empty-queue path has been run for real — but that first real
-  `ready-for-agent` pickup is still open.
+- That `just watch`'s current dispatch target (`adw_simple_sdlc.py` — planner
+  → builder → reviewer → revision loop → documenter → commit, since 2026-09-10)
+  has itself been run live end to end yet. `just watch` **has** claimed and
+  shipped two real issues end to end (`opencode-expo`, 2026-09-09/10, real
+  cost, real commits) — but both ran before this fix, through the lighter
+  chain the watcher used to call, with no reviewer/documenter phase at all.
+  That gap (found by reading the diffs afterward, not by anything the queue
+  itself caught) is *why* the dispatch target changed. The corrected,
+  full-chain dispatch is tested (`tests/test_watch.py` mocks
+  `adw_simple_sdlc.main`, same coverage as before) but not yet exercised by a
+  real live `just watch` run.
 
 ## Version history
 
 | Version | Date | Changes |
 |---|---|---|
+| 4.4 | 2026-09-10 | `just watch` now dispatches through the full SDLC chain (`adw_simple_sdlc.py`: planner → builder → reviewer → revision loop → documenter → commit), not the lighter `plan_build_test` chain it silently used before. Found downstream (`opencode-expo`): its first two real queue dispatches (a PIN-authentication access gate, a biometric-unlock follow-up) both landed with zero review — the watcher had always called `adw_plan_build_test.main()`, which has no reviewer, revision loop, or documenter phase at all. That's a materially bigger gap for an unattended queue than for a manual `just sdlc` run a human reads afterward. `adw_simple_sdlc.main()`'s signature is identical (`prompt, config, adw_id`), confirmed before switching; the roster already had `reviewer`/`documenter` configured, so no config change was needed. Updated Part D's "Dispatch" step description to match. |
 | 4.3 | 2026-09-09 | Renamed the `just sssf` recipe to `just watch`, matching its script (`adw_watch.py`) — found via a downstream adoption (`opencode-expo`) questioning the mismatch: 6 of 8 recipes mirror their script name directly, and this one didn't need to be the exception `sdlc` legitimately is (that one names the workflow's meaning, not its script). Updated the recipe, `adw_watch.py`'s own runtime log-line prefixes, `test_watch.py`, and every prescriptive (non-changelog) reference in this playbook's Part D prose and diagram. Also ported back a real bug fix found downstream: `git_helper.py`'s `_git()` did a full `.strip()` on subprocess output, which silently ate the leading space off only the *first* line of multi-line porcelain output (git status codes are leading-whitespace-significant) — corrupting `changed_files()`'s first result. Never reachable before a target repo actually had git history to run these functions against; fixed to `.rstrip()`. |
 | 4.2 | 2026-09-09 | Named the filing step Part D's diagram had glossed over: neither `grill-with-docs` nor `improve-codebase-architecture` writes an issue — someone has to manually create `.scratch/<feature>/spec.md` or `issues/NN-slug.md` with a parseable `Status: needs-triage` line before `/triage` can see it. Added a "Filing" subsection with the exact required shape and a new diagram node. |
 | 4.1 | 2026-09-09 | Built Part D's `just sssf` for real: `adws/adw_watch.py` (stamped like every other ADW) plus 24 tests covering frontier/blocking/claim/resolve/dispatch/tracker-detection. Updated "What this playbook does not claim" — it's shipped and tested, just not yet run against a real live queue end to end. |

@@ -1,7 +1,7 @@
 ---
 title: "Handoff — where this work stands and how to pick it up"
-version: 1.6
-updated: 2026-09-09
+version: 1.7
+updated: 2026-09-10
 status: active
 ---
 
@@ -190,3 +190,4 @@ The guard invisible through the public entry point. The gate table that was simp
 | 1.4 | 2026-09-09 | Filed a new Open item: `adw_watch.py` (`just sssf`, built today) doesn't work against every target repo — found trying to point it at `opencode-expo`. Assumes a git repo unconditionally (breaks against a deliberately git-free target, ADR 0003 there) and its frontier scan's `issues/NN-slug.md` shape doesn't match that repo's older single-`issue.md` tracker convention. Not fixed; `opencode-expo`'s next ticket dispatched manually instead. |
 | 1.5 | 2026-09-09 | Filed a new Open item: the vendored `code-review` skill (`opencode-expo`) was deliberately left unwired from `reviewer` after assessment — it assumes interactivity + sub-agent orchestration `reviewer`'s tools can't support, contradicts `reviewer`'s own "not your job: style opinions" charter, and its human-readable report format mismatches the `ReviewOutput`/JSON contract `adw_simple_sdlc.py`'s revision loop consumes programmatically. `wayfinder`/`write-a-prd`/`prd-to-plan`/`tdd` remain wired to `planner`, unaffected. Flags a possible playbook follow-up (does the target agent's contract survive composition, not just "ask the user") — not written yet. |
 | 1.6 | 2026-09-09 | Ported two fixes back from `opencode-expo` after it became the first target repo to actually run `adw_watch.py`'s git-dependent code against a real, live git history: a real bug in `git_helper.py`'s `_git()` (a full `.strip()` corrupted the first path in multi-line porcelain output — fixed to `.rstrip()`), and `just sssf` renamed to `just watch` to match its script name. Playbook bumped to 4.3 with a new changelog row; historical 4.0/4.1 rows deliberately left saying `just sssf`, matching what was actually named at the time. Full suite green (126 passed). |
+| 1.7 | 2026-09-10 | Ported another real fix back from `opencode-expo`, found after its first two live `just watch` dispatches (a PIN-authentication access gate, a biometric-unlock follow-up) both landed with zero review: `adw_watch.py` always called `adw_plan_build_test.main()` (planner → builder → test → commit, no reviewer/revision-loop/documenter), not the fuller `adw_simple_sdlc.py` chain the playbook's own prose implied. An unattended queue dispatch has nothing else checking it besides the test gate — worse than a manual `just sdlc` run a human reads afterward. Switched the dispatch target (identical 3-arg signature, confirmed before switching); the roster already had `reviewer`/`documenter` configured. Playbook bumped to 4.4; "What this playbook does not claim" corrected — `just watch` genuinely has shipped two real issues now, but not yet through this corrected full-chain path. Full suite green (126 passed). |

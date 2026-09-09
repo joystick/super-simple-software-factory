@@ -3,7 +3,11 @@
 # dependencies = ["pydantic", "python-dotenv", "pyyaml", "rich"]
 # ///
 """ADW Watch -- `just watch`: scan the issue tracker for ready-for-agent work,
-claim the frontier, and dispatch it through the full SDLC chain.
+claim the frontier, and dispatch it through the full SDLC chain (planner ->
+builder -> reviewer -> revision loop -> documenter -> commit --
+adw_simple_sdlc.py, not the lighter plan_build_test chain -- an unattended
+queue dispatch gets no other independent check besides the test gate, so it
+needs the review/revision loop a supervised manual run could otherwise skip).
 
 Usage:
     uv run adws/adw_watch.py --once
@@ -55,7 +59,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-import adw_plan_build_test
+import adw_simple_sdlc
 from adw_modules import git_helper, utils
 
 STATUS_RE = re.compile(r"^Status:\s*(\S+)", re.MULTILINE)
@@ -159,7 +163,7 @@ def append_comment(path: Path, note: str) -> None:
 def commit_watcher_state(message: str) -> None:
     """Commit the watcher's own claim/resolve writes to the issue file.
 
-    The ADW's own commit phase (inside adw_plan_build_test.main) fires mid-run,
+    The ADW's own commit phase (inside adw_simple_sdlc.main) fires mid-run,
     before dispatch() writes the final Status: -- so without this, that final
     write sits uncommitted after every run, needing a manual follow-up commit.
     is_dirty() guards against there being nothing to commit (e.g. a crash
@@ -179,7 +183,7 @@ def dispatch(issue: Issue, config: str) -> tuple[bool, str]:
     adw_id = utils.new_id()
     prompt = utils.resolve_prompt(str(issue.path))
     try:
-        exit_code = adw_plan_build_test.main(prompt, config=config, adw_id=adw_id)
+        exit_code = adw_simple_sdlc.main(prompt, config=config, adw_id=adw_id)
     except Exception as exc:  # a crash here is a failed run, not a watcher crash
         set_status(issue.path, FAILED_STATE)
         append_comment(issue.path, f"> *just watch: session `{adw_id}` crashed: {exc}*")
