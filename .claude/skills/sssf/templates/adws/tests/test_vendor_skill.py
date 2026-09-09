@@ -242,3 +242,65 @@ def test_check_drift_reports_a_moved_or_deleted_source(tmp_path):
     drift = vendor_skill.check_drift(result.dest)
     assert drift.drifted is True
     assert str(source) in drift.message
+
+
+# ── --as path-traversal guard ───────────────────────────────────────────────
+# Path(dest_dir) / name joins literally: "../../../etc/passwd" walks out of
+# dest_dir, and an absolute name discards dest_dir outright (that's how
+# Path's "/" operator resolves an absolute right-hand side). --as is
+# operator-supplied, not attacker-controlled in the common case, but the tool
+# still refuses rather than trusting it — same posture as the hand-authored
+# refusal above.
+
+@pytest.mark.parametrize("unsafe_name", [
+    "../../../etc/passwd",
+    "../escape",
+    "sub/dir",
+    "/etc/passwd",
+])
+def test_vendor_rejects_a_path_traversal_as_name(tmp_path, unsafe_name):
+    source = tmp_path / "tdd.md"
+    source.write_text("# TDD\n\nRed, green, refactor.\n")
+    dest_dir = tmp_path / "vendored"
+
+    with pytest.raises(vendor_skill.UnsafeNameError):
+        vendor_skill.vendor(source, dest_dir, name=unsafe_name)
+
+    # nothing must have been written outside dest_dir, and dest_dir itself
+    # must not even have been created by the attempt
+    assert not (tmp_path / "escape.md").exists()
+    assert not dest_dir.exists()
+
+
+@pytest.mark.parametrize("unsafe_name", [".", ".."])
+def test_vendor_rejects_a_dot_or_dot_dot_name(tmp_path, unsafe_name):
+    source = tmp_path / "tdd.md"
+    source.write_text("# TDD\n\nRed, green, refactor.\n")
+    dest_dir = tmp_path / "vendored"
+
+    with pytest.raises(vendor_skill.UnsafeNameError):
+        vendor_skill.vendor(source, dest_dir, name=unsafe_name)
+
+
+def test_vendor_treats_an_explicit_empty_as_name_like_not_provided(tmp_path):
+    # name="" is falsy, so `name or _default_name(source)` falls through to
+    # the default — it never reaches validation, and can't cause traversal
+    # either way, so this is a no-op, not a hole.
+    source = tmp_path / "tdd.md"
+    source.write_text("# TDD\n\nRed, green, refactor.\n")
+    dest_dir = tmp_path / "vendored"
+
+    result = vendor_skill.vendor(source, dest_dir, name="")
+
+    assert result.dest == dest_dir / "tdd.md"
+
+
+def test_vendor_accepts_a_bare_filename_stem_as_name(tmp_path):
+    source = tmp_path / "tdd.md"
+    source.write_text("# TDD\n\nRed, green, refactor.\n")
+    dest_dir = tmp_path / "vendored"
+
+    result = vendor_skill.vendor(source, dest_dir, name="my-tdd-variant")
+
+    assert result.dest == dest_dir / "my-tdd-variant.md"
+    assert result.dest.is_file()

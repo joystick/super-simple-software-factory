@@ -1,6 +1,6 @@
 ---
 title: "Handoff — where this work stands and how to pick it up"
-version: 1.2
+version: 1.3
 updated: 2026-09-08
 status: active
 ---
@@ -65,9 +65,15 @@ that installs this skill. Sat uncommitted for over a week; reviewed and committe
 - **A head-to-head** between `agy` and `claude` — `docs/head-to-head-agy-vs-claude.md`.
 - **`skill_engineering` — built.** Landed upstream in the fork (6 phases + 4 rounds of
   adversarial review, `skill_engineering.py`/`vendor_skill.py`/`adw_skills.py`), pulled into
-  this repo 2026-09-08. Reviewed post-pull — findings filed, none blocking (missing test
-  coverage on an unrelated small `load_plan_from_file` addition, and an unvalidated `--as`
-  path-traversal case in `vendor_skill.py`, both low severity).
+  this repo 2026-09-08. Reviewed post-pull — two low-severity findings, both fixed
+  2026-09-08 (see below): missing test coverage on `load_plan_from_file`, and an
+  unvalidated `--as` path-traversal case in `vendor_skill.py`.
+- **Fixed the two review findings above.** `vendor_skill.vendor()` now rejects any `--as`
+  name containing a path separator or resolving to `.`/`..`/empty (`UnsafeNameError`) —
+  `Path(dest_dir) / name` joins literally, so an unchecked name could escape `dest_dir` or
+  (if absolute) discard it outright. Added `test_vendor_skill.py` coverage for the guard,
+  plus a new `test_utils.py` covering `load_plan_from_file`'s summary extraction and both
+  its error paths. Full suite green (99 passed) after the changes.
 
 ## Open
 
@@ -107,3 +113,4 @@ The guard invisible through the public entry point. The gate table that was simp
 | 1.0 | 2026-08-27 | Initial handoff. |
 | 1.1 | 2026-08-30 | Recorded two uncommitted fork skill fixes (`install.py` visualizer-vendoring, `db.ts` WAL read-write) found while dogfooding `just obs` downstream. |
 | 1.2 | 2026-09-08 | Committed and pushed the two fork skill fixes. Pulled 21 upstream commits, including `skill_engineering` (now built) and the adoption-playbook rework; reviewed, findings filed. |
+| 1.3 | 2026-09-08 | Fixed both review findings from 1.2: `vendor_skill.py`'s `--as` path-traversal case, and missing test coverage on `load_plan_from_file`. |

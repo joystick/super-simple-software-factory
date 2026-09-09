@@ -68,6 +68,23 @@ class HandAuthoredFileError(ValueError):
     provenance header) — refuse rather than silently overwrite it."""
 
 
+class UnsafeNameError(ValueError):
+    """--as (or a default derived from a hostile source path) contains a
+    path separator or traversal component. Path(dest_dir) / name joins
+    literally: a name of "../../../etc/passwd" escapes dest_dir entirely,
+    and an absolute name like "/etc/passwd" discards dest_dir outright —
+    that is how Python's Path "/" operator resolves an absolute right-hand
+    side. Reject anything that is not a bare filename stem."""
+
+
+def _validate_name(name: str) -> None:
+    if not name or name in (".", "..") or "/" in name or "\\" in name:
+        raise UnsafeNameError(
+            f"{name!r} is not a valid vendored filename stem — no '/', no "
+            "'\\', not empty, not '.' or '..'. --as must name a bare file, "
+            "not a path.")
+
+
 @dataclass
 class VendorResult:
     dest: Path
@@ -101,7 +118,9 @@ def vendor(source: str | Path, dest_dir: str | Path, name: str | None = None,
     source = Path(source)
     body = source.read_text()
     source_hash = _hash(body)
-    dest = Path(dest_dir) / f"{name or _default_name(source)}.md"
+    name = name or _default_name(source)
+    _validate_name(name)
+    dest = Path(dest_dir) / f"{name}.md"
 
     if dest.is_file():
         existing = HEADER_RE.match(dest.read_text())
@@ -168,7 +187,7 @@ def main() -> int:
 
     try:
         result = vendor(args.path, args.dest_dir, name=args.name)
-    except HandAuthoredFileError as e:
+    except (HandAuthoredFileError, UnsafeNameError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
     if result.changed:
