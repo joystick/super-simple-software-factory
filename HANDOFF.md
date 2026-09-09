@@ -1,6 +1,6 @@
 ---
 title: "Handoff — where this work stands and how to pick it up"
-version: 1.4
+version: 1.5
 updated: 2026-09-09
 status: active
 ---
@@ -77,7 +77,7 @@ that installs this skill. Sat uncommitted for over a week; reviewed and committe
 
 ## Open
 
-**Nothing is blocked.** Three things were deliberately left:
+**Nothing is blocked.** Four things were deliberately left:
 
 1. **The dead-gate demo** (~£1). Break `pricing-ts`'s test gate to an `echo`, plant a known
    bug, run a real `just sdlc` on an unrelated feature, watch the factory commit the bug and
@@ -113,6 +113,37 @@ that installs this skill. Sat uncommitted for over a week; reviewed and committe
    `detect_tracker`, (b) decide whether `discover_issues()` should also recognize the
    single-`issue.md` shape, or whether that's a tracker-migration problem for the target repo
    instead (`docs/agents/issue-tracker.md` there would need updating either way).
+4. **Not every vendored skill belongs on a headless agent via `skill_engineering:` — the
+   `code-review` skill is a concrete counter-example, found live in `opencode-expo`.**
+   Vendored alongside `wayfinder`/`write-a-prd`/`prd-to-plan`/`tdd` (all four wired to
+   `planner`, 2026-09-09), `code-review` was deliberately left unwired after assessment
+   (independent research agent, `opencode-expo`'s own `adws/`): wiring it to the `reviewer`
+   agent would conflict on three fronts, not just need the same "ask the user" override the
+   planner skills got —
+   - **Assumes interactivity the override pattern can't fully absorb.** Beyond "ask for the
+     fixed point" / "ask the user where the spec is" (the planner-style fix), it also
+     requires **parallel sub-agents** it has no tool access to under `reviewer`'s
+     `tools:` list (no Task/Agent tool) — unexecutable, not just interactively awkward.
+   - **Contradicts the target agent's own charter.** `reviewer/system.md` already says
+     "not your job: running tests, style opinions, refactors" — `code-review`'s Standards
+     axis is exactly that. Letting style findings count toward `blocking` would spend
+     `adw_simple_sdlc.py`'s bounded `MAX_REVISION_LOOPS` on style, not spec conformance.
+   - **Output-shape mismatch.** The skill wants to produce a human-readable two-section
+     report ("don't pick a single winner across axes"); the reviewer's actual contract
+     (`ReviewOutput`: `approved: bool` + `blocking: [...]`) is consumed *programmatically*
+     to gate commit-vs-revise — `reviewer/user.md` demands "ONLY valid JSON, no prose."
+   Planner's wiring worked because stripping "ask the user" left transferable content
+   behind (PRD structure, TDD discipline). Here, stripping the interactive bits *and* the
+   unsupported orchestration *and* the incompatible output format leaves only a smell
+   checklist that actively fights the reviewer's own no-style-opinions rule. **Left
+   unwired** (`code-review.md` sits in `adws/adw_data/skill_engineering/`, `just skills`
+   correctly reports it `(unused)`) — kept instead as a candidate for the engineer's own
+   *interactive* pre-merge use, same bootstrap-phase category as `/grill-with-docs`.
+   Possible follow-up if standards-checking is wanted headlessly: route it through the
+   deterministic `ast-grep scan` gate `reviewer/system.md` already names, not through
+   `skill_engineering:`. Worth folding this "does the target agent's contract survive
+   composition" check into the adoption playbook's "Where the two layers sit" section as
+   general guidance, not just an `opencode-expo`-local note — not done yet.
 
 ## Things that will bite if forgotten
 
@@ -141,3 +172,4 @@ The guard invisible through the public entry point. The gate table that was simp
 | 1.2 | 2026-09-08 | Committed and pushed the two fork skill fixes. Pulled 21 upstream commits, including `skill_engineering` (now built) and the adoption-playbook rework; reviewed, findings filed. |
 | 1.3 | 2026-09-08 | Fixed both review findings from 1.2: `vendor_skill.py`'s `--as` path-traversal case, and missing test coverage on `load_plan_from_file`. |
 | 1.4 | 2026-09-09 | Filed a new Open item: `adw_watch.py` (`just sssf`, built today) doesn't work against every target repo — found trying to point it at `opencode-expo`. Assumes a git repo unconditionally (breaks against a deliberately git-free target, ADR 0003 there) and its frontier scan's `issues/NN-slug.md` shape doesn't match that repo's older single-`issue.md` tracker convention. Not fixed; `opencode-expo`'s next ticket dispatched manually instead. |
+| 1.5 | 2026-09-09 | Filed a new Open item: the vendored `code-review` skill (`opencode-expo`) was deliberately left unwired from `reviewer` after assessment — it assumes interactivity + sub-agent orchestration `reviewer`'s tools can't support, contradicts `reviewer`'s own "not your job: style opinions" charter, and its human-readable report format mismatches the `ReviewOutput`/JSON contract `adw_simple_sdlc.py`'s revision loop consumes programmatically. `wayfinder`/`write-a-prd`/`prd-to-plan`/`tdd` remain wired to `planner`, unaffected. Flags a possible playbook follow-up (does the target agent's contract survive composition, not just "ask the user") — not written yet. |
