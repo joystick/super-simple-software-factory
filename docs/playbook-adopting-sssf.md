@@ -1,6 +1,6 @@
 ---
 title: "Adoption playbook — putting SSSF to work on real code"
-version: 4.0
+version: 4.1
 updated: 2026-09-09
 status: active
 ---
@@ -665,14 +665,18 @@ Everything in Part C's definition of done, plus:
   gates judge the outcome, not the process. That distinction is the point.
 - That any cost figure transfers to your repo. Language, suite size, and repo
   shape dominate. Measure your own on a throwaway branch before budgeting.
-- That `just sssf` (Part D) exists as shipped code. It's a design, reasoned
-  through against the tracker mechanisms this playbook already documents —
-  build it before pointing a scheduler at a repo expecting it.
+- That `just sssf` (Part D) has claimed and shipped a real issue end to end
+  yet. It's shipped (`adws/adw_watch.py`, stamped by `install.py` like every
+  other ADW), tested (frontier/blocking/claim/resolve logic, dispatch success
+  and failure paths, tracker detection — `tests/test_watch.py`), and its
+  empty-queue path has been run for real — but that first real
+  `ready-for-agent` pickup is still open.
 
 ## Version history
 
 | Version | Date | Changes |
 |---|---|---|
+| 4.1 | 2026-09-09 | Built Part D's `just sssf` for real: `adws/adw_watch.py` (stamped like every other ADW) plus 24 tests covering frontier/blocking/claim/resolve/dispatch/tracker-detection. Updated "What this playbook does not claim" — it's shipped and tested, just not yet run against a real live queue end to end. |
 | 4.0 | 2026-09-09 | Added Part D — the queue: turns Part C's single unattended run into a standing queue. Keeps feasibility/compatibility/compliance/security judgment interactive via the `triage` skill (terminal state `ready-for-agent` posts a durable agent brief, same bootstrap-then-headless pattern as `grill-with-docs`); `just sssf` only ever claims already-`ready-for-agent` work. Reuses wayfinder's existing map/child/frontier/claim/resolve mechanism as the queue rather than inventing a new one, and flags the gap it exposes: `prd-to-plan` phases need their own issue files with `Blocked by:` to be queue-pickable. Design only, not yet built. |
 | 3.1 | 2026-09-08 | Replaced every `/grill-me` reference (A4, A5, B1) with `/grill-with-docs`. `grill-me` is a bare alias for the `grilling` interview with no artifact output; `grill-with-docs` composes the same interview with `domain-modeling`, writing resolved vocabulary to `CONTEXT.md`/`docs/adr/`. Part C's AFK mechanism depends on that vocabulary existing on disk for scout/planner to read — `grill-me` alone can't produce it, so the playbook now names one interview skill throughout, and it's the AFK-sufficient one. |
 | 3.0 | 2026-09-08 | Added Part C — going dark: relocates `write-a-prd`/`wayfinder`'s interactive interview to a human-supervised bootstrap phase (`/grill-with-docs`, writes `CONTEXT.md`/`docs/adr/`, committed before the headless loop starts) so the AFK loop never needs to prompt live; adds glossary → knowledge-source → structural-search discovery to scout before planning, so plans scope to the delta instead of re-implementing what exists. Generalized from a same-session design pass on a real project (`weather-report`'s `docs/agents/dark-factory-protocol.md`), which stays as that project's concrete instance of this part. |
