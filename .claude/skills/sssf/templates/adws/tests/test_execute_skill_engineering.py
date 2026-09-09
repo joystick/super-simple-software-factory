@@ -19,7 +19,7 @@ import json
 import subprocess
 
 import pytest
-from adw_modules import agent_agy, agent_cc, agent_pi, agents
+from adw_modules import agent_agy, agent_cc, agent_opencode, agent_pi, agents
 from adw_modules.data_types import (AgentCall, AgentConfig, ConfigDefaults,
                                     GenericOutput, Phase, PhaseParams,
                                     PiResult, PromptEngineering, SSSFConfig)
@@ -61,7 +61,7 @@ def captured_request(monkeypatch):
         captured["request"] = request
         return PiResult(text='{"status": "success", "summary": "ok"}')
 
-    for module in (agent_cc, agent_pi, agent_agy):
+    for module in (agent_cc, agent_pi, agent_agy, agent_opencode):
         monkeypatch.setattr(module, "run", fake_run)
     return captured
 
@@ -78,6 +78,7 @@ def _skill_dir(tmp_path) -> None:
     ("claude_code", "anthropic/claude-sonnet-4"),
     ("pi", "google/gemini-3.6-flash"),
     ("agy", "agy/gemini-3.7-flash-medium"),
+    ("opencode", "opencode/openrouter/nvidia/nemotron-3-super-120b-a12b:free"),
 ])
 def test_skill_engineering_applies_or_not_per_coding_agent(
         repo, captured_request, coding_agent, model):

@@ -17,7 +17,8 @@ from typing import Optional
 
 import yaml
 
-from . import agent_agy, agent_cc, agent_pi, permissions, prompts, skill_engineering
+from . import (agent_agy, agent_cc, agent_opencode, agent_pi, permissions,
+              prompts, skill_engineering)
 from .data_types import (AgentCall, AgentConfig, EnvelopeBase, EventRecord,
                          GateCheck, GateReport, Phase, PiRequest, SSSFConfig,
                          UsageBreakdown)
@@ -25,10 +26,11 @@ from .utils import new_id
 
 JSON_FIX_ATTEMPTS = 2      # continue-with-correction attempts for malformed JSON
 
-# The two coding agents behind a phase. Both expose the same surface —
+# The coding agents behind a phase. All expose the same surface —
 # run(request, on_event, on_spawn, on_exit) -> PiResult, resolve_model(pattern),
 # ToolCallTracker — so everything below picks a module and stops caring which.
-INTERFACES = {"pi": agent_pi, "claude_code": agent_cc, "agy": agent_agy}
+INTERFACES = {"pi": agent_pi, "claude_code": agent_cc, "agy": agent_agy,
+             "opencode": agent_opencode}
 
 
 def interface(agent: AgentConfig):
