@@ -1,6 +1,7 @@
 """agents.ignored_field_warnings() — Phase 5.
 
-skill_engineering only takes effect under coding_agent: claude_code;
+skill_engineering takes effect under any coding_agent covered by
+skill_engineering_applies() (currently all four known coding agents);
 harness_engineering only takes effect under coding_agent: pi. Naming the
 other agent's field is not an error (the config is still usable), but it's
 exactly the kind of silently-ignored setting this repo has been bitten by
@@ -22,13 +23,13 @@ def _agent(**overrides) -> AgentConfig:
     )
 
 
-def test_pi_agent_with_skill_engineering_warns():
-    agent = _agent(coding_agent="pi", skill_engineering=["adws/adw_data/skill_engineering/tdd.md"])
-    warnings = ignored_field_warnings(agent)
-    assert len(warnings) == 1
-    assert "builder" in warnings[0]
-    assert "skill_engineering" in warnings[0]
-    assert "pi" in warnings[0]
+def test_pi_agent_with_harness_engineering_and_skill_engineering_warns_about_neither():
+    # Both fields are honoured under pi now: harness_engineering always has
+    # been, and skill_engineering_applies() covers pi too.
+    agent = _agent(coding_agent="pi",
+                   harness_engineering=["adws/adw_data/harness_engineering/subagents.ts"],
+                   skill_engineering=["adws/adw_data/skill_engineering/tdd.md"])
+    assert ignored_field_warnings(agent) == []
 
 
 def test_claude_code_agent_with_harness_engineering_warns():
@@ -41,13 +42,11 @@ def test_claude_code_agent_with_harness_engineering_warns():
     assert "claude_code" in warnings[0]
 
 
-def test_agy_agent_with_skill_engineering_also_warns():
-    # skill_engineering only takes effect under claude_code — agy is just as
-    # silently-ignored a target as pi is.
+def test_agy_agent_with_skill_engineering_does_not_warn():
+    # skill_engineering_applies() covers agy — this is now the normal case,
+    # not a silently-ignored one.
     agent = _agent(coding_agent="agy", skill_engineering=["adws/adw_data/skill_engineering/tdd.md"])
-    warnings = ignored_field_warnings(agent)
-    assert len(warnings) == 1
-    assert "agy" in warnings[0]
+    assert ignored_field_warnings(agent) == []
 
 
 def test_pi_agent_with_harness_engineering_does_not_warn():
@@ -69,7 +68,10 @@ def test_agent_with_neither_field_set_warns_about_nothing():
     assert ignored_field_warnings(agent) == []
 
 
-def test_pi_agent_with_both_ignored_fields_set_warns_about_only_the_relevant_one():
-    agent = _agent(coding_agent="pi", skill_engineering=["adws/adw_data/skill_engineering/tdd.md"])
+def test_claude_code_agent_with_harness_engineering_and_skill_engineering_warns_about_only_the_relevant_one():
+    agent = _agent(coding_agent="claude_code",
+                   harness_engineering=["adws/adw_data/harness_engineering/subagents.ts"],
+                   skill_engineering=["adws/adw_data/skill_engineering/tdd.md"])
     warnings = ignored_field_warnings(agent)
-    assert len(warnings) == 1  # not two — harness_engineering is fine under pi
+    assert len(warnings) == 1  # not two — skill_engineering is fine under claude_code
+    assert "harness_engineering" in warnings[0]

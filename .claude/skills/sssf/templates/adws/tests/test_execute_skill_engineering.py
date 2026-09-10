@@ -80,8 +80,12 @@ def _skill_dir(tmp_path) -> None:
     ("agy", "agy/gemini-3.7-flash-medium"),
     ("opencode", "opencode/openrouter/nvidia/nemotron-3-super-120b-a12b:free"),
 ])
-def test_skill_engineering_applies_or_not_per_coding_agent(
+def test_skill_engineering_applies_to_every_known_coding_agent(
         repo, captured_request, coding_agent, model):
+    # Verified live (not just by reasoning about --system-prompt vs.
+    # _compose()) that all four coding agents actually receive the composed
+    # skill text through their own delivery channel — see
+    # skill_engineering_applies()'s docstring in agents.py.
     _skill_dir(repo)
     cfg = SSSFConfig(
         defaults=ConfigDefaults(),
@@ -95,27 +99,17 @@ def test_skill_engineering_applies_or_not_per_coding_agent(
     agents.execute(run, _phase(), _call())
 
     system_prompt = captured_request["request"].system_prompt
-    contains_skill = "Red, green, refactor." in system_prompt
-    if coding_agent == "claude_code":
-        assert contains_skill, "claude_code must receive the composed skill text"
-    else:
-        assert not contains_skill, (
-            f"{coding_agent} must NOT receive skill text — skill_engineering "
-            "only applies under claude_code, and this is exactly the bug an "
-            "adversarial review found: it was being injected anyway")
+    assert "Red, green, refactor." in system_prompt, (
+        f"{coding_agent} must receive the composed skill text")
 
     # The trace must agree with the actual request, not just echo the
     # config — a second review pass found agent_session_row recording
     # agent.skill_engineering unconditionally, so a pi/agy agent's row
     # claimed a skill was "given" even when execute() correctly never
-    # applied it.
+    # applied it (true when skill_engineering was claude_code-only; kept
+    # as a regression guard now that all four agents apply).
     row = run.tracer.conn.execute(
         "SELECT skill_engineering_json FROM agent_sessions WHERE adw_id=? AND agent=?",
         (run.adw_id, "builder")).fetchone()
     recorded_skills = json.loads(row[0])
-    if coding_agent == "claude_code":
-        assert recorded_skills == ["adws/adw_data/skill_engineering/tdd.md"]
-    else:
-        assert recorded_skills == [], (
-            f"{coding_agent}'s trace row must not claim tdd.md was given when "
-            "it was never applied")
+    assert recorded_skills == ["adws/adw_data/skill_engineering/tdd.md"]

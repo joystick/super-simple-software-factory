@@ -73,20 +73,36 @@ def skill_engineering_applies(agent: AgentConfig) -> bool:
     injected and billed with no signal that it was happening. One function,
     called from both places, is what makes that specific bug impossible to
     reintroduce silently.
+
+    Applies to every coding_agent that actually receives `request.system_prompt`
+    through some channel — which, checked directly against each interface
+    module, is all four: `agent_cc.py`/`agent_pi.py` pass it as a real
+    `--system-prompt` CLI flag; `agent_agy.py`/`agent_opencode.py` have no such
+    flag but fold it into the user turn via their own `_compose()` (weaker —
+    advice inside the conversation, not a separate channel — but it does
+    arrive). Previously hardcoded to `claude_code` only, on the belief
+    (documented in the old adoption-playbook prose, itself now corrected) that
+    `--system-prompt` was claude_code-specific — checked live and it was not:
+    pi has always had the same flag, and agy/opencode's composed system text
+    was verified to actually reach the model, not just architecturally
+    plausible to. An explicit allowlist rather than `return True` on purpose:
+    a future fifth coding_agent needs someone to deliberately add it here,
+    confirmed against its own interface module, not inherit this by default.
     """
-    return agent.coding_agent == "claude_code"
+    return agent.coding_agent in ("claude_code", "pi", "agy", "opencode")
 
 
 def ignored_field_warnings(agent: AgentConfig) -> list[str]:
     """Configured but silently-ignored-by-design fields, named — never
     fatal, and never silent either. `harness_engineering` only takes effect
-    under `coding_agent: pi`; `skill_engineering` only takes effect under
-    `coding_agent: claude_code` (see skill_engineering_applies). The other
-    coding agent's own field is a valid combination (a roster naming both,
-    meant to be flipped between agents later, say) so this warns rather
-    than fails validate() — but it warns, because a config field that does
-    nothing with no signal is exactly the failure mode this repo has
-    already been bitten by.
+    under `coding_agent: pi`; `skill_engineering` takes effect under any
+    coding_agent covered by skill_engineering_applies() — currently all
+    four known coding agents, so this second warning is presently dead in
+    practice. Left in place for the day a fifth coding_agent is added
+    without (yet) earning a place in that allowlist — silent-ignore-with-
+    billing is exactly the failure mode this repo has already been bitten
+    by once, so the check stays live rather than being deleted as
+    currently-unreachable.
     """
     warnings = []
     if agent.coding_agent != "pi" and agent.harness_engineering:
@@ -97,8 +113,8 @@ def ignored_field_warnings(agent: AgentConfig) -> list[str]:
     if not skill_engineering_applies(agent) and agent.skill_engineering:
         warnings.append(
             f"agent {agent.name!r}: skill_engineering is set but coding_agent is "
-            f"{agent.coding_agent!r} — skill_engineering only takes effect under "
-            f"coding_agent: claude_code and will be ignored")
+            f"{agent.coding_agent!r} — skill_engineering does not yet apply to this "
+            f"coding_agent and will be ignored")
     return warnings
 
 

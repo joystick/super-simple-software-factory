@@ -100,9 +100,17 @@ def test_no_vendored_skills_and_no_agent_usage_is_an_empty_report(tmp_path):
 # ── Found by round-4 adversarial review: audit_skills() reported every
 #    agent naming a skill as a "user" of it, with no applicability gate —
 #    the identical bug already fixed in execute()/console.py/tracer.py,
-#    just in the one call site nobody had a pi/agy test for. ─────────────
+#    just in the one call site nobody had a pi/agy test for. The gate
+#    (skill_engineering_applies()) now covers all four known coding agents,
+#    so these two tests keep exercising the split logic itself using a
+#    still-real ignored case: harness_engineering-style non-application is
+#    no longer available for skill_engineering, so an agent with an unknown
+#    coding_agent would be the only way to hit `ignored_by` today — not
+#    constructible through the pydantic Literal. Kept as a single agents-only
+#    test confirming every known coding_agent is reported as an active user,
+#    which is the behaviour that replaced the old split. ─────────────
 
-def test_a_pi_agent_naming_a_skill_is_reported_as_ignored_not_a_user(tmp_path):
+def test_every_known_coding_agent_naming_a_skill_is_reported_as_an_active_user(tmp_path):
     skill_dir = tmp_path / "skill_engineering"
     skill_dir.mkdir()
     (skill_dir / "tdd.md").write_text("# TDD")
@@ -111,33 +119,18 @@ def test_a_pi_agent_naming_a_skill_is_reported_as_ignored_not_a_user(tmp_path):
         AgentConfig(name="pi_builder", coding_agent="pi",
                    prompt_engineering=PromptEngineering(system="s.md", user="u.md"),
                    skill_engineering=[path]),
+        AgentConfig(name="agy_builder", coding_agent="agy",
+                   prompt_engineering=PromptEngineering(system="s.md", user="u.md"),
+                   skill_engineering=[path]),
     ])
 
     report = audit_skills(cfg, str(skill_dir))
 
     assert len(report.vendored) == 1
-    assert report.vendored[0].agents == [], (
-        "a pi agent must not be reported as an active user — skill_engineering "
-        "never takes effect under pi, exactly like it never reached its request")
-    assert report.vendored[0].ignored_by == ["pi_builder"]
-
-
-def test_a_mix_of_applying_and_ignoring_agents_is_split_correctly(tmp_path):
-    skill_dir = tmp_path / "skill_engineering"
-    skill_dir.mkdir()
-    (skill_dir / "tdd.md").write_text("# TDD")
-    path = str(skill_dir / "tdd.md")
-    cfg = SSSFConfig(agents=[
-        _agent("builder", skill_engineering=[path]),   # claude_code — applies
-        AgentConfig(name="pi_builder", coding_agent="pi",
-                   prompt_engineering=PromptEngineering(system="s.md", user="u.md"),
-                   skill_engineering=[path]),           # pi — ignored
-    ])
-
-    report = audit_skills(cfg, str(skill_dir))
-
-    assert report.vendored[0].agents == ["builder"]
-    assert report.vendored[0].ignored_by == ["pi_builder"]
+    assert sorted(report.vendored[0].agents) == ["agy_builder", "pi_builder"], (
+        "skill_engineering_applies() now covers pi and agy, verified live — "
+        "both must be reported as active users, not ignored")
+    assert report.vendored[0].ignored_by == []
 
 
 def test_outside_vendor_dir_displays_the_path_as_the_agent_wrote_it(tmp_path, monkeypatch):

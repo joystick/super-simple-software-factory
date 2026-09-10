@@ -8,6 +8,14 @@ compose() regardless of coding_agent — so pi and agy agents actually HAD
 skills injected and billed, contradicting the tool's own warning. The two
 call sites (the warning, and whether to compose) must derive from one
 function, or they can silently diverge again exactly like this.
+
+The function was originally hardcoded to `claude_code` only, on the belief
+that `--system-prompt` (the delivery channel) was claude_code-specific.
+Checked live and that belief was wrong: `pi` has always had the identical
+`--system-prompt` flag as `claude_code` (agent_pi.py / agent_cc.py), and
+agy/opencode fold the composed system text into the user turn via their own
+_compose() — a different but working channel. All four coding agents were
+confirmed to actually receive the composed skill text, so all four apply.
 """
 
 from __future__ import annotations
@@ -27,9 +35,13 @@ def test_applies_under_claude_code():
     assert skill_engineering_applies(_agent("claude_code")) is True
 
 
-def test_does_not_apply_under_pi():
-    assert skill_engineering_applies(_agent("pi")) is False
+def test_applies_under_pi():
+    assert skill_engineering_applies(_agent("pi")) is True
 
 
-def test_does_not_apply_under_agy():
-    assert skill_engineering_applies(_agent("agy")) is False
+def test_applies_under_agy():
+    assert skill_engineering_applies(_agent("agy")) is True
+
+
+def test_applies_under_opencode():
+    assert skill_engineering_applies(_agent("opencode")) is True
