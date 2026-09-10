@@ -1,6 +1,6 @@
 ---
 title: "Adoption playbook — putting SSSF to work on real code"
-version: 4.4
+version: 4.5
 updated: 2026-09-10
 status: active
 ---
@@ -568,9 +568,8 @@ ships it without anyone manually running `just sdlc` per item.
 
 ```mermaid
 flowchart TD
-    Idea["/grill-with-docs or<br/>/improve-codebase-architecture<br/>(engineer, interactive: ideate)"] --> File[["File it — engineer writes<br/>.scratch/&lt;feature&gt;/spec.md or<br/>issues/NN-slug.md, Status: needs-triage.<br/>No skill does this step yet."]]
-    File --> Filed[Committed —<br/>needs-triage]
-    Filed --> Triage["/triage<br/>(engineer, interactive: JUDGE —<br/>feasibility, compatibility, compliance,<br/>security, redundancy, .out-of-scope/)"]
+    Idea["/grill-with-docs or<br/>/improve-codebase-architecture<br/>(engineer, interactive: ideate)"] --> File[["Hand /triage the settled<br/>description — no file needed first.<br/>/triage itself creates<br/>issues/NN-slug.md, Status: needs-triage"]]
+    File --> Triage["/triage<br/>(engineer, interactive: JUDGE —<br/>feasibility, compatibility, compliance,<br/>security, redundancy, .out-of-scope/)"]
     Triage -->|Rejected or already exists| Wontfix([wontfix])
     Triage -->|Needs a human| ReadyHuman([ready-for-human])
     Triage -->|Approved, agent brief posted| Ready[["ready-for-agent"]]
@@ -586,27 +585,46 @@ flowchart TD
     style Resolve fill:#bbf7d0,stroke:#15803d,color:#000
 ```
 
-### Filing: the step no skill does yet
+### Filing: less manual than it looks, but one real gap remains
 
-`grill-with-docs` (`grilling` + `domain-modeling`) and
-`improve-codebase-architecture`'s grilling loop both end at updated
-`CONTEXT.md`/`docs/adr/` — **neither writes an issue.** Something still has
-to turn "we settled on this" into a file `/triage` can see. Right now that's
-a manual step: you (or an assisting agent, in the same interactive session)
-write it.
+**Correction (v4.5):** earlier versions of this section claimed nothing
+writes `issues/NN-slug.md`. Traced against a real repo's filed tickets and
+that's wrong for that file specifically — `/triage`'s own "apply the
+outcome" step, for `ready-for-agent`, is *"post an agent brief comment,"* and
+`docs/agents/issue-tracker.md` says *"when a skill says 'publish to the
+issue tracker' → create a new file."* On the local-markdown tracker, `/triage`
+posting its agent brief on a not-yet-tracked item **is** the file-creation
+event — verified by content only `/triage`'s documented flow produces (a
+`.out-of-scope/` prior-rejection check, a redundancy check, the exact
+category/state role vocabulary) showing up inside filed issue files that
+were never touched by any other skill. So: **`/triage` files
+`issues/NN-slug.md` itself**, one full pass per item, as long as it's handed
+something to triage.
+
+The remaining gap is narrower and upstream of that: `grill-with-docs`
+(`grilling` + `domain-modeling`) and `improve-codebase-architecture`'s
+grilling loop both end at updated `CONTEXT.md`/`docs/adr/` — **neither hands
+`/triage` anything.** Something still has to turn "we settled on this" into
+the first description `/triage` can act on. That's the actual manual step:
+you (or an assisting agent, same interactive session) either invoke `/triage`
+directly with the settled description in natural language (no file needed
+first — triage creates it), or write a minimal stub yourself if you want the
+file to exist before triage runs.
 
 **Pick the shape**, per `docs/agents/issue-tracker.md`'s own convention:
 
 - **New feature** → `.scratch/<feature-slug>/spec.md` — a PRD (problem,
-  solution, user stories), if the idea is substantial enough to be its own
-  feature.
+  solution, user stories). `/write-a-prd` writes this directly; no manual
+  step here at all once you've run it.
 - **Addition to an existing feature** → `.scratch/<existing-feature-slug>/issues/NN-<slug>.md`,
   `NN` the next free number in that feature's `issues/` dir. Numbers are
   scoped per feature, not global — a `Blocked by: 01` in one feature never
-  refers to another feature's `01`.
+  refers to another feature's `01`. Hand `/triage` the description; it files
+  the ticket.
 
-**What the file must contain** — this is what `/triage` and `just watch` both
-actually parse, not just prose for a human:
+**If you write a stub yourself** (rather than handing `/triage` a bare
+description), it must contain what `/triage` and `just watch` both actually
+parse, not just prose for a human:
 
 ```md
 # Short title
@@ -629,6 +647,52 @@ CONTEXT.md terms or ADRs it touches.
 from your conversation — an uncommitted file is invisible to a fresh session,
 same reasoning as committing `CONTEXT.md`/ADRs before the headless loop
 starts.
+
+### Mandatory checkpoints — verify the filing actually happened
+
+Every one of these has failed silently on a real repo this playbook was
+built against: a skill claims to have written something, and the file isn't
+where the claim said, or isn't committed, or the status string doesn't match
+what the state machine expects. Run this after `/write-a-prd`, `/prd-to-plan`,
+or `/triage` — before assuming the queue can see the work:
+
+```bash
+# 1. The feature directory actually exists
+ls .scratch/<feature-slug>/                    # expect: spec.md, plan.md (if
+                                                 # planned), issues/ (if any
+                                                 # scope was deferred)
+
+# 2. spec.md / plan.md exist if the skills that claim to write them ran
+test -f .scratch/<feature-slug>/spec.md  && echo "spec.md: present"
+test -f .scratch/<feature-slug>/plan.md  && echo "plan.md: present"
+
+# 3. Every issues/ file has a parseable Status: line, exact shape
+grep -L "^Status: " .scratch/<feature-slug>/issues/*.md   # empty output = good;
+                                                            # any listed file is
+                                                            # invisible to both
+                                                            # /triage and
+                                                            # adw_watch.py's
+                                                            # frontier scan
+
+# 4. Status values are one of the five canonical roles — a typo here is
+#    silent, not an error
+grep -h "^Status: " .scratch/<feature-slug>/issues/*.md \
+  | sort -u   # every line must be one of: needs-triage, needs-info,
+              # ready-for-agent, ready-for-human, wontfix
+
+# 5. Nothing is sitting uncommitted — invisible to a fresh session, same
+#    failure mode as an unwired gate reporting a phantom PASS
+git status --short .scratch/<feature-slug>/    # expect: empty
+
+# 6. Blocked-by references actually resolve within the same feature
+grep -h "^Blocked by: " .scratch/<feature-slug>/issues/*.md
+# then confirm each NN referenced has a matching <feature-slug>/issues/NN-*.md
+```
+
+If any of these come back wrong, don't proceed to `just watch` — a `Status:`
+typo or an uncommitted file doesn't error, it just makes `adw_watch.py`'s
+frontier scan silently skip the item forever, the same class of
+manufactures-confidence failure rule zero exists to catch at the gate level.
 
 ### The judgment call stays interactive, on purpose
 
@@ -738,6 +802,7 @@ Everything in Part C's definition of done, plus:
 
 | Version | Date | Changes |
 |---|---|---|
+| 4.5 | 2026-09-10 | Corrected v4.2's Filing claim: `/triage` does write `issues/NN-slug.md` itself — verified against a real repo's filed tickets (`weather-report`), whose content included a `.out-of-scope/` prior-rejection check and the exact category/state role vocabulary that only `/triage`'s documented flow produces, never touched by any other skill. `docs/agents/issue-tracker.md`'s own "publish to the issue tracker → create a new file" rule means `/triage` posting its agent brief on a not-yet-tracked item *is* the file-creation event on the local-markdown tracker. The real gap is narrower and upstream: nothing hands `/triage` the settled description in the first place after `grill-with-docs`/`improve-codebase-architecture` finish. Updated the Filing section and Part D's diagram node accordingly. Added a "Mandatory checkpoints" subsection: concrete shell commands to verify a filing actually landed (directory exists, `Status:` lines present and canonical, nothing uncommitted, `Blocked by:` references resolve) — this class of failure (claimed-but-not-actually-written, or written-but-invisible-to-the-state-machine) is silent, not an error, the same manufactures-confidence risk rule zero exists to catch for quality gates. |
 | 4.4 | 2026-09-10 | `just watch` now dispatches through the full SDLC chain (`adw_simple_sdlc.py`: planner → builder → reviewer → revision loop → documenter → commit), not the lighter `plan_build_test` chain it silently used before. Found downstream (`opencode-expo`): its first two real queue dispatches (a PIN-authentication access gate, a biometric-unlock follow-up) both landed with zero review — the watcher had always called `adw_plan_build_test.main()`, which has no reviewer, revision loop, or documenter phase at all. That's a materially bigger gap for an unattended queue than for a manual `just sdlc` run a human reads afterward. `adw_simple_sdlc.main()`'s signature is identical (`prompt, config, adw_id`), confirmed before switching; the roster already had `reviewer`/`documenter` configured, so no config change was needed. Updated Part D's "Dispatch" step description to match. |
 | 4.3 | 2026-09-09 | Renamed the `just sssf` recipe to `just watch`, matching its script (`adw_watch.py`) — found via a downstream adoption (`opencode-expo`) questioning the mismatch: 6 of 8 recipes mirror their script name directly, and this one didn't need to be the exception `sdlc` legitimately is (that one names the workflow's meaning, not its script). Updated the recipe, `adw_watch.py`'s own runtime log-line prefixes, `test_watch.py`, and every prescriptive (non-changelog) reference in this playbook's Part D prose and diagram. Also ported back a real bug fix found downstream: `git_helper.py`'s `_git()` did a full `.strip()` on subprocess output, which silently ate the leading space off only the *first* line of multi-line porcelain output (git status codes are leading-whitespace-significant) — corrupting `changed_files()`'s first result. Never reachable before a target repo actually had git history to run these functions against; fixed to `.rstrip()`. |
 | 4.2 | 2026-09-09 | Named the filing step Part D's diagram had glossed over: neither `grill-with-docs` nor `improve-codebase-architecture` writes an issue — someone has to manually create `.scratch/<feature>/spec.md` or `issues/NN-slug.md` with a parseable `Status: needs-triage` line before `/triage` can see it. Added a "Filing" subsection with the exact required shape and a new diagram node. |
