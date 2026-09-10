@@ -324,7 +324,8 @@ would otherwise have been answered by the agent guessing, mid-build.
 > true. The addition is the `skill_engineering:` config key: a *specific named*
 > skill can be vendored into the repo and attached to one agent (see "Where the
 > two layers sit"), so the two layers can meet — but only for skills you choose
-> on purpose, and only for `claude_code` agents. Your general interactive
+> on purpose, and only for the coding agents SSSF knows how to hand a system
+> prompt to (currently all four it ships with). Your general interactive
 > toolkit is still yours alone.
 
 ### B2. Make it a repo with a walking skeleton
@@ -432,9 +433,14 @@ How it works. Each claim below is documented behaviour you can verify in
   now lives in your tree, versioned with your code.
 - **Attach** it with the `skill_engineering:` config key on an agent in
   `sssf.config.yaml`. That agent's prompt carries the protocol.
-- **`claude_code` only.** Agents configured as `pi` or `agy` ignore the key —
-  check where `skill_engineering` is read in `adws/adw_modules/` to confirm on
-  your version.
+- **Every coding agent, delivered differently.** `claude_code` and `pi` both
+  take it as a real `--system-prompt` CLI flag; `agy` and `opencode` have no
+  such flag, so they fold it into the user turn instead — weaker (advice
+  inside the conversation, not a separate channel) but it arrives. Check
+  `skill_engineering_applies()` in `adws/adw_modules/agents.py` to confirm
+  which coding agents are covered on your version; a future coding agent
+  added to SSSF needs a deliberate addition there before this key does
+  anything for it.
 - **Cost is visible.** Vendored skill text is real tokens on every call that
   agent makes, and the run reports it in the session record `just sessions`
   reads. Attach protocols you want, not every protocol you own.

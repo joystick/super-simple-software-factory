@@ -85,12 +85,18 @@ def test_validate_passes_for_an_agent_with_no_skill_engineering(tmp_path, monkey
     agents.validate(cfg, ["builder"])  # must not raise — user story 24
 
 
-def test_validate_warns_but_does_not_raise_for_a_non_claude_code_agent_with_skill_engineering(
+def test_validate_passes_silently_for_a_non_claude_code_agent_with_skill_engineering(
         tmp_path, monkeypatch, capsys):
     # coding_agent="agy" deliberately, same reason as _config()'s own choice
     # of "claude_code" elsewhere in this file: resolve_model() must be pure
-    # (no `pi --list-models` subprocess) for this test to be about the
-    # warning, not about whether pi happens to be installed on this machine.
+    # (no `pi --list-models` subprocess) for this test to be about validate(),
+    # not about whether pi happens to be installed on this machine.
+    #
+    # skill_engineering_applies() covers all four known coding agents
+    # (claude_code, pi, agy, opencode), verified live against each — so this
+    # is no longer the "silently-ignored, warn about it" case it used to be
+    # when skill_engineering was claude_code-only. It's just a normal,
+    # honoured config now: no warning.
     monkeypatch.chdir(tmp_path)
     (tmp_path / "system.md").write_text("system")
     (tmp_path / "user.md").write_text("user")
@@ -104,6 +110,4 @@ def test_validate_warns_but_does_not_raise_for_a_non_claude_code_agent_with_skil
 
     agents.validate(cfg, ["builder"])  # must not raise
     captured = capsys.readouterr()
-    assert "warning" in captured.err
-    assert "skill_engineering" in captured.err
-    assert "builder" in captured.err
+    assert "skill_engineering" not in captured.err
