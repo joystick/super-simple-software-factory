@@ -219,6 +219,32 @@ def test_dispatch_flips_to_ready_for_human_on_a_crash_not_a_watcher_crash(tmp_pa
     assert "crashed" in path.read_text()
 
 
+def test_dispatch_flips_to_ready_for_human_on_a_system_exit_not_a_watcher_crash(tmp_path, monkeypatch):
+    # agents.validate() raises SystemExit on a config problem (bad model string,
+    # missing prompt file, etc.) -- SystemExit inherits BaseException, not
+    # Exception, so a bare `except Exception` never sees it. Found live: a
+    # malformed roster model string crashed the whole watcher process instead of
+    # flipping the issue to ready-for-human, leaving it stuck at Status: claimed
+    # with no resolution commit.
+    issues_dir = tmp_path / "feature" / "issues"
+    path = make_issue(issues_dir, "01-a", "ready-for-agent")
+    issue = adw_watch.discover_issues(tmp_path)[0]
+    mock_git(monkeypatch)
+
+    def config_error(*a, **kw):
+        raise SystemExit("config validation failed:\n- agent 'planner': bad model")
+
+    monkeypatch.setattr(adw_watch.adw_simple_sdlc, "main", config_error)
+
+    ok, adw_id = adw_watch.dispatch(issue, "adws/adw_sssf_config/sssf.config.yaml")
+
+    assert ok is False
+    text = path.read_text()
+    assert "Status: ready-for-human" in text
+    assert "crashed" in text
+    assert "bad model" in text
+
+
 def test_dispatch_claims_before_running_so_a_crash_never_leaves_it_ready(tmp_path, monkeypatch):
     issues_dir = tmp_path / "feature" / "issues"
     path = make_issue(issues_dir, "01-a", "ready-for-agent")
