@@ -184,7 +184,17 @@ def dispatch(issue: Issue, config: str) -> tuple[bool, str]:
     prompt = utils.resolve_prompt(str(issue.path))
     try:
         exit_code = adw_simple_sdlc.main(prompt, config=config, adw_id=adw_id)
-    except Exception as exc:  # a crash here is a failed run, not a watcher crash
+    except (Exception, SystemExit) as exc:
+        # A crash here is a failed run, not a watcher crash -- SystemExit must be
+        # caught explicitly alongside Exception: agents.validate() raises SystemExit
+        # on a config problem (bad model string, missing prompt file, etc.), and
+        # SystemExit inherits BaseException, not Exception, so a bare `except
+        # Exception` never sees it. That let a config error crash the whole watcher
+        # process, skipping this handler entirely and leaving the issue stuck at
+        # Status: claimed with no resolution commit -- found live, 2026-09-10,
+        # against a real malformed model string. KeyboardInterrupt (also
+        # BaseException, not caught here) still propagates and stops the watcher,
+        # which is the behavior an operator hitting Ctrl+C actually wants.
         set_status(issue.path, FAILED_STATE)
         append_comment(issue.path, f"> *just watch: session `{adw_id}` crashed: {exc}*")
         commit_watcher_state(f"just watch: session {adw_id} crashed -- flipped to ready-for-human")
