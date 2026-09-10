@@ -39,7 +39,7 @@ ALLOWED_UNGATED = {
     ("agents.py", 212): "validate()'s file-existence check runs for every agent on purpose — "
                         "a typo should be caught even on a pi/agy/opencode agent, in case the "
                         "roster later switches that agent to claude_code",
-    ("agents.py", 275): "agent_start event payload is deliberately AS-DECLARED, not as-applied "
+    ("agents.py", 284): "agent_start event payload is deliberately AS-DECLARED, not as-applied "
                         "(see the comment at that call site) — matches harness_engineering's "
                         "own always-declared behaviour one line above it",
     ("tracer.py", 276): "the documented fallback when a caller omits the explicit override — "

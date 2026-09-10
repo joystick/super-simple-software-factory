@@ -235,7 +235,16 @@ def execute(run, phase: Phase, call: AgentCall) -> EnvelopeBase:
     variables = {
         "prompt": call.prompt,
         "previous_envelope": call.previous.model_dump_json(indent=2) if call.previous else "(none)",
-        "context_handoff_dir": str(run.context_handoff_dir),
+        # .resolve(): found live, 2026-09-10 -- a reviewer `cd searoute-rs`'d for
+        # `cargo test -p searoute-rs` (unnecessary; the workspace root already
+        # supports `-p`), then wrote its declared review.md via this templated
+        # path. Claude Code's Bash tool is a persistent shell across turns, so
+        # that cd stuck for the rest of the session -- the agent's own relative
+        # Write landed at searoute-rs/adws/adw_data/sessions/.../review.md, one
+        # directory off. A relative context_handoff_dir is fine only as long as
+        # no tool call in the session ever changes cwd; nothing enforces that,
+        # so the injected path itself must be immune to it instead.
+        "context_handoff_dir": str(run.context_handoff_dir.resolve()),
     }
     system_text = prompts.render(agent.prompt_engineering.system, variables)
     # skill_engineering_applies() gates BOTH of these — composing (or even
