@@ -234,15 +234,28 @@ full suite (102 tests) and `just skills`' roster audit both green after
 the migration.
 
 **R3 [MEDIUM] — Make `setup-matt-pocock-skills` the single source of the
-tracker doc, with a fenced SSSF extension.** In
-`.claude/skills/sssf/references/config.md` (Vendoring section) and the
-playbook's Filing section, document the contract: the base of
-`docs/agents/issue-tracker.md` belongs to the setup skill; SSSF's queue
-states live in a clearly delimited block (e.g. `<!-- sssf:queue-extension
--->` … `<!-- /sssf:queue-extension -->`) that the installer re-appends after
-any template re-sync. Optionally teach `install.py` to (re)inject the block.
-This turns F4 from "someone remembers" into a mechanism, using the same
-marker idiom `vendor_skill.py` already established.
+tracker doc, with a fenced SSSF extension. DONE (2026-09-13, fork commit
+pending push / opencode-expo `6aaf9fd`).** Documented the contract in
+`.claude/skills/sssf/references/config.md` (new paragraph after Vendoring)
+and the playbook (new "Two owners of one file" subsection in Filing, v4.7).
+Applied the actual markers to opencode-expo's real `docs/agents/
+issue-tracker.md`: the base template turned out to be interleaved with
+SSSF's additions, not cleanly appended at the bottom, so the fence is four
+separate `<!-- sssf:queue-extension -->` regions (the re-sync history note,
+the `Type:` line, the heavily-rewritten "Wayfinding operations" section
+with a visible "on re-sync, keep this version" callout above it, and the
+two `/handoff`-integration sections that don't exist in the base template
+at all) rather than one contiguous block — the plan's original single-block
+framing didn't survive contact with the real file.
+
+Scoped down from the original ask: did **not** teach `install.py` to
+(re)inject the block — `install.py` doesn't own this file at all (it's
+written by `/setup-matt-pocock-skills`, a Pocock skill this project doesn't
+control), so there's no SSSF-side hook to attach automatic reinjection to.
+The markers are a diff aid for whoever re-syncs the base by hand, not
+automatic reinjection — documented as such rather than overclaiming a
+mechanism that doesn't exist. Full suite still green (102 passed); this
+file isn't machine-parsed.
 
 **R4 [MEDIUM] — Close (or formally accept) the grill → triage gap.** Neither
 snapshot bridges it, so the fix is repo-local: add a checklist line to the

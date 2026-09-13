@@ -1,6 +1,6 @@
 ---
 title: "Adoption playbook — putting SSSF to work on real code"
-version: 4.6
+version: 4.7
 updated: 2026-09-13
 status: active
 ---
@@ -634,7 +634,7 @@ file to exist before triage runs.
 **Pick the shape**, per `docs/agents/issue-tracker.md`'s own convention:
 
 - **New feature** → `.scratch/<feature-slug>/spec.md` — a PRD (problem,
-  solution, user stories). `/write-a-prd` writes this directly; no manual
+  solution, user stories). `/to-spec` writes this directly; no manual
   step here at all once you've run it.
 - **Addition to an existing feature** → `.scratch/<existing-feature-slug>/issues/NN-<slug>.md`,
   `NN` the next free number in that feature's `issues/` dir. Numbers are
@@ -667,6 +667,23 @@ CONTEXT.md terms or ADRs it touches.
 from your conversation — an uncommitted file is invisible to a fresh session,
 same reasoning as committing `CONTEXT.md`/ADRs before the headless loop
 starts.
+
+### Two owners of one file — protect the queue's extensions on re-sync
+
+`docs/agents/issue-tracker.md` itself has two owners. `/setup-matt-pocock-skills`
+(not part of SSSF) writes its base from its own canonical local-tracker
+template. `just watch` then depends on that same file also carrying SSSF's
+own additions — most concretely, the `claimed`/`resolved` states
+`adw_watch.py` writes, which the base template's own wayfinding-operations
+prose doesn't name. Nothing currently merges these automatically: if
+`/setup-matt-pocock-skills` is ever re-run to refresh the base, it has no way
+to know an SSSF extension was layered on top, and a whole-file regeneration
+silently drops it. Wrap anything SSSF added or reworded in
+`<!-- sssf:queue-extension -->` … `<!-- /sssf:queue-extension -->` markers —
+same idiom `vendor_skill.py` uses for its provenance headers — so a re-sync
+has something greppable to diff against rather than relying on someone
+remembering. This is a diff aid, not automatic reinjection; there is no
+tooling yet that restores a dropped block on its own.
 
 ### Mandatory checkpoints — verify the filing actually happened
 
@@ -822,6 +839,7 @@ Everything in Part C's definition of done, plus:
 
 | Version | Date | Changes |
 |---|---|---|
+| 4.7 | 2026-09-13 | Added a "Two owners of one file" subsection to the Filing section: `docs/agents/issue-tracker.md`'s base belongs to `/setup-matt-pocock-skills`, SSSF's queue depends on that same file also carrying its own extensions (the `claimed`/`resolved` states `adw_watch.py` writes), and nothing merges the two automatically — a re-sync silently drops the extension. Documents the `<!-- sssf:queue-extension -->` marker convention (same idiom as `vendor_skill.py`'s provenance headers) as a diff aid, not automatic reinjection. Also fixed a stale `/write-a-prd` reference in the Filing section's shape-picking guidance to `/to-spec` (missed by the v4.6 rename pass). |
 | 4.6 | 2026-09-13 | Added a "Skill-name compatibility" subsection to Part C, right before Problem 1: Matt Pocock's upstream skill collection has renamed `write-a-prd` to `to-spec` (via an intermediate `to-prd`) and has no equivalent for `prd-to-plan` (hand-authored here; nearest upstream behavior is `to-tickets` + `implement`). Verified against a fresh clone of the upstream repo plus its CHANGELOG, cross-checked in `.okf/pocock-skills/naming-drift.md`. This playbook's Part C prose and the planner's "On the skills composed below" section were both written against the old names — a new adopter vendoring from current upstream couldn't find two of the three skills this Part tells them to. Documentation-only; the vendored files and planner prompt in this repo are unchanged (`prd-to-plan` stays load-bearing until a deliberate follow-up migration). |
 | 4.5 | 2026-09-10 | Corrected v4.2's Filing claim: `/triage` does write `issues/NN-slug.md` itself — verified against a real repo's filed tickets (`weather-report`), whose content included a `.out-of-scope/` prior-rejection check and the exact category/state role vocabulary that only `/triage`'s documented flow produces, never touched by any other skill. `docs/agents/issue-tracker.md`'s own "publish to the issue tracker → create a new file" rule means `/triage` posting its agent brief on a not-yet-tracked item *is* the file-creation event on the local-markdown tracker. The real gap is narrower and upstream: nothing hands `/triage` the settled description in the first place after `grill-with-docs`/`improve-codebase-architecture` finish. Updated the Filing section and Part D's diagram node accordingly. Added a "Mandatory checkpoints" subsection: concrete shell commands to verify a filing actually landed (directory exists, `Status:` lines present and canonical, nothing uncommitted, `Blocked by:` references resolve) — this class of failure (claimed-but-not-actually-written, or written-but-invisible-to-the-state-machine) is silent, not an error, the same manufactures-confidence risk rule zero exists to catch for quality gates. |
 | 4.4 | 2026-09-10 | `just watch` now dispatches through the full SDLC chain (`adw_simple_sdlc.py`: planner → builder → reviewer → revision loop → documenter → commit), not the lighter `plan_build_test` chain it silently used before. Found downstream (`opencode-expo`): its first two real queue dispatches (a PIN-authentication access gate, a biometric-unlock follow-up) both landed with zero review — the watcher had always called `adw_plan_build_test.main()`, which has no reviewer, revision loop, or documenter phase at all. That's a materially bigger gap for an unattended queue than for a manual `just sdlc` run a human reads afterward. `adw_simple_sdlc.main()`'s signature is identical (`prompt, config, adw_id`), confirmed before switching; the roster already had `reviewer`/`documenter` configured, so no config change was needed. Updated Part D's "Dispatch" step description to match. |
