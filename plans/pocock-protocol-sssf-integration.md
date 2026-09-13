@@ -301,10 +301,22 @@ as available skills, and `wayfinder`'s `research`/`prototype` ticket types
 stop no-op'ing. Local install: 20 skills, no duplicate generations. No
 repo file changed by this item; nothing to push.
 
-**R7 [LOW] — Terminology pass to "spec".** When the playbook is next
-edited, converge prose on "spec" (upstream finished this in 1.2.0; the
-audit's "one artifact, four names" is the same disease). Pure cosmetics;
-do it opportunistically, not as its own effort.
+**R7 [LOW] — Terminology pass to "spec". DONE (2026-09-13, playbook
+v4.10).** All 5 remaining "PRD" mentions converted to "spec". Widened
+slightly beyond pure word-swap: Problem 1's title and body still named the
+retired `write-a-prd`/`prd-to-plan` skills throughout (R1 had deliberately
+left prose like this alone), and renaming "PRD" right next to unrenamed
+skill names would have read incoherently, so that one section's skill
+references were updated too (`write-a-prd` → `to-spec`, `prd-to-plan`'s
+"ask the user to paste it" → `to-tickets`'s "quiz the user"). Also
+corrected the section's title, which claimed "the interview `to-spec`
+wants" — no longer true now that `to-spec` doesn't interview by design;
+reframed around `wayfinder`'s own fallback instead, which is where the
+interview-with-no-audience problem actually still lives. Scoped to
+Problem 1 and one Filing-section mention only — the ~15 remaining
+`/write-a-prd`/`/prd-to-plan` references elsewhere (diagrams, Parts A/B
+walkthroughs) stay as-is per R1's original decision, not swept in this
+pass.
 
 ## 5. What I could NOT verify
 

@@ -1,6 +1,6 @@
 ---
 title: "Adoption playbook — putting SSSF to work on real code"
-version: 4.9
+version: 4.10
 updated: 2026-09-13
 status: active
 ---
@@ -488,13 +488,14 @@ expects, or update the planner's "On the skills composed below" section in
 the same commit — don't do one without the other, or the composed skill
 list and the prompt's per-skill instructions silently stop lining up.
 
-### Problem 1 — the interview `write-a-prd` wants doesn't have anyone to answer it
+### Problem 1 — the interview a vendored planning skill wants doesn't have anyone to answer it
 
-`write-a-prd` (and `wayfinder`'s "ask the user how to proceed" fallback) are
-written for an interactive session — a human on the other end who answers
+`wayfinder`'s "ask the user how to proceed" fallback (and, on an older
+skill generation than the one this repo now vendors, `to-spec`'s own
+interview) are written for an interactive session — a human on the other end who answers
 back. Vendored under `skill_engineering:` and run by a headless `claude_code`
 node, there is no one there. Best case the model role-plays both sides and you
-get a low-fidelity PRD with none of the interview's real value; worst case it
+get a low-fidelity spec with none of the interview's real value; worst case it
 tries to prompt and the run hangs waiting for input that never comes.
 
 **Do not delete the interview — relocate it.** The interview is genuinely how
@@ -507,28 +508,30 @@ a run is unattended. Split it into two phases that run in different modes:
   `/grill-with-docs` yourself — interactively, in whichever harness you're in.
   It composes `grilling` (the relentless interview) with `domain-modeling`
   (writes the resolved vocabulary into `CONTEXT.md`/`docs/adr/` — durable and
-  citable, not prose trapped in one PRD). Approve it, then **commit
+  citable, not prose trapped in one spec). Approve it, then **commit
   `CONTEXT.md`/`docs/adr/` before starting `just sdlc`** — scout and planner
   read them from the working tree, not from any live session. Skipping the
   commit makes the whole bootstrap step invisible to the pipeline.
 - **AFK, headless, the common case.** If the request only composes concepts
   `CONTEXT.md` already names, skip bootstrap entirely — there's nothing left
-  to interview about. `write-a-prd` runs unmodified (do not edit the vendored
-  copy) and degrades to pure PRD-formatting from already-agreed vocabulary.
-  Add this to your `skill_engineering`-attached agent's own `system.md` (not
-  the vendored skill file) so it knows what to do when the composed skill text
-  below it says "ask the user":
+  to interview about. `to-spec` already doesn't interview by design (it's
+  "no interview, just synthesis" — see the compatibility table above), so it
+  runs unmodified (do not edit the vendored copy) and degrades to pure
+  spec-formatting from already-agreed vocabulary. Add this to your
+  `skill_engineering`-attached agent's own `system.md` (not the vendored
+  skill file) so it knows what to do when the composed skill text below it
+  says "ask the user":
 
-  - `wayfinder` finds no fog → continue directly into `write-a-prd`, don't
+  - `wayfinder` finds no fog → continue directly into `to-spec`, don't
     stop and ask how to proceed.
-  - `write-a-prd` never prompts. If it hits a genuine ambiguity `CONTEXT.md`
+  - `to-spec` never prompts. If it hits a genuine ambiguity `CONTEXT.md`
     can't resolve, it says so in the plan and in `notes_for_next_agent`,
     proposes a best-guess term explicitly labeled provisional, and flags that
     a human should run the bootstrap interview before the plan is final —
     it does not guess silently and does not attempt to prompt.
-  - `prd-to-plan`'s "ask the user to paste it" branch never applies in-loop —
-    the PRD is always already in context from the prior step in the same
-    composed prompt.
+  - `to-tickets`'s "quiz the user" step never applies in-loop — the spec is
+    always already in context from the prior step in the same composed
+    prompt.
 
 `grill-with-docs` should stay **out of `skill_engineering/`** — its
 `disable-model-invocation: true` is load-bearing, not an oversight. Vendoring
@@ -656,7 +659,7 @@ file to exist before triage runs.
 
 **Pick the shape**, per `docs/agents/issue-tracker.md`'s own convention:
 
-- **New feature** → `.scratch/<feature-slug>/spec.md` — a PRD (problem,
+- **New feature** → `.scratch/<feature-slug>/spec.md` — a spec (problem,
   solution, user stories). `/to-spec` writes this directly; no manual
   step here at all once you've run it.
 - **Addition to an existing feature** → `.scratch/<existing-feature-slug>/issues/NN-<slug>.md`,
@@ -873,6 +876,7 @@ Everything in Part C's definition of done, plus:
 
 | Version | Date | Changes |
 |---|---|---|
+| 4.10 | 2026-09-13 | R7: converged remaining "PRD" prose on "spec" (upstream finished this same rename in its 1.2.0 — the bootstrap/AFK audit's "one artifact, four names" finding was the same disease). Problem 1's title and body still used the retired `write-a-prd`/`prd-to-plan` names throughout (R1 deliberately left prose like this alone in favor of a compatibility table) — since a PRD→spec wording pass sitting right next to unrenamed skill names would read incoherently, renamed those too in this one section: `write-a-prd` → `to-spec`, `prd-to-plan`'s "ask the user to paste it" → `to-tickets`'s "quiz the user". Scoped to Problem 1 and one Filing-section mention only, not a playbook-wide sweep — the ~15 remaining `/write-a-prd`/`/prd-to-plan` mentions elsewhere (mostly diagrams and Parts A/B walkthroughs) stay as-is per R1's original "documentation-only, point to the compatibility table" decision. |
 | 4.9 | 2026-09-13 | R5: updated the local `triage` skill install (`~/.agents/skills/triage` — the real location; `~/.claude/skills/triage` is a symlink to it) to the fresh upstream clone, which adds external-PR-as-request-surface support (`disable-model-invocation: true`, off by default). Backed up the prior version alongside it before overwriting. Added a Part D paragraph noting the PR surface exists but hits a real ceiling today: a PR only exists on a GitHub/GitLab tracker, and `adw_watch.py` currently refuses those outright (its own module docstring already flags GitHub/GitLab support as unbuilt) — triage can flip a PR to `ready-for-agent`, but nothing in this repo's queue would ever pick it up yet. Also fixed one more stale `write-a-prd` reference (the queue's "judgment call stays interactive" section) to `to-spec`. |
 | 4.8 | 2026-09-13 | Formally accepted the `/grill-with-docs` → `/triage` handoff as manual (R4 in `plans/pocock-protocol-sssf-integration.md`, citing the bootstrap/AFK audit's finding 3.1.3) rather than building a bridge skill — evaluated and rejected as not worth maintaining for one reminder a checklist line covers as well. Added a new subsection in Part C recording the decision (checked against current upstream Pocock skills too: nothing there bridges it either), and a new Definition-of-done checklist item. Also fixed another stale `write-a-prd`/`prd-to-plan` reference (Problem 2's composition-list note) missed by the v4.6 rename pass, to `to-spec`/`to-tickets`. |
 | 4.7 | 2026-09-13 | Added a "Two owners of one file" subsection to the Filing section: `docs/agents/issue-tracker.md`'s base belongs to `/setup-matt-pocock-skills`, SSSF's queue depends on that same file also carrying its own extensions (the `claimed`/`resolved` states `adw_watch.py` writes), and nothing merges the two automatically — a re-sync silently drops the extension. Documents the `<!-- sssf:queue-extension -->` marker convention (same idiom as `vendor_skill.py`'s provenance headers) as a diff aid, not automatic reinjection. Also fixed a stale `/write-a-prd` reference in the Filing section's shape-picking guidance to `/to-spec` (missed by the v4.6 rename pass). |
