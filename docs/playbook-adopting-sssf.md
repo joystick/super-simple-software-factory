@@ -786,6 +786,18 @@ typo or an uncommitted file doesn't error, it just makes `adw_watch.py`'s
 frontier scan silently skip the item forever, the same class of
 manufactures-confidence failure rule zero exists to catch at the gate level.
 
+**Check 6's sharp edge, found live:** an unblocked ticket must have **no**
+`Blocked by:` line at all — never a line saying "none" or explaining why in
+prose. `adw_watch.py`'s `BLOCKED_BY_RE` captures everything after the colon
+and splits it on commas, treating every resulting fragment as a blocking
+ticket number to resolve. A hand-written value like `(none — API exists,
+see spec.md)` splits into two fragments, neither matching a real sibling
+ticket, so `is_unblocked()` returns `False` — the ticket sits at
+`ready-for-agent`, passes every other checkpoint, and is still invisible to
+the frontier scan. No error, no warning: `just watch --once` just reports
+"queue empty." If a ticket has no real blocker, omit the `Blocked by:` line
+entirely; don't write one to say so.
+
 ### The judgment call stays interactive, on purpose
 
 It's tempting to have `just watch` itself analyze a raw issue's feasibility,
@@ -906,6 +918,7 @@ Everything in Part C's definition of done, plus:
 
 | Version | Date | Changes |
 |---|---|---|
+| 4.15 | 2026-09-13 | B1 (first live end-to-end run, `opencode-expo`, device-management-ui): found a real Mandatory-checkpoints gap. `/grill-with-docs` wrote a hand-authored `Blocked by: (none — API exists, see spec.md)` on an unblocked ticket — check 6's own `grep` passed (the line parses), but `adw_watch.py`'s `BLOCKED_BY_RE` splits its value on commas into fragments and treats each as a real blocker; neither fragment matched a sibling ticket, so the ticket sat at `ready-for-agent`, passed every checkpoint, and was still silently invisible to the frontier scan (`just watch --once` reported "queue empty" with no error). Added a "Check 6's sharp edge" callout: an unblocked ticket must omit the `Blocked by:` line entirely, never write "none" in prose. Also confirmed live: `/grill-with-docs` can write `spec.md` and the ticket itself inline during grilling, rather than stopping for separate `/to-spec`/`/to-tickets` runs — "The whole chain, named once" describes 4 distinct human-run steps, but a single grilling session can legitimately collapse steps 1–3 into one. Not yet reflected in that list; flagging here pending a decision on whether to document it as a valid shortcut or leave the list as the general case. |
 | 4.14 | 2026-09-13 | Group A of a fourth-pass re-audit's sync plan (`plans/pocock-protocol-sssf-integration.md`, `downloads/pocock-sssf-sync-plan-v2.md`), per explicit direction that the playbook carry no historical naming baggage as live instruction: deleted the "Skill-name compatibility" section outright (the migration it bridged is complete everywhere else in the system; the table's own standing vendoring instruction had been inverted since R2 — history stays only in this changelog's v4.6 row). Fixed the one cross-reference that pointed at it. Rewrote Parts A4/A5/B1's walkthroughs from prose to numbered command steps naming only current skills (`to-spec`/`to-tickets`, not the retired `write-a-prd`/`prd-to-plan`, which R6 deleted from the local install entirely). Added a new "The whole chain, named once" list at the top of Part D — the working `grill-with-docs → to-spec → to-tickets → triage → watch` sequence previously had to be assembled from three separate sections. Swept the remaining live retired-name references (Problem 1's opening, the Mandatory-checkpoints trigger line, the queue-gap paragraph, the definition-of-done). Also fixed `references/config.md`, which still claimed only 3 coding agents exist and that `skill_engineering`/`harness_engineering` are ignored under `pi`/`agy` — the shipped code covers all four (`agent_opencode.py` was undocumented entirely); added a full `opencode` subsection matching `agy`'s detail level. |
 | 4.13 | 2026-09-13 | F4 (same re-audit): Problem 1's AFK bullet list taught only the interview-related overrides (`wayfinder` no-fog, `to-spec` never-prompts, `to-tickets` quiz-skip), omitting the two triage-bypass overrides R2 actually shipped in the real template (force `needs-triage`, force plain `Status:`/`Blocked by:` lines). An adopter following this list to hand-write their own `system.md` would get a queue-bypassing, queue-invisible configuration even though the shipped template is correct. Added both missing overrides so the playbook teaches what the template actually does. |
 | 4.12 | 2026-09-13 | F2 (same re-audit): fixed a third instance of the exact self-inflicted-error pattern this effort keeps catching — Part D's "judgment call stays interactive" section claimed "`to-spec`'s interview had no one to answer it headless," which v4.9's mechanical rename introduced and v4.10's own cleanup pass missed; `to-spec` never interviews, directly contradicting the compatibility table 280 lines earlier. Reworded to point at `wayfinder`'s fallback instead, which is the thing that's actually still true. Also fixed two wording nits the re-audit flagged in the same pass: the compatibility table's "renamed two of the three" (only one skill was renamed; the other has no upstream equivalent at all) and Problem 1's garbled `to-spec`/`write-a-prd` parenthetical. |
