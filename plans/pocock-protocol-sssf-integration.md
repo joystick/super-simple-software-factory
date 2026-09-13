@@ -287,13 +287,19 @@ support as unbuilt). So triage adopting PR support does not extend to
 `just watch` at all yet; caught and fixed before it shipped as a second
 stale claim in the same playbook this whole effort exists to de-stale.
 
-**R6 [LOW, mostly cosmetic] — Local-install hygiene.** Delete the superseded
-generations from `~/.claude/skills/` (`write-a-prd`, `to-prd`,
-`prd-to-issues`, `to-issues`, `review`) *after* R1/R2 land — before that,
-deleting `write-a-prd` breaks the documented vendoring source. Install
-`research` and `prototype` so the local `wayfinder`'s composition stops
-no-op'ing. This fixes trigger ambiguity only; it changes no SSSF behavior,
-which is why it is LOW despite being the most visible mess.
+**R6 [LOW, mostly cosmetic] — Local-install hygiene. DONE (2026-09-13).**
+R1/R2 had already landed, so the precondition was met — confirmed no
+remaining vendored `skill_engineering/` file's provenance header pointed at
+any of the five before deleting. Backed up
+`write-a-prd`/`to-prd`/`prd-to-issues`/`to-issues`/`review` to
+`~/.agents/skills/.superseded-backup-2026-09-13/`, then removed both the
+`~/.claude/skills/` symlinks and their `~/.agents/skills/` backing
+directories. Installed `research` and `prototype` from the pinned fresh
+clone the same way (copy into `~/.agents/skills/`, symlink from
+`~/.claude/skills/`, matching the existing convention) — both now register
+as available skills, and `wayfinder`'s `research`/`prototype` ticket types
+stop no-op'ing. Local install: 20 skills, no duplicate generations. No
+repo file changed by this item; nothing to push.
 
 **R7 [LOW] — Terminology pass to "spec".** When the playbook is next
 edited, converge prose on "spec" (upstream finished this in 1.2.0; the
