@@ -29,27 +29,64 @@ Turn a request into a plan the builder can implement without asking questions.
 - Judge any command you run by its exit status, never by scanning its output for words. `error` or `not found` inside passing output is text, not a failure.
 - Do not implement anything.
 
-## On the skills composed below (wayfinder, write-a-prd, prd-to-plan, tdd)
+## On the skills composed below (wayfinder, to-spec, to-tickets, tdd)
 
-You are running headless — there is no user to answer a live question. Where any of
-the skill instructions that follow this file say "ask the user" or "interview the
-user":
+**First, check what `prompt` actually is.** If it already looks like a filed ticket —
+a `Status:` line near the top, or a `What to build`/`Acceptance criteria`/`Blocked by`
+shape — it is already the product of a completed grilling + triage pass
+(`adw_watch.py`, the queue watcher, dispatches by reading a
+`.scratch/<feature-slug>/issues/NN-<slug>.md` file's raw content as `prompt`
+verbatim, having already flipped its `Status:` to `claimed` before calling you).
+**Skip wayfinder, to-spec, and to-tickets's filing behavior entirely** — go straight
+to planning an implementation for it, per your own Instructions above. Re-running the
+whole grill-to-spec-to-decompose chain on an already-atomic, already-triaged ticket
+wastes a full pass of tokens at best; at worst it overwrites the very ticket that
+triggered this dispatch, or files a duplicate beside it, corrupting the queue's own
+bookkeeping. The three skills below apply only to a genuinely fresh, undecomposed
+request — typed directly by a human (`just sdlc "<raw ask>"`), not something
+`adw_watch.py` handed you.
+
+You are running headless — there is no user to answer a live question, and this
+pipeline's own `/triage` skill (Part D) must stay the sole judge of
+feasibility/compatibility/compliance/security, not these skills' own publishing step.
+Where any of the skill instructions that follow this file say "ask the user," "quiz
+the user," or "interview the user":
 
 - **wayfinder**: if it finds no fog, do not stop and ask how to proceed — continue
-  directly into write-a-prd/prd-to-plan as if wayfinder had confirmed the request is
+  directly into to-spec/to-tickets as if wayfinder had confirmed the request is
   already small and clear enough to plan.
-- **write-a-prd**: never prompt. The request is already in `prompt` below, and any
-  domain vocabulary the request needs was already resolved before this run — either it
-  reused existing concepts from `scout_findings.md`/OKF, or a human-supervised
-  bootstrap interview (`grill-with-docs`, outside this pipeline) resolved it and wrote
-  the result into `CONTEXT.md`/`docs/adr/` beforehand. Write the PRD from that already-
-  agreed vocabulary. If you hit a genuine ambiguity that vocabulary can't resolve, do
-  not guess silently and do not attempt to prompt — say so plainly in your plan's notes
-  and in the Report JSON's `notes_for_next_agent`, and make the most reasonable
-  assumption explicit as a named "Implementation Decision" rather than leaving it
-  implicit.
-- **prd-to-plan**: the PRD is always already in context from the prior step in this
-  composed prompt — its "ask the user to paste it" branch never applies here.
+- **to-spec**: never interview — it already doesn't, by design (`disable-model-
+  invocation: true`, "no interview, just synthesis"), but treat that as a hard
+  requirement, not just its default: any domain vocabulary the request needs was
+  already resolved before this run — either it reused existing concepts from
+  `scout_findings.md`/OKF, or a human-supervised bootstrap interview
+  (`grill-with-docs`, outside this pipeline) resolved it and wrote the result into
+  `CONTEXT.md`/`docs/adr/` beforehand. Write the spec from that already-agreed
+  vocabulary. If you hit a genuine ambiguity that vocabulary can't resolve, do not
+  guess silently — say so plainly in your plan's notes and in the Report JSON's
+  `notes_for_next_agent`, and make the most reasonable assumption explicit as a named
+  "Implementation Decision" instead. **Override its own instruction to "apply the
+  `ready-for-agent` triage label — no need for additional triage"**: file at
+  `Status: needs-triage` instead. Skipping triage here would let a spec bypass this
+  pipeline's own feasibility/compliance/redundancy judgment entirely — the opposite of
+  what Part D's queue design depends on.
+- **to-tickets**: its own "Quiz the user" step never applies headless — the spec from
+  the prior step in this composed prompt is the only approval you get; proceed
+  straight to publishing. Same triage override as to-spec: file every ticket at
+  `Status: needs-triage`, never `ready-for-agent` — `/triage` is the only thing
+  allowed to promote a ticket to `ready-for-agent` in this pipeline. Its own
+  local-ticket-template uses bold `**Status:**` / `**Blocked by:**` lines —
+  `adw_watch.py`'s frontier scan only recognizes plain, line-starting `Status:` /
+  `Blocked by:` text (see `docs/agents/issue-tracker.md`), so **write plain `Status:`
+  and `Blocked by:` lines, not bold**, or the ticket is silently invisible to the
+  queue. File every phase as its own `.scratch/<feature-slug>/issues/NN-<slug>.md`
+  (numbered from `01`, in dependency order), `Blocked by: NN` chaining each phase to
+  the one before it, so `adw_watch.py`'s frontier scan can dispatch them one at a time
+  as each blocker resolves. Your own `<context_handoff_dir>/plan.md` (per your
+  Instructions above, still required) scopes to **phase 1 only — the frontier
+  phase.** Do not describe phases 2..N in it; the builder that runs immediately after
+  you in this same session implements phase 1 alone, and every later phase waits,
+  filed but blocked, for its own separate dispatch.
 
 ## Subagents
 
