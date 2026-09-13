@@ -1,7 +1,7 @@
 ---
 title: "Adoption playbook — putting SSSF to work on real code"
-version: 4.5
-updated: 2026-09-10
+version: 4.6
+updated: 2026-09-13
 status: active
 ---
 
@@ -468,6 +468,26 @@ flowchart TD
     style Rest fill:#bbf7d0,stroke:#15803d,color:#000
 ```
 
+### Skill-name compatibility
+
+The skill names below (`write-a-prd`, `prd-to-plan`) are what this Part is
+written against, and what `prompt_engineering/planner/system.md`'s "On the
+skills composed below" section keys its per-skill overrides on. Matt
+Pocock's upstream skill collection has since renamed two of the three:
+
+| This playbook says | Current upstream name | Notes |
+|---|---|---|
+| `write-a-prd` | `to-spec` (via `to-prd`) | Not cosmetic: `to-spec` never interviews, by design — adopting it *removes* the "never prompt" override below rather than needing a new one |
+| `prd-to-plan` | no upstream equivalent | Hand-authored for this repo; nearest upstream behavior is `to-tickets` + `implement`, which natively produce per-phase ticket files with `Blocked by:` edges — the exact gap Problem 2 below flags as missing |
+| `wayfinder` | `wayfinder` | Unchanged |
+| `tdd` | `tdd` | Unchanged |
+
+If you vendor from current upstream, either pass `vendor_skill.py --as
+write-a-prd` (etc.) so the filenames still match what the planner prompt
+expects, or update the planner's "On the skills composed below" section in
+the same commit — don't do one without the other, or the composed skill
+list and the prompt's per-skill instructions silently stop lining up.
+
 ### Problem 1 — the interview `write-a-prd` wants doesn't have anyone to answer it
 
 `write-a-prd` (and `wayfinder`'s "ask the user how to proceed" fallback) are
@@ -802,6 +822,7 @@ Everything in Part C's definition of done, plus:
 
 | Version | Date | Changes |
 |---|---|---|
+| 4.6 | 2026-09-13 | Added a "Skill-name compatibility" subsection to Part C, right before Problem 1: Matt Pocock's upstream skill collection has renamed `write-a-prd` to `to-spec` (via an intermediate `to-prd`) and has no equivalent for `prd-to-plan` (hand-authored here; nearest upstream behavior is `to-tickets` + `implement`). Verified against a fresh clone of the upstream repo plus its CHANGELOG, cross-checked in `.okf/pocock-skills/naming-drift.md`. This playbook's Part C prose and the planner's "On the skills composed below" section were both written against the old names — a new adopter vendoring from current upstream couldn't find two of the three skills this Part tells them to. Documentation-only; the vendored files and planner prompt in this repo are unchanged (`prd-to-plan` stays load-bearing until a deliberate follow-up migration). |
 | 4.5 | 2026-09-10 | Corrected v4.2's Filing claim: `/triage` does write `issues/NN-slug.md` itself — verified against a real repo's filed tickets (`weather-report`), whose content included a `.out-of-scope/` prior-rejection check and the exact category/state role vocabulary that only `/triage`'s documented flow produces, never touched by any other skill. `docs/agents/issue-tracker.md`'s own "publish to the issue tracker → create a new file" rule means `/triage` posting its agent brief on a not-yet-tracked item *is* the file-creation event on the local-markdown tracker. The real gap is narrower and upstream: nothing hands `/triage` the settled description in the first place after `grill-with-docs`/`improve-codebase-architecture` finish. Updated the Filing section and Part D's diagram node accordingly. Added a "Mandatory checkpoints" subsection: concrete shell commands to verify a filing actually landed (directory exists, `Status:` lines present and canonical, nothing uncommitted, `Blocked by:` references resolve) — this class of failure (claimed-but-not-actually-written, or written-but-invisible-to-the-state-machine) is silent, not an error, the same manufactures-confidence risk rule zero exists to catch for quality gates. |
 | 4.4 | 2026-09-10 | `just watch` now dispatches through the full SDLC chain (`adw_simple_sdlc.py`: planner → builder → reviewer → revision loop → documenter → commit), not the lighter `plan_build_test` chain it silently used before. Found downstream (`opencode-expo`): its first two real queue dispatches (a PIN-authentication access gate, a biometric-unlock follow-up) both landed with zero review — the watcher had always called `adw_plan_build_test.main()`, which has no reviewer, revision loop, or documenter phase at all. That's a materially bigger gap for an unattended queue than for a manual `just sdlc` run a human reads afterward. `adw_simple_sdlc.main()`'s signature is identical (`prompt, config, adw_id`), confirmed before switching; the roster already had `reviewer`/`documenter` configured, so no config change was needed. Updated Part D's "Dispatch" step description to match. |
 | 4.3 | 2026-09-09 | Renamed the `just sssf` recipe to `just watch`, matching its script (`adw_watch.py`) — found via a downstream adoption (`opencode-expo`) questioning the mismatch: 6 of 8 recipes mirror their script name directly, and this one didn't need to be the exception `sdlc` legitimately is (that one names the workflow's meaning, not its script). Updated the recipe, `adw_watch.py`'s own runtime log-line prefixes, `test_watch.py`, and every prescriptive (non-changelog) reference in this playbook's Part D prose and diagram. Also ported back a real bug fix found downstream: `git_helper.py`'s `_git()` did a full `.strip()` on subprocess output, which silently ate the leading space off only the *first* line of multi-line porcelain output (git status codes are leading-whitespace-significant) — corrupting `changed_files()`'s first result. Never reachable before a target repo actually had git history to run these functions against; fixed to `.rstrip()`. |
