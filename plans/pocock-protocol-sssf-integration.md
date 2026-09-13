@@ -270,11 +270,22 @@ session"). Re-checked F2 against current upstream while there: still
 unbridged in the fresh clone too, so this isn't a gap SSSF could have
 inherited a fix for.
 
-**R5 [MEDIUM] — Adopt the fresh `triage` (and note the PR surface).** Update
-the local install to the fresh clone's `triage` so the human gate matches
-current upstream (PR-as-request-surface off by default, so behavior is
-unchanged until wanted). Add one playbook sentence noting the queue can
-gate external PRs the same way once the tracker config flips the flag.
+**R5 [MEDIUM] — Adopt the fresh `triage` (and note the PR surface). DONE
+(2026-09-13, playbook v4.9).** Updated the local install — turns out
+`~/.claude/skills/triage` is a symlink to `~/.agents/skills/triage`, the
+real location (and, per F1's evidence, the same directory the vendored
+provenance headers already point at). Backed up the prior version to
+`~/.agents/skills/.triage-backup-2026-09-13/` before overwriting; the fresh
+copy now matches the upstream clone byte-for-byte (`diff -rq` clean).
+
+The playbook sentence turned out to need a correction the plan didn't
+anticipate: the original framing ("the queue can gate external PRs the
+same way once the tracker config flips the flag") is wrong. A PR only
+exists on a GitHub/GitLab tracker, and `adw_watch.py` explicitly refuses
+those (exit code 2 — its own module docstring already names GitHub/GitLab
+support as unbuilt). So triage adopting PR support does not extend to
+`just watch` at all yet; caught and fixed before it shipped as a second
+stale claim in the same playbook this whole effort exists to de-stale.
 
 **R6 [LOW, mostly cosmetic] — Local-install hygiene.** Delete the superseded
 generations from `~/.claude/skills/` (`write-a-prd`, `to-prd`,

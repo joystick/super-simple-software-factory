@@ -1,6 +1,6 @@
 ---
 title: "Adoption playbook — putting SSSF to work on real code"
-version: 4.8
+version: 4.9
 updated: 2026-09-13
 status: active
 ---
@@ -760,7 +760,7 @@ It's tempting to have `just watch` itself analyze a raw issue's feasibility,
 compatibility with what's already live, and compliance/security against
 `CLAUDE.md`/`AGENTS.md`, `CONTEXT.md`, your knowledge source, and `docs/`/plan
 files — then decide whether to build it. Don't: that recreates the exact
-failure Part C already fixed once. `write-a-prd`'s interview had no one to
+failure Part C already fixed once. `to-spec`'s interview had no one to
 answer it headless; an unattended loop making its own security/compliance
 judgment calls has no one to catch it when it's wrong, either.
 
@@ -772,6 +772,17 @@ approved work, `ready-for-agent`, means a durable **agent brief** has been
 posted to the issue. That's the same pattern as `grill-with-docs`: the
 judgment happens once, by a human, and only the *result* — not the judgment
 process — becomes something a headless loop can safely consume later.
+
+Current `triage` (`disable-model-invocation: true`) also covers **external
+pull requests** as a request surface — "a PR is an issue with attached code,"
+same roles, same states, same machine — if the tracker config marks them in
+scope. Off by default, so nothing here changes until you turn it on. Note
+the ceiling this hits today, though: a PR only exists on a GitHub/GitLab
+tracker, and `adw_watch.py` currently refuses those outright (exit code 2,
+local-markdown only — see its own module docstring). Triage can flip a PR
+to `ready-for-agent`; `just watch` has nothing that would ever pick it up
+until the GitHub/GitLab tracker support the watcher's docstring already
+flags as unbuilt actually lands.
 
 So: **`just watch` only ever picks up issues already in `ready-for-agent`
 state.** Everything that decides whether something is safe, compatible, and
@@ -862,6 +873,7 @@ Everything in Part C's definition of done, plus:
 
 | Version | Date | Changes |
 |---|---|---|
+| 4.9 | 2026-09-13 | R5: updated the local `triage` skill install (`~/.agents/skills/triage` — the real location; `~/.claude/skills/triage` is a symlink to it) to the fresh upstream clone, which adds external-PR-as-request-surface support (`disable-model-invocation: true`, off by default). Backed up the prior version alongside it before overwriting. Added a Part D paragraph noting the PR surface exists but hits a real ceiling today: a PR only exists on a GitHub/GitLab tracker, and `adw_watch.py` currently refuses those outright (its own module docstring already flags GitHub/GitLab support as unbuilt) — triage can flip a PR to `ready-for-agent`, but nothing in this repo's queue would ever pick it up yet. Also fixed one more stale `write-a-prd` reference (the queue's "judgment call stays interactive" section) to `to-spec`. |
 | 4.8 | 2026-09-13 | Formally accepted the `/grill-with-docs` → `/triage` handoff as manual (R4 in `plans/pocock-protocol-sssf-integration.md`, citing the bootstrap/AFK audit's finding 3.1.3) rather than building a bridge skill — evaluated and rejected as not worth maintaining for one reminder a checklist line covers as well. Added a new subsection in Part C recording the decision (checked against current upstream Pocock skills too: nothing there bridges it either), and a new Definition-of-done checklist item. Also fixed another stale `write-a-prd`/`prd-to-plan` reference (Problem 2's composition-list note) missed by the v4.6 rename pass, to `to-spec`/`to-tickets`. |
 | 4.7 | 2026-09-13 | Added a "Two owners of one file" subsection to the Filing section: `docs/agents/issue-tracker.md`'s base belongs to `/setup-matt-pocock-skills`, SSSF's queue depends on that same file also carrying its own extensions (the `claimed`/`resolved` states `adw_watch.py` writes), and nothing merges the two automatically — a re-sync silently drops the extension. Documents the `<!-- sssf:queue-extension -->` marker convention (same idiom as `vendor_skill.py`'s provenance headers) as a diff aid, not automatic reinjection. Also fixed a stale `/write-a-prd` reference in the Filing section's shape-picking guidance to `/to-spec` (missed by the v4.6 rename pass). |
 | 4.6 | 2026-09-13 | Added a "Skill-name compatibility" subsection to Part C, right before Problem 1: Matt Pocock's upstream skill collection has renamed `write-a-prd` to `to-spec` (via an intermediate `to-prd`) and has no equivalent for `prd-to-plan` (hand-authored here; nearest upstream behavior is `to-tickets` + `implement`). Verified against a fresh clone of the upstream repo plus its CHANGELOG, cross-checked in `.okf/pocock-skills/naming-drift.md`. This playbook's Part C prose and the planner's "On the skills composed below" section were both written against the old names — a new adopter vendoring from current upstream couldn't find two of the three skills this Part tells them to. Documentation-only; the vendored files and planner prompt in this repo are unchanged (`prd-to-plan` stays load-bearing until a deliberate follow-up migration). |
