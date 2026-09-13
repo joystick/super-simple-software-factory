@@ -339,3 +339,45 @@ pass.
   parsed programmatically (frontmatter, cross-references, bundled files) and
   the load-bearing ten read closely; the `misc/` and `writing-*` bodies were
   skimmed at digest level only.
+
+## 6. Independent re-audit (2026-09-13) and follow-up fixes (F1–F6)
+
+An independent fable-agent re-audit of R1–R7, `downloads/pocock-sssf-reaudit.md`,
+verified every claim above directly on disk (not on trust) and found R1–R7
+substantially landed correctly — every artifact exists, both R2 safety
+overrides are present and still accurate against current upstream (which
+had not moved), and opencode-expo's suite genuinely passes (102, re-run
+fresh). It also found new issues the original R1–R7 pass didn't and
+couldn't have caught, prioritized below as F1–F6, continuing the numbering.
+
+**F1 [HIGH] — Document the interactive `ready-for-agent` triage bypass.
+DONE (2026-09-13, playbook v4.11, `11a3cc2`).** R2's needs-triage/plain-line
+overrides only ever applied to the headless planner prompt. The Filing
+section's own guidance recommends running `/to-spec` interactively, and
+both `/to-spec`/`/to-tickets` self-apply `ready-for-agent` by default —
+running either by hand bypasses `/triage` entirely, undocumented until now.
+Added a "sharp edge" paragraph: `/to-tickets`' bold template makes an
+interactive ticket invisible to the queue (silent stall); plain lines
+instead produce an untriaged `ready-for-agent` ticket the watcher builds
+unjudged. Instructs running `/triage` on interactive output, or hand-fixing
+the status line and format, first.
+
+**F2 [MEDIUM] — Fix a third instance of the self-inflicted-error pattern.
+DONE (2026-09-13, playbook v4.12, `e56901c`).** Part D's "judgment call
+stays interactive" section claimed "`to-spec`'s interview had no one to
+answer it headless" — false, `to-spec` never interviews; introduced by
+v4.9's mechanical rename, missed by v4.10's own cleanup pass which fixed
+the identical disease elsewhere. Reworded to point at `wayfinder`'s
+fallback instead (the thing Problem 1 actually still describes). Also
+fixed two wording nits: the compatibility table's "renamed two of the
+three" (only one skill was renamed) and Problem 1's garbled parenthetical.
+
+**F3 [MEDIUM] — Extend `issue-tracker.md` fencing to full coverage. DONE
+(2026-09-13, opencode-expo `f66afd9`).** The four R3 fences were real but
+incomplete against a direct diff of the actual base template: the
+`Blocked by:` Conventions bullet, the whole Directory Structure section,
+the reworded publish-to-the-tracker guidance, and the trailing
+Rule-of-thumb line all sat outside every fence. Diffed line-by-line against
+the base template and fenced every genuinely SSSF-added-or-reworded piece
+— 8 balanced regions now (was 4). Also fixed two more stale "PRD" mentions
+surfaced during the close read. Full suite still green (102 passed).
