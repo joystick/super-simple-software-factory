@@ -1,6 +1,6 @@
 ---
 title: "Adoption playbook — putting SSSF to work on real code"
-version: 4.10
+version: 4.11
 updated: 2026-09-13
 status: active
 ---
@@ -668,6 +668,26 @@ file to exist before triage runs.
   refers to another feature's `01`. Hand `/triage` the description; it files
   the ticket.
 
+**Sharp edge running either of these interactively: they self-promote past
+`/triage`.** `/to-spec` and `/to-tickets` both apply the `ready-for-agent`
+triage label themselves by default (their own "no need for additional
+triage" / "the tickets are agent-grabbable by construction" instructions) —
+this pipeline's headless planner overrides that (see Part C's AFK bullet
+list), but running either skill **by hand** gets you their unmodified
+behavior. Two ways that goes wrong: `/to-tickets`' own local-ticket-template
+uses bold `**Status:**`/`**Blocked by:**` lines, which `adw_watch.py`'s
+frontier scan can't match — filed exactly per that template, a ticket is
+silently invisible to the queue, a stall not an error. Or, if you (or the
+model) write plain lines instead, you get an **untriaged** `ready-for-agent`
+ticket — `just watch` will build it without anyone having judged
+feasibility, redundancy, or compliance first, exactly the check Part D's
+"judgment call stays interactive" section depends on `/triage` providing.
+After running either skill interactively, either hand its output to
+`/triage` before committing, or hand-edit the `Status:` line to
+`needs-triage` and confirm the file uses plain (not bold) `Status:`/
+`Blocked by:` lines — same shape the Mandatory checkpoints below already
+check for.
+
 **If you write a stub yourself** (rather than handing `/triage` a bare
 description), it must contain what `/triage` and `just watch` both actually
 parse, not just prose for a human:
@@ -876,6 +896,7 @@ Everything in Part C's definition of done, plus:
 
 | Version | Date | Changes |
 |---|---|---|
+| 4.11 | 2026-09-13 | F1 (independent re-audit of R1–R7, `downloads/pocock-sssf-reaudit.md`): documented a gap R2's headless-only planner override left open — `/to-spec`/`/to-tickets` self-apply `ready-for-agent` by default, and running either interactively (which the Filing section's own guidance recommends) bypasses `/triage` entirely. Added a "sharp edge" paragraph to Filing: `/to-tickets`' bold `**Status:**`/`**Blocked by:**` template makes an interactively-filed ticket invisible to `adw_watch.py`'s frontier scan (a silent stall); plain lines instead produce an untriaged `ready-for-agent` ticket the watcher will build unjudged. Instructs running `/triage` on interactive output, or hand-fixing the status line and format, before `just watch` sees it. |
 | 4.10 | 2026-09-13 | R7: converged remaining "PRD" prose on "spec" (upstream finished this same rename in its 1.2.0 — the bootstrap/AFK audit's "one artifact, four names" finding was the same disease). Problem 1's title and body still used the retired `write-a-prd`/`prd-to-plan` names throughout (R1 deliberately left prose like this alone in favor of a compatibility table) — since a PRD→spec wording pass sitting right next to unrenamed skill names would read incoherently, renamed those too in this one section: `write-a-prd` → `to-spec`, `prd-to-plan`'s "ask the user to paste it" → `to-tickets`'s "quiz the user". Scoped to Problem 1 and one Filing-section mention only, not a playbook-wide sweep — the ~15 remaining `/write-a-prd`/`/prd-to-plan` mentions elsewhere (mostly diagrams and Parts A/B walkthroughs) stay as-is per R1's original "documentation-only, point to the compatibility table" decision. |
 | 4.9 | 2026-09-13 | R5: updated the local `triage` skill install (`~/.agents/skills/triage` — the real location; `~/.claude/skills/triage` is a symlink to it) to the fresh upstream clone, which adds external-PR-as-request-surface support (`disable-model-invocation: true`, off by default). Backed up the prior version alongside it before overwriting. Added a Part D paragraph noting the PR surface exists but hits a real ceiling today: a PR only exists on a GitHub/GitLab tracker, and `adw_watch.py` currently refuses those outright (its own module docstring already flags GitHub/GitLab support as unbuilt) — triage can flip a PR to `ready-for-agent`, but nothing in this repo's queue would ever pick it up yet. Also fixed one more stale `write-a-prd` reference (the queue's "judgment call stays interactive" section) to `to-spec`. |
 | 4.8 | 2026-09-13 | Formally accepted the `/grill-with-docs` → `/triage` handoff as manual (R4 in `plans/pocock-protocol-sssf-integration.md`, citing the bootstrap/AFK audit's finding 3.1.3) rather than building a bridge skill — evaluated and rejected as not worth maintaining for one reminder a checklist line covers as well. Added a new subsection in Part C recording the decision (checked against current upstream Pocock skills too: nothing there bridges it either), and a new Definition-of-done checklist item. Also fixed another stale `write-a-prd`/`prd-to-plan` reference (Problem 2's composition-list note) missed by the v4.6 rename pass, to `to-spec`/`to-tickets`. |
