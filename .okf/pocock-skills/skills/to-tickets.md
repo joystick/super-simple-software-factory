@@ -37,4 +37,19 @@ gap `prd-to-plan` leaves.
 `disable-model-invocation: true`). Not installed locally.
 
 **Headless verdict:** headless-plausible — pure synthesis and file/tracker
-writes; no interview in the protocol.
+writes; no interview in the protocol. Two gotchas found integrating it into
+SSSF's queue (fixed in `planner/system.md`'s composed-skills override, see
+R2 in `plans/pocock-protocol-sssf-integration.md`), neither caught by the
+naming-drift pass alone:
+
+- It applies the `ready-for-agent` triage label itself by default ("the
+  tickets are agent-grabbable by construction," its own "Quiz the user"
+  step standing in for a triage gate). SSSF's `/triage` judges
+  feasibility/compatibility/compliance/security — a materially different,
+  fuller check — so a headless override must force `Status: needs-triage`
+  instead, or this skill silently disables SSSF's triage gate entirely.
+- Its `<local-ticket-template>` uses bold `**Status:**` / `**Blocked by:**`
+  lines. `adw_watch.py`'s frontier scan regexes only match plain,
+  line-starting `Status:` / `Blocked by:` text — a ticket filed exactly per
+  this skill's own template is silently invisible to the queue unless the
+  override also forces plain (non-bold) lines.

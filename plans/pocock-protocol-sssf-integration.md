@@ -210,18 +210,28 @@ must either use `vendor_skill.py --as write-a-prd` etc., or update
 section in the same commit.* This is documentation-only and removes the
 playbook's broken instruction for new adopters.
 
-**R2 [HIGH] — Migrate the planner composition to gen-3 skills, deliberately.**
-Follow-up change (not this task): re-vendor `to-spec` and `to-tickets` from
-`downloads/skills/skills/engineering/…` (a pinned, auditable source — record
-the clone commit in the provenance header's `source:` line rather than
-`~/.agents/skills`), retire `write-a-prd.md`, and rewrite
-`.claude/skills/sssf/templates/prompt_engineering/planner/system.md:32-51`
-against the new names. Payoff is real, not cosmetic: `to-spec` is
-non-interactive by design, so the "write-a-prd: never prompt" override
-disappears; `to-tickets` natively produces the per-phase issue files with
-`Blocked by:` that Part D currently flags as a gap in `prd-to-plan` — which
-can then be retired instead of maintained by hand. Keep `prd-to-plan.md`
-until that same commit lands (it is load-bearing today).
+**R2 [HIGH] — Migrate the planner composition to gen-3 skills, deliberately.
+DONE (2026-09-13, `6bc5940` fork / `f6e292e`+`fdd1809` opencode-expo).**
+Re-vendored `to-spec` and `to-tickets` from `downloads/skills/skills/
+engineering/…` pinned at commit `3cca18b`; retired `write-a-prd.md` and
+`prd-to-plan.md`; rewrote the planner template's composed-skills section
+for the new names in both the fork's generic template and opencode-expo's
+live copy. Payoff landed as predicted: `to-spec`'s non-interactive design
+removed a whole "never prompt" override rather than adding one, and
+`to-tickets`' native per-phase ticket files retired the hand-maintained
+`prd-to-plan` gap entirely.
+
+Two headless-safety gaps surfaced during the rewrite that this plan's
+research pass had not caught (now recorded in `.okf/pocock-skills/skills/
+to-spec.md` and `to-tickets.md`): both skills apply `ready-for-agent`
+themselves by default (their own "quiz/check with the user" step standing
+in for a triage gate in their model) — overridden to file at
+`needs-triage` instead, since SSSF's `/triage` judges a materially fuller
+set of concerns; and `to-tickets`' own local-ticket-template uses bold
+`**Status:**`/`**Blocked by:**` lines, which `adw_watch.py`'s frontier scan
+would never match — overridden to require plain lines. opencode-expo's
+full suite (102 tests) and `just skills`' roster audit both green after
+the migration.
 
 **R3 [MEDIUM] — Make `setup-matt-pocock-skills` the single source of the
 tracker doc, with a fenced SSSF extension.** In
