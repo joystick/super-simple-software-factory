@@ -902,22 +902,27 @@ Everything in Part C's definition of done, plus:
   gates judge the outcome, not the process. That distinction is the point.
 - That any cost figure transfers to your repo. Language, suite size, and repo
   shape dominate. Measure your own on a throwaway branch before budgeting.
-- That `just watch`'s current dispatch target (`adw_simple_sdlc.py` — planner
-  → builder → reviewer → revision loop → documenter → commit, since 2026-09-10)
-  has itself been run live end to end yet. `just watch` **has** claimed and
-  shipped two real issues end to end (`opencode-expo`, 2026-09-09/10, real
-  cost, real commits) — but both ran before this fix, through the lighter
-  chain the watcher used to call, with no reviewer/documenter phase at all.
-  That gap (found by reading the diffs afterward, not by anything the queue
-  itself caught) is *why* the dispatch target changed. The corrected,
-  full-chain dispatch is tested (`tests/test_watch.py` mocks
-  `adw_simple_sdlc.main`, same coverage as before) but not yet exercised by a
-  real live `just watch` run.
+- **Resolved 2026-09-13** (was: not yet run live). The full chain —
+  `grill-with-docs` → `to-spec`/`to-tickets` (inline, in this run — see the
+  v4.15 changelog row) → `triage` → Mandatory checkpoints → `just watch`'s
+  current dispatch target (`adw_simple_sdlc.py`: planner → builder →
+  reviewer → revision loop → documenter → commit) — has now been run live,
+  once, end to end (`opencode-expo`, device-management-ui,
+  `adw_id: c1eff7ac`): 10/10 phases passed, reviewer approved 12/12 plan
+  requirements and 6/6 acceptance criteria, real cost ($4.42, 4.3M tokens),
+  real commits (plan, build, docs, each its own commit), ticket auto-flipped
+  to `resolved`. One real defect surfaced along the way and was fixed before
+  dispatch succeeded (the free-text `Blocked by:` gap, v4.15) — the run did
+  not go perfectly on the first try, and this playbook does not claim it
+  will for you either. One live run is evidence the chain *can* work
+  end to end, not that it reliably will across other repos, request shapes,
+  or failure modes this single pass didn't happen to hit.
 
 ## Version history
 
 | Version | Date | Changes |
 |---|---|---|
+| 4.16 | 2026-09-13 | B1 closed out: `just watch --once` succeeded live end to end after the v4.15 fix (`opencode-expo`, device-management-ui, `adw_id: c1eff7ac` — 10/10 phases, reviewer approved 12/12 plan requirements and 6/6 acceptance criteria, real commits for plan/build/docs, ticket auto-resolved). Updated "What this playbook does not claim" from "not yet run live" to the actual result, including the one real defect the run surfaced and fixed along the way — framed as evidence the chain can work, not a reliability guarantee. |
 | 4.15 | 2026-09-13 | B1 (first live end-to-end run, `opencode-expo`, device-management-ui): found a real Mandatory-checkpoints gap. `/grill-with-docs` wrote a hand-authored `Blocked by: (none — API exists, see spec.md)` on an unblocked ticket — check 6's own `grep` passed (the line parses), but `adw_watch.py`'s `BLOCKED_BY_RE` splits its value on commas into fragments and treats each as a real blocker; neither fragment matched a sibling ticket, so the ticket sat at `ready-for-agent`, passed every checkpoint, and was still silently invisible to the frontier scan (`just watch --once` reported "queue empty" with no error). Added a "Check 6's sharp edge" callout: an unblocked ticket must omit the `Blocked by:` line entirely, never write "none" in prose. Also confirmed live: `/grill-with-docs` can write `spec.md` and the ticket itself inline during grilling, rather than stopping for separate `/to-spec`/`/to-tickets` runs — "The whole chain, named once" describes 4 distinct human-run steps, but a single grilling session can legitimately collapse steps 1–3 into one. Not yet reflected in that list; flagging here pending a decision on whether to document it as a valid shortcut or leave the list as the general case. |
 | 4.14 | 2026-09-13 | Group A of a fourth-pass re-audit's sync plan (`plans/pocock-protocol-sssf-integration.md`, `downloads/pocock-sssf-sync-plan-v2.md`), per explicit direction that the playbook carry no historical naming baggage as live instruction: deleted the "Skill-name compatibility" section outright (the migration it bridged is complete everywhere else in the system; the table's own standing vendoring instruction had been inverted since R2 — history stays only in this changelog's v4.6 row). Fixed the one cross-reference that pointed at it. Rewrote Parts A4/A5/B1's walkthroughs from prose to numbered command steps naming only current skills (`to-spec`/`to-tickets`, not the retired `write-a-prd`/`prd-to-plan`, which R6 deleted from the local install entirely). Added a new "The whole chain, named once" list at the top of Part D — the working `grill-with-docs → to-spec → to-tickets → triage → watch` sequence previously had to be assembled from three separate sections. Swept the remaining live retired-name references (Problem 1's opening, the Mandatory-checkpoints trigger line, the queue-gap paragraph, the definition-of-done). Also fixed `references/config.md`, which still claimed only 3 coding agents exist and that `skill_engineering`/`harness_engineering` are ignored under `pi`/`agy` — the shipped code covers all four (`agent_opencode.py` was undocumented entirely); added a full `opencode` subsection matching `agy`'s detail level. |
 | 4.13 | 2026-09-13 | F4 (same re-audit): Problem 1's AFK bullet list taught only the interview-related overrides (`wayfinder` no-fog, `to-spec` never-prompts, `to-tickets` quiz-skip), omitting the two triage-bypass overrides R2 actually shipped in the real template (force `needs-triage`, force plain `Status:`/`Blocked by:` lines). An adopter following this list to hand-write their own `system.md` would get a queue-bypassing, queue-invisible configuration even though the shipped template is correct. Added both missing overrides so the playbook teaches what the template actually does. |
