@@ -1,6 +1,6 @@
 ---
 title: "Adoption playbook — putting SSSF to work on real code"
-version: 4.12
+version: 4.13
 updated: 2026-09-13
 status: active
 ---
@@ -535,6 +535,22 @@ a run is unattended. Split it into two phases that run in different modes:
     always already in context from the prior step in the same composed
     prompt.
 
+  Two more overrides belong here, on top of the interview question — both
+  `to-spec` and `to-tickets` self-apply the `ready-for-agent` triage label
+  by default, which bypasses this pipeline's own `/triage` gate (Part D's
+  "the judgment call stays interactive" depends on `/triage` being the only
+  promoter):
+
+  - `to-spec` files at `Status: needs-triage`, not the `ready-for-agent` its
+    own instructions say to apply. Skipping triage here would let a spec
+    bypass this pipeline's own feasibility/compliance/redundancy judgment
+    entirely.
+  - `to-tickets` files every ticket at `Status: needs-triage` too, and
+    writes plain `Status:`/`Blocked by:` lines — never the bold
+    `**Status:**`/`**Blocked by:**` its own local-ticket-template uses,
+    which `adw_watch.py`'s frontier scan (line-starting plain text only)
+    can't match.
+
 `grill-with-docs` should stay **out of `skill_engineering/`** — its
 `disable-model-invocation: true` is load-bearing, not an oversight. Vendoring
 it risks it landing in an agent's composed prompt and firing headless despite
@@ -899,6 +915,7 @@ Everything in Part C's definition of done, plus:
 
 | Version | Date | Changes |
 |---|---|---|
+| 4.13 | 2026-09-13 | F4 (same re-audit): Problem 1's AFK bullet list taught only the interview-related overrides (`wayfinder` no-fog, `to-spec` never-prompts, `to-tickets` quiz-skip), omitting the two triage-bypass overrides R2 actually shipped in the real template (force `needs-triage`, force plain `Status:`/`Blocked by:` lines). An adopter following this list to hand-write their own `system.md` would get a queue-bypassing, queue-invisible configuration even though the shipped template is correct. Added both missing overrides so the playbook teaches what the template actually does. |
 | 4.12 | 2026-09-13 | F2 (same re-audit): fixed a third instance of the exact self-inflicted-error pattern this effort keeps catching — Part D's "judgment call stays interactive" section claimed "`to-spec`'s interview had no one to answer it headless," which v4.9's mechanical rename introduced and v4.10's own cleanup pass missed; `to-spec` never interviews, directly contradicting the compatibility table 280 lines earlier. Reworded to point at `wayfinder`'s fallback instead, which is the thing that's actually still true. Also fixed two wording nits the re-audit flagged in the same pass: the compatibility table's "renamed two of the three" (only one skill was renamed; the other has no upstream equivalent at all) and Problem 1's garbled `to-spec`/`write-a-prd` parenthetical. |
 | 4.11 | 2026-09-13 | F1 (independent re-audit of R1–R7, `downloads/pocock-sssf-reaudit.md`): documented a gap R2's headless-only planner override left open — `/to-spec`/`/to-tickets` self-apply `ready-for-agent` by default, and running either interactively (which the Filing section's own guidance recommends) bypasses `/triage` entirely. Added a "sharp edge" paragraph to Filing: `/to-tickets`' bold `**Status:**`/`**Blocked by:**` template makes an interactively-filed ticket invisible to `adw_watch.py`'s frontier scan (a silent stall); plain lines instead produce an untriaged `ready-for-agent` ticket the watcher will build unjudged. Instructs running `/triage` on interactive output, or hand-fixing the status line and format, before `just watch` sees it. |
 | 4.10 | 2026-09-13 | R7: converged remaining "PRD" prose on "spec" (upstream finished this same rename in its 1.2.0 — the bootstrap/AFK audit's "one artifact, four names" finding was the same disease). Problem 1's title and body still used the retired `write-a-prd`/`prd-to-plan` names throughout (R1 deliberately left prose like this alone in favor of a compatibility table) — since a PRD→spec wording pass sitting right next to unrenamed skill names would read incoherently, renamed those too in this one section: `write-a-prd` → `to-spec`, `prd-to-plan`'s "ask the user to paste it" → `to-tickets`'s "quiz the user". Scoped to Problem 1 and one Filing-section mention only, not a playbook-wide sweep — the ~15 remaining `/write-a-prd`/`/prd-to-plan` mentions elsewhere (mostly diagrams and Parts A/B walkthroughs) stay as-is per R1's original "documentation-only, point to the compatibility table" decision. |
