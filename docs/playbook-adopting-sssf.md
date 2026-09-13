@@ -1,6 +1,6 @@
 ---
 title: "Adoption playbook — putting SSSF to work on real code"
-version: 4.7
+version: 4.8
 updated: 2026-09-13
 status: active
 ---
@@ -564,7 +564,25 @@ None of this needs a new SSSF agent role or a new `skill_engineering` entry —
 `ast-grep` and a knowledge-source lookup are tool-usage patterns baked into
 scout's own instructions, the same way `writes` and `protected_files` already
 are. They don't belong in the same composition list as `wayfinder`/
-`write-a-prd`/`prd-to-plan`/`tdd`, which are planning methodologies.
+`to-spec`/`to-tickets`/`tdd`, which are planning methodologies.
+
+### The grill → triage handoff is manual, on purpose (accepted, not a gap to close)
+
+`/grill-with-docs` ends at a committed `CONTEXT.md`/`docs/adr/` update; it does
+not hand `/triage` anything, and neither does upstream Pocock's own flow (see
+`.okf/pocock-skills/naming-drift.md` and the integration plan's finding F2 —
+checked against the current upstream skill set too, not just the version this
+playbook was originally written against; nothing there bridges it either). The
+bootstrap/AFK audit's finding 3.1.3 flagged this as the one place in the whole
+pipeline where forgetting a step loses work silently: a grilled-and-settled
+feature that never reaches `/triage` never enters the queue, and nothing lists
+"settled but unfiled" work.
+
+**Decision: accept this as a manual step, not a mechanism to build.** Closing
+it would mean a thin wrapper skill (run `/grill-with-docs`, then `/to-spec`,
+then remind `/triage`) — evaluated and deliberately not built, since it adds a
+skill to maintain for one reminder a checklist line covers just as well. The
+checklist item below is the actual guard.
 
 ### Definition of done, extended
 
@@ -578,6 +596,11 @@ Everything in the standing checklist above, plus:
 - [ ] Your knowledge source (OKF, concept map, whatever you use) got updated
       by the documenter stage if the feature changed anything it describes —
       otherwise the next feature's discovery step is reading stale claims.
+- [ ] If this bootstrap session ran because of a fresh grilling
+      (`/grill-with-docs` or `/improve-codebase-architecture`), its outcome is
+      filed — run `/triage` before leaving the session. Nothing bridges this
+      automatically (see above); a settled-but-unfiled grill is invisible to
+      the queue, not just slow to reach it.
 
 ## Part D — the queue: from `ready-for-agent` to shipped
 
@@ -839,6 +862,7 @@ Everything in Part C's definition of done, plus:
 
 | Version | Date | Changes |
 |---|---|---|
+| 4.8 | 2026-09-13 | Formally accepted the `/grill-with-docs` → `/triage` handoff as manual (R4 in `plans/pocock-protocol-sssf-integration.md`, citing the bootstrap/AFK audit's finding 3.1.3) rather than building a bridge skill — evaluated and rejected as not worth maintaining for one reminder a checklist line covers as well. Added a new subsection in Part C recording the decision (checked against current upstream Pocock skills too: nothing there bridges it either), and a new Definition-of-done checklist item. Also fixed another stale `write-a-prd`/`prd-to-plan` reference (Problem 2's composition-list note) missed by the v4.6 rename pass, to `to-spec`/`to-tickets`. |
 | 4.7 | 2026-09-13 | Added a "Two owners of one file" subsection to the Filing section: `docs/agents/issue-tracker.md`'s base belongs to `/setup-matt-pocock-skills`, SSSF's queue depends on that same file also carrying its own extensions (the `claimed`/`resolved` states `adw_watch.py` writes), and nothing merges the two automatically — a re-sync silently drops the extension. Documents the `<!-- sssf:queue-extension -->` marker convention (same idiom as `vendor_skill.py`'s provenance headers) as a diff aid, not automatic reinjection. Also fixed a stale `/write-a-prd` reference in the Filing section's shape-picking guidance to `/to-spec` (missed by the v4.6 rename pass). |
 | 4.6 | 2026-09-13 | Added a "Skill-name compatibility" subsection to Part C, right before Problem 1: Matt Pocock's upstream skill collection has renamed `write-a-prd` to `to-spec` (via an intermediate `to-prd`) and has no equivalent for `prd-to-plan` (hand-authored here; nearest upstream behavior is `to-tickets` + `implement`). Verified against a fresh clone of the upstream repo plus its CHANGELOG, cross-checked in `.okf/pocock-skills/naming-drift.md`. This playbook's Part C prose and the planner's "On the skills composed below" section were both written against the old names — a new adopter vendoring from current upstream couldn't find two of the three skills this Part tells them to. Documentation-only; the vendored files and planner prompt in this repo are unchanged (`prd-to-plan` stays load-bearing until a deliberate follow-up migration). |
 | 4.5 | 2026-09-10 | Corrected v4.2's Filing claim: `/triage` does write `issues/NN-slug.md` itself — verified against a real repo's filed tickets (`weather-report`), whose content included a `.out-of-scope/` prior-rejection check and the exact category/state role vocabulary that only `/triage`'s documented flow produces, never touched by any other skill. `docs/agents/issue-tracker.md`'s own "publish to the issue tracker → create a new file" rule means `/triage` posting its agent brief on a not-yet-tracked item *is* the file-creation event on the local-markdown tracker. The real gap is narrower and upstream: nothing hands `/triage` the settled description in the first place after `grill-with-docs`/`improve-codebase-architecture` finish. Updated the Filing section and Part D's diagram node accordingly. Added a "Mandatory checkpoints" subsection: concrete shell commands to verify a filing actually landed (directory exists, `Status:` lines present and canonical, nothing uncommitted, `Blocked by:` references resolve) — this class of failure (claimed-but-not-actually-written, or written-but-invisible-to-the-state-machine) is silent, not an error, the same manufactures-confidence risk rule zero exists to catch for quality gates. |

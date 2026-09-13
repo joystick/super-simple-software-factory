@@ -257,15 +257,18 @@ automatic reinjection — documented as such rather than overclaiming a
 mechanism that doesn't exist. Full suite still green (102 passed); this
 file isn't machine-parsed.
 
-**R4 [MEDIUM] — Close (or formally accept) the grill → triage gap.** Neither
-snapshot bridges it, so the fix is repo-local: add a checklist line to the
-playbook's Part C definition-of-done ("the grill session's outcome is filed
-— run `/triage` before leaving the session") *and*, if a mechanism is
-wanted, a thin repo-local user-invoked skill (`grill-and-file`: run
-`/grill-with-docs`, then `/to-spec`, then remind `/triage`) — three lines,
-same composition style as `grill-with-docs` itself. Cite the prior audit's
-3.1.3 in the playbook so the decision (bridge vs. accept-as-manual) is
-recorded either way.
+**R4 [MEDIUM] — Close (or formally accept) the grill → triage gap. DONE
+(2026-09-13, playbook v4.8).** Decision: **accept-as-manual**, not
+bridge — the user opted against building the `grill-and-file` wrapper
+skill, on the reasoning that a skill to maintain for one reminder isn't
+worth it when a checklist line covers the same ground. Added a new Part C
+subsection ("The grill → triage handoff is manual, on purpose") recording
+the decision and citing the prior audit's 3.1.3, plus a new Definition-of-
+done checklist item ("if this bootstrap session ran because of a fresh
+grilling, its outcome is filed — run `/triage` before leaving the
+session"). Re-checked F2 against current upstream while there: still
+unbridged in the fresh clone too, so this isn't a gap SSSF could have
+inherited a fix for.
 
 **R5 [MEDIUM] — Adopt the fresh `triage` (and note the PR surface).** Update
 the local install to the fresh clone's `triage` so the human gate matches
