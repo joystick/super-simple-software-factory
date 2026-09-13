@@ -381,3 +381,46 @@ Rule-of-thumb line all sat outside every fence. Diffed line-by-line against
 the base template and fenced every genuinely SSSF-added-or-reworded piece
 — 8 balanced regions now (was 4). Also fixed two more stale "PRD" mentions
 surfaced during the close read. Full suite still green (102 passed).
+
+**F4 [MEDIUM] — Teach both R2 safety overrides in Problem 1's AFK bullet
+list. DONE (2026-09-13, playbook v4.13, `962a537`).** Problem 1's list only
+covered the interview-related overrides (wayfinder no-fog, to-spec
+never-prompts, to-tickets quiz-skip) — it never mentioned the two
+triage-bypass overrides R2 actually shipped (force `needs-triage`, force
+plain lines). An adopter hand-writing their own `system.md` from this list
+alone would get a queue-bypassing, queue-invisible configuration even
+though the shipped template is correct. Added both.
+
+**F5 [LOW] — Back-port a real heuristic fix, document a manual drift check.
+DONE (2026-09-13, fork `2f48f59`).** Diffed the fork's shipped planner
+template against opencode-expo's live copy: the fork's ticket-detection
+heuristic keyed on `to-tickets`' own local-ticket-template shape, while
+opencode's correctly keys on what `/triage` actually posts (`## Agent
+Brief`/`Current behavior`/`Desired behavior`) — opencode's version matches
+reality, the fork's didn't. Backported it plus a missing "do not attempt to
+prompt" safety clause. Re-diffed after: only formatting differences remain.
+Added a `config.md` paragraph documenting why this file has no automatic
+drift check (it isn't provenance-headered — downstream customization is
+expected) and a manual `diff` command with guidance on what's worth
+noticing (a safety override present on one side, not the other) versus
+what to ignore (wrapping, phrasing).
+
+**F6 [LOW] — Unify provenance-source convention, refresh stale tracking.
+DONE (2026-09-13, opencode-expo `89b36b1`).** `to-spec`/`to-tickets`'
+provenance headers pointed at the gitignored, disposable `downloads/`
+clone while `code-review`/`tdd`/`wayfinder` pointed at the durable
+`~/.agents/skills/`. Installed `to-spec`/`to-tickets` into
+`~/.agents/skills/` (matching R6's `research`/`prototype` convention) and
+re-vendored both from there — same content, same sha256, only the recorded
+source changed; all five vendored files now share one convention. Also
+found and fixed real staleness the audit flagged: local `tdd` and
+`grill-with-docs` were both tracking pre-upstream-wording-pass copies
+(cosmetic em-dash→colon changes, plus a real invocation-mechanism note in
+`grill-with-docs`: "run a `/grilling` session" → "call the Skill tool
+twice"). Backed up both before refreshing from the fresh clone, then
+re-vendored `tdd` (not `grill-with-docs`, which stays deliberately
+unvendored per its `disable-model-invocation: true`). `--check` clean on
+all five vendored files; full suite still green (102 passed).
+
+All six follow-up findings from the independent re-audit (F1–F6) are now
+addressed.
