@@ -1,6 +1,6 @@
 ---
 title: "Adoption playbook — putting SSSF to work on real code"
-version: 4.11
+version: 4.12
 updated: 2026-09-13
 status: active
 ---
@@ -472,8 +472,9 @@ flowchart TD
 
 The skill names below (`write-a-prd`, `prd-to-plan`) are what this Part is
 written against, and what `prompt_engineering/planner/system.md`'s "On the
-skills composed below" section keys its per-skill overrides on. Matt
-Pocock's upstream skill collection has since renamed two of the three:
+skills composed below" section keys its per-skill overrides on. Two of the
+four have moved since: Matt Pocock's upstream skill collection renamed
+`write-a-prd`, and has no equivalent at all for `prd-to-plan`:
 
 | This playbook says | Current upstream name | Notes |
 |---|---|---|
@@ -490,9 +491,10 @@ list and the prompt's per-skill instructions silently stop lining up.
 
 ### Problem 1 — the interview a vendored planning skill wants doesn't have anyone to answer it
 
-`wayfinder`'s "ask the user how to proceed" fallback (and, on an older
-skill generation than the one this repo now vendors, `to-spec`'s own
-interview) are written for an interactive session — a human on the other end who answers
+`wayfinder`'s "ask the user how to proceed" fallback (and, on the older
+`write-a-prd` generation this repo used to vendor before R2's migration,
+its own interview — `to-spec`, its replacement, never interviews at all)
+are written for an interactive session — a human on the other end who answers
 back. Vendored under `skill_engineering:` and run by a headless `claude_code`
 node, there is no one there. Best case the model role-plays both sides and you
 get a low-fidelity spec with none of the interview's real value; worst case it
@@ -783,9 +785,10 @@ It's tempting to have `just watch` itself analyze a raw issue's feasibility,
 compatibility with what's already live, and compliance/security against
 `CLAUDE.md`/`AGENTS.md`, `CONTEXT.md`, your knowledge source, and `docs/`/plan
 files — then decide whether to build it. Don't: that recreates the exact
-failure Part C already fixed once. `to-spec`'s interview had no one to
-answer it headless; an unattended loop making its own security/compliance
-judgment calls has no one to catch it when it's wrong, either.
+failure Part C already fixed once: `wayfinder`'s "ask the user how to
+proceed" fallback had no one to answer it headless (Problem 1). An
+unattended loop making its own security/compliance judgment calls has no
+one to catch it when it's wrong, either.
 
 The `triage` skill (if installed) already does this analysis — feasibility,
 redundancy against existing implementation, `.out-of-scope/` prior-rejection
@@ -896,6 +899,7 @@ Everything in Part C's definition of done, plus:
 
 | Version | Date | Changes |
 |---|---|---|
+| 4.12 | 2026-09-13 | F2 (same re-audit): fixed a third instance of the exact self-inflicted-error pattern this effort keeps catching — Part D's "judgment call stays interactive" section claimed "`to-spec`'s interview had no one to answer it headless," which v4.9's mechanical rename introduced and v4.10's own cleanup pass missed; `to-spec` never interviews, directly contradicting the compatibility table 280 lines earlier. Reworded to point at `wayfinder`'s fallback instead, which is the thing that's actually still true. Also fixed two wording nits the re-audit flagged in the same pass: the compatibility table's "renamed two of the three" (only one skill was renamed; the other has no upstream equivalent at all) and Problem 1's garbled `to-spec`/`write-a-prd` parenthetical. |
 | 4.11 | 2026-09-13 | F1 (independent re-audit of R1–R7, `downloads/pocock-sssf-reaudit.md`): documented a gap R2's headless-only planner override left open — `/to-spec`/`/to-tickets` self-apply `ready-for-agent` by default, and running either interactively (which the Filing section's own guidance recommends) bypasses `/triage` entirely. Added a "sharp edge" paragraph to Filing: `/to-tickets`' bold `**Status:**`/`**Blocked by:**` template makes an interactively-filed ticket invisible to `adw_watch.py`'s frontier scan (a silent stall); plain lines instead produce an untriaged `ready-for-agent` ticket the watcher will build unjudged. Instructs running `/triage` on interactive output, or hand-fixing the status line and format, before `just watch` sees it. |
 | 4.10 | 2026-09-13 | R7: converged remaining "PRD" prose on "spec" (upstream finished this same rename in its 1.2.0 — the bootstrap/AFK audit's "one artifact, four names" finding was the same disease). Problem 1's title and body still used the retired `write-a-prd`/`prd-to-plan` names throughout (R1 deliberately left prose like this alone in favor of a compatibility table) — since a PRD→spec wording pass sitting right next to unrenamed skill names would read incoherently, renamed those too in this one section: `write-a-prd` → `to-spec`, `prd-to-plan`'s "ask the user to paste it" → `to-tickets`'s "quiz the user". Scoped to Problem 1 and one Filing-section mention only, not a playbook-wide sweep — the ~15 remaining `/write-a-prd`/`/prd-to-plan` mentions elsewhere (mostly diagrams and Parts A/B walkthroughs) stay as-is per R1's original "documentation-only, point to the compatibility table" decision. |
 | 4.9 | 2026-09-13 | R5: updated the local `triage` skill install (`~/.agents/skills/triage` — the real location; `~/.claude/skills/triage` is a symlink to it) to the fresh upstream clone, which adds external-PR-as-request-surface support (`disable-model-invocation: true`, off by default). Backed up the prior version alongside it before overwriting. Added a Part D paragraph noting the PR surface exists but hits a real ceiling today: a PR only exists on a GitHub/GitLab tracker, and `adw_watch.py` currently refuses those outright (its own module docstring already flags GitHub/GitLab support as unbuilt) — triage can flip a PR to `ready-for-agent`, but nothing in this repo's queue would ever pick it up yet. Also fixed one more stale `write-a-prd` reference (the queue's "judgment call stays interactive" section) to `to-spec`. |
