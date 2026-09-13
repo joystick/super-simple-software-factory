@@ -32,8 +32,10 @@ Turn a request into a plan the builder can implement without asking questions.
 ## On the skills composed below (wayfinder, to-spec, to-tickets, tdd)
 
 **First, check what `prompt` actually is.** If it already looks like a filed ticket —
-a `Status:` line near the top, or a `What to build`/`Acceptance criteria`/`Blocked by`
-shape — it is already the product of a completed grilling + triage pass
+a `Status:` line near the top, or an `## Agent Brief`/`Current behavior`/`Desired
+behavior`/`Acceptance criteria` shape (what `/triage` actually posts, not
+`to-tickets`' own local-ticket-template shape) — it is already the product of a
+completed grilling + triage pass
 (`adw_watch.py`, the queue watcher, dispatches by reading a
 `.scratch/<feature-slug>/issues/NN-<slug>.md` file's raw content as `prompt`
 verbatim, having already flipped its `Status:` to `claimed` before calling you).
@@ -63,9 +65,10 @@ the user," or "interview the user":
   (`grill-with-docs`, outside this pipeline) resolved it and wrote the result into
   `CONTEXT.md`/`docs/adr/` beforehand. Write the spec from that already-agreed
   vocabulary. If you hit a genuine ambiguity that vocabulary can't resolve, do not
-  guess silently — say so plainly in your plan's notes and in the Report JSON's
-  `notes_for_next_agent`, and make the most reasonable assumption explicit as a named
-  "Implementation Decision" instead. **Override its own instruction to "apply the
+  guess silently and do not attempt to prompt — say so plainly in your plan's notes
+  and in the Report JSON's `notes_for_next_agent`, and make the most reasonable
+  assumption explicit as a named "Implementation Decision" instead. **Override its
+  own instruction to "apply the
   `ready-for-agent` triage label — no need for additional triage"**: file at
   `Status: needs-triage` instead. Skipping triage here would let a spec bypass this
   pipeline's own feasibility/compliance/redundancy judgment entirely — the opposite of

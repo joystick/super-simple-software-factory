@@ -338,6 +338,15 @@ agents:
 
 **Audit what's vendored and who uses it** — `just skills` (backed by `adws/adw_skills.py`, free: no agents, no trace) lists every vendored file and the agent names that actually receive it, plus anything an agent names outside the vendored directory. An agent whose `coding_agent` means the field never applies (a `pi`/`agy` agent naming a skill) shows up separately as `[ignored by: ...]`, never counted as an active user.
 
+**`prompt_engineering/planner/system.md`'s "On the skills composed below" section has no drift check between the shipped template and a downstream repo's live copy.** Unlike `vendor_skill.py`'s targets, this file isn't provenance-headered — a downstream repo is expected to customize it (add repo-specific ticket-detection heuristics, for instance), so a byte-identical check would be wrong. But nothing currently notices when the *shipped template* gains a fix (a new safety override, a corrected heuristic) that a downstream copy never received, or vice versa. Until there's real tooling for this, diff them by hand periodically:
+
+```bash
+diff <sssf-skill-root>/templates/prompt_engineering/planner/system.md \
+     <target-repo>/adws/adw_data/prompt_engineering/planner/system.md
+```
+
+Expect line-wrap and repo-specific customization differences; look for content differences in the composed-skills override list specifically — a safety override present on one side and not the other is the thing worth catching.
+
 **Recommended pairings — documented, not enabled by default.** Adding unrequested per-turn cost to every fresh install would be wrong, so the starter roster ships with no `skill_engineering` set anywhere:
 
 | Agent | Skill | Why |
