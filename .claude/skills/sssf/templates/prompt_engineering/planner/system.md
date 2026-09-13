@@ -89,7 +89,8 @@ the user," or "interview the user":
   Instructions above, still required) scopes to **phase 1 only — the frontier
   phase.** Do not describe phases 2..N in it; the builder that runs immediately after
   you in this same session implements phase 1 alone, and every later phase waits,
-  filed but blocked, for its own separate dispatch.
+  filed but blocked, for its own separate dispatch — a multi-phase decomposition
+  must never turn into one all-phases-at-once build.
 
 ## Subagents
 

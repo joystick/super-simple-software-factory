@@ -405,6 +405,18 @@ expected) and a manual `diff` command with guidance on what's worth
 noticing (a safety override present on one side, not the other) versus
 what to ignore (wrapping, phrasing).
 
+**Fourth-pass correction (B2, `downloads/pocock-sssf-sync-plan-v2.md`):**
+"only formatting differences remain" understated the real diff — a
+normalized word-level comparison found genuine (if benign) wording deltas
+in both directions beyond wrapping (a fork-only clarifying parenthetical;
+an opencode-only closing sentence about one-phase-at-a-time). No safety
+override differs on either side, which is the test that actually matters
+per `config.md`'s own drift-check guidance — so the substantive conclusion
+still holds. But "formatting differences" was the wrong description, and a
+future drift-checker trusting that phrase at face value would misread a
+real delta as noise. See B3 for the follow-up decision on these two
+sentences.
+
 **F6 [LOW] — Unify provenance-source convention, refresh stale tracking.
 DONE (2026-09-13, opencode-expo `89b36b1`).** `to-spec`/`to-tickets`'
 provenance headers pointed at the gitignored, disposable `downloads/`
