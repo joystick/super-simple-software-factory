@@ -1,6 +1,6 @@
 ---
 title: "Adoption playbook — putting SSSF to work on real code"
-version: 4.13
+version: 4.14
 updated: 2026-09-13
 status: active
 ---
@@ -141,14 +141,16 @@ before spec-writing, spec-writing before slicing.
 
 Do this interactively in Claude Code, where your installed skills are available:
 
-```
-/grill-with-docs interrogate your own intent against the scout findings from
-                 A1 — what actually breaks today, what must not change, what
-                 you are assuming about the existing design. Writes the
-                 resolved vocabulary to CONTEXT.md/docs/adr/ as you go.
-/write-a-prd     synthesise that conversation into a spec.
-/prd-to-plan     break the spec into slices, each independently shippable.
-```
+1. `/grill-with-docs` — interrogate your own intent against the scout findings
+   from A1: what actually breaks today, what must not change, what you are
+   assuming about the existing design. Writes the resolved vocabulary to
+   `CONTEXT.md`/`docs/adr/` as you go.
+2. `/to-spec` — synthesize that conversation into a spec. No interview; it
+   already happened.
+3. `/to-tickets` — slice the spec into per-phase tickets with `Blocked by:`
+   edges.
+4. Both (2) and (3) self-apply `ready-for-agent` by default — see Part D's
+   Filing "sharp edge" before committing their output.
 
 Then hand one slice to SSSF. `just plan` is SSSF's own synthesis step, and it is
 downstream of your thinking, not a replacement for it.
@@ -159,7 +161,7 @@ downstream of your thinking, not a replacement for it.
 flowchart LR
     Job{What are you<br/>trying to do?}
 
-    Job -->|Architecture| A1["/grill-with-docs → /write-a-prd<br/>→ /prd-to-plan"]
+    Job -->|Architecture| A1["/grill-with-docs → /to-spec<br/>→ /to-tickets"]
     A1 --> A2["just plan (one slice)"]
     A2 --> A3[["READ the spec<br/>cheap checkpoint"]]
     A3 --> A4{Understood<br/>your design?}
@@ -253,7 +255,7 @@ specs.
 flowchart LR
     subgraph I["INTERACTIVE Claude Code — skills ARE available"]
         direction TB
-        P1["/grill-with-docs<br/>interrogate first"] --> P2["/write-a-prd<br/>synthesise the spec"] --> P3["/prd-to-plan<br/>slice the spec"]
+        P1["/grill-with-docs<br/>interrogate first"] --> P2["/to-spec<br/>synthesise the spec"] --> P3["/to-tickets<br/>slice into tickets"]
     end
     subgraph S["SSSF — headless, only vendored skills are visible"]
         direction TB
@@ -274,17 +276,17 @@ SSSF is an execution engine. It is the wrong tool for deciding what to build.
 Do this part **interactively** in Claude Code, where your installed skills are
 available. The order matters, and it is the reverse of what most people assume:
 
-```
-/grill-with-docs interrogate relentlessly, round after round, until nothing
-                 important is left silently assumed. This happens BEFORE any
-                 spec exists — it is how you reach shared understanding.
-                 Writes the resolved vocabulary to CONTEXT.md/docs/adr/ as
-                 you go, so it survives past this conversation.
-/write-a-prd     synthesise that conversation into a structured spec.
-                 No interrogation here; it already happened.
-/prd-to-plan     break the spec into slices, each independently shippable and
-                 verifiable, with explicit blocking order.
-```
+1. `/grill-with-docs` — interrogate relentlessly, round after round, until
+   nothing important is left silently assumed. This happens BEFORE any spec
+   exists — it is how you reach shared understanding. Writes the resolved
+   vocabulary to `CONTEXT.md`/`docs/adr/` as you go, so it survives past this
+   conversation.
+2. `/to-spec` — synthesize that conversation into a structured spec. No
+   interrogation here; it already happened.
+3. `/to-tickets` — break the spec into per-phase tickets, each independently
+   shippable and verifiable, with explicit `Blocked by:` edges.
+4. Both (2) and (3) self-apply `ready-for-agent` by default — see Part D's
+   Filing "sharp edge" before committing their output.
 
 Skipping the grill and starting at the spec produces a document that reads well
 and encodes assumptions nobody tested. The spec step is downstream of the
@@ -468,33 +470,10 @@ flowchart TD
     style Rest fill:#bbf7d0,stroke:#15803d,color:#000
 ```
 
-### Skill-name compatibility
-
-The skill names below (`write-a-prd`, `prd-to-plan`) are what this Part is
-written against, and what `prompt_engineering/planner/system.md`'s "On the
-skills composed below" section keys its per-skill overrides on. Two of the
-four have moved since: Matt Pocock's upstream skill collection renamed
-`write-a-prd`, and has no equivalent at all for `prd-to-plan`:
-
-| This playbook says | Current upstream name | Notes |
-|---|---|---|
-| `write-a-prd` | `to-spec` (via `to-prd`) | Not cosmetic: `to-spec` never interviews, by design — adopting it *removes* the "never prompt" override below rather than needing a new one |
-| `prd-to-plan` | no upstream equivalent | Hand-authored for this repo; nearest upstream behavior is `to-tickets` + `implement`, which natively produce per-phase ticket files with `Blocked by:` edges — the exact gap Problem 2 below flags as missing |
-| `wayfinder` | `wayfinder` | Unchanged |
-| `tdd` | `tdd` | Unchanged |
-
-If you vendor from current upstream, either pass `vendor_skill.py --as
-write-a-prd` (etc.) so the filenames still match what the planner prompt
-expects, or update the planner's "On the skills composed below" section in
-the same commit — don't do one without the other, or the composed skill
-list and the prompt's per-skill instructions silently stop lining up.
-
 ### Problem 1 — the interview a vendored planning skill wants doesn't have anyone to answer it
 
-`wayfinder`'s "ask the user how to proceed" fallback (and, on the older
-`write-a-prd` generation this repo used to vendor before R2's migration,
-its own interview — `to-spec`, its replacement, never interviews at all)
-are written for an interactive session — a human on the other end who answers
+`wayfinder`'s "ask the user how to proceed" fallback is written for an
+interactive session — a human on the other end who answers
 back. Vendored under `skill_engineering:` and run by a headless `claude_code`
 node, there is no one there. Best case the model role-plays both sides and you
 get a low-fidelity spec with none of the interview's real value; worst case it
@@ -516,8 +495,8 @@ a run is unattended. Split it into two phases that run in different modes:
   commit makes the whole bootstrap step invisible to the pipeline.
 - **AFK, headless, the common case.** If the request only composes concepts
   `CONTEXT.md` already names, skip bootstrap entirely — there's nothing left
-  to interview about. `to-spec` already doesn't interview by design (it's
-  "no interview, just synthesis" — see the compatibility table above), so it
+  to interview about. `to-spec` already doesn't interview by design —
+  "no interview, just synthesis," per its own frontmatter — so it
   runs unmodified (do not edit the vendored copy) and degrades to pure
   spec-formatting from already-agreed vocabulary. Add this to your
   `skill_engineering`-attached agent's own `system.md` (not the vendored
@@ -629,6 +608,18 @@ Part C gets one feature through the headless loop unattended. This part is
 what turns that into a standing queue: an engineer files or triages work
 whenever they want, and something — `just watch`, watching — picks it up and
 ships it without anyone manually running `just sdlc` per item.
+
+### The whole chain, named once
+
+1. `/grill-with-docs` — interactively, commit `CONTEXT.md`/`docs/adr/`.
+2. `/to-spec` — synthesize the spec.
+3. `/to-tickets` — slice into tickets.
+4. `/triage` — the only thing allowed to promote a ticket to
+   `ready-for-agent`. (Steps 2–4: see Filing's "sharp edge" — running (2)/(3)
+   interactively self-promotes past this gate by default; fix that there,
+   not here.)
+5. Commit; run the Mandatory checkpoints.
+6. `just watch`.
 
 ```mermaid
 flowchart TD
@@ -754,7 +745,7 @@ tooling yet that restores a dropped block on its own.
 Every one of these has failed silently on a real repo this playbook was
 built against: a skill claims to have written something, and the file isn't
 where the claim said, or isn't committed, or the status string doesn't match
-what the state machine expects. Run this after `/write-a-prd`, `/prd-to-plan`,
+what the state machine expects. Run this after `/to-spec`, `/to-tickets`,
 or `/triage` — before assuming the queue can see the work:
 
 ```bash
@@ -846,12 +837,12 @@ doesn't care who's claiming. `just watch` reuses it verbatim: same frontier
 scan, same claim-before-work, same resolve-after-work, just performed by an
 agent instead of a human.
 
-This also closes a real gap: a `prd-to-plan` plan's individual **phases**
-(Part A5/B1) have no atomic, independently-pickable file of their own by
-default — only the feature's `spec.md` does. For a queue to claim work safely,
-each phase needs its own issue file, with a `Blocked by:` line expressing
-phase ordering (Phase 2 blocked by Phase 1) the same way a wayfinder ticket
-blocks on another.
+This also depends on a `to-tickets` slice's individual **phases** (Part
+A5/B1) each having their own atomic, independently-pickable file — not just
+the feature's `spec.md`. `to-tickets` natively files one ticket per phase,
+with a `Blocked by:` line expressing phase ordering (Phase 2 blocked by
+Phase 1) the same way a wayfinder ticket blocks on another, so a queue can
+claim work safely one phase at a time.
 
 ### What `just watch` does, concretely
 
@@ -887,7 +878,7 @@ Everything in Part C's definition of done, plus:
       claimed it — never a raw or `needs-triage` issue.
 - [ ] A failed run is `ready-for-human` with a comment explaining what broke,
       not silently retried or left `claimed` forever.
-- [ ] Each `prd-to-plan` phase intended for the queue has its own issue file
+- [ ] Each `to-tickets` phase intended for the queue has its own issue file
       with `Blocked by:` expressing phase order, not just a shared `plan.md`.
 
 ## What this playbook does not claim
@@ -915,6 +906,7 @@ Everything in Part C's definition of done, plus:
 
 | Version | Date | Changes |
 |---|---|---|
+| 4.14 | 2026-09-13 | Group A of a fourth-pass re-audit's sync plan (`plans/pocock-protocol-sssf-integration.md`, `downloads/pocock-sssf-sync-plan-v2.md`), per explicit direction that the playbook carry no historical naming baggage as live instruction: deleted the "Skill-name compatibility" section outright (the migration it bridged is complete everywhere else in the system; the table's own standing vendoring instruction had been inverted since R2 — history stays only in this changelog's v4.6 row). Fixed the one cross-reference that pointed at it. Rewrote Parts A4/A5/B1's walkthroughs from prose to numbered command steps naming only current skills (`to-spec`/`to-tickets`, not the retired `write-a-prd`/`prd-to-plan`, which R6 deleted from the local install entirely). Added a new "The whole chain, named once" list at the top of Part D — the working `grill-with-docs → to-spec → to-tickets → triage → watch` sequence previously had to be assembled from three separate sections. Swept the remaining live retired-name references (Problem 1's opening, the Mandatory-checkpoints trigger line, the queue-gap paragraph, the definition-of-done). Also fixed `references/config.md`, which still claimed only 3 coding agents exist and that `skill_engineering`/`harness_engineering` are ignored under `pi`/`agy` — the shipped code covers all four (`agent_opencode.py` was undocumented entirely); added a full `opencode` subsection matching `agy`'s detail level. |
 | 4.13 | 2026-09-13 | F4 (same re-audit): Problem 1's AFK bullet list taught only the interview-related overrides (`wayfinder` no-fog, `to-spec` never-prompts, `to-tickets` quiz-skip), omitting the two triage-bypass overrides R2 actually shipped in the real template (force `needs-triage`, force plain `Status:`/`Blocked by:` lines). An adopter following this list to hand-write their own `system.md` would get a queue-bypassing, queue-invisible configuration even though the shipped template is correct. Added both missing overrides so the playbook teaches what the template actually does. |
 | 4.12 | 2026-09-13 | F2 (same re-audit): fixed a third instance of the exact self-inflicted-error pattern this effort keeps catching — Part D's "judgment call stays interactive" section claimed "`to-spec`'s interview had no one to answer it headless," which v4.9's mechanical rename introduced and v4.10's own cleanup pass missed; `to-spec` never interviews, directly contradicting the compatibility table 280 lines earlier. Reworded to point at `wayfinder`'s fallback instead, which is the thing that's actually still true. Also fixed two wording nits the re-audit flagged in the same pass: the compatibility table's "renamed two of the three" (only one skill was renamed; the other has no upstream equivalent at all) and Problem 1's garbled `to-spec`/`write-a-prd` parenthetical. |
 | 4.11 | 2026-09-13 | F1 (independent re-audit of R1–R7, `downloads/pocock-sssf-reaudit.md`): documented a gap R2's headless-only planner override left open — `/to-spec`/`/to-tickets` self-apply `ready-for-agent` by default, and running either interactively (which the Filing section's own guidance recommends) bypasses `/triage` entirely. Added a "sharp edge" paragraph to Filing: `/to-tickets`' bold `**Status:**`/`**Blocked by:**` template makes an interactively-filed ticket invisible to `adw_watch.py`'s frontier scan (a silent stall); plain lines instead produce an untriaged `ready-for-agent` ticket the watcher will build unjudged. Instructs running `/triage` on interactive output, or hand-fixing the status line and format, before `just watch` sees it. |

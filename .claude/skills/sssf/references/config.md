@@ -42,12 +42,12 @@ agents:
 
 | Field | Type | Meaning |
 |---|---|---|
-| `coding_agent` | `pi` \| `claude_code` \| `agy` | Which interface runs the agent. All three are implemented (`agent_pi.py`, `agent_cc.py`, `agent_agy.py`) and may be mixed per agent. Default `claude_code`. |
+| `coding_agent` | `pi` \| `claude_code` \| `agy` \| `opencode` | Which interface runs the agent. All four are implemented (`agent_pi.py`, `agent_cc.py`, `agent_agy.py`, `agent_opencode.py`) and may be mixed per agent. Default `claude_code`. |
 | `model` | string | Model id, always `provider/id`. `claude_code`: `anthropic/<id>`. `pi`: anything `pi --list-models` lists. Default `anthropic/claude-sonnet-4-6`. |
 | `thinking` | enum | Reasoning effort — see below. Default `medium`. |
 | `color` | hex string | Lane color for every agent that does not set its own. Default empty — the visualizer falls back to its own palette. |
-| `harness_engineering` | list[string] | Pi extension paths, passed as `pi -e <path>`. **Ignored under `claude_code`/`agy`** — not deferred, not partially honoured — but `agents.validate()` now warns when a non-`pi` agent has this set, rather than staying silent about it. See "Harness engineering" below. |
-| `skill_engineering` | list[string] | Vendored Pocock-protocol skill file paths, composed onto the agent's system prompt. **Ignored under `pi`/`agy`** — `agents.validate()` warns the same way. See "Skill engineering" below. |
+| `harness_engineering` | list[string] | Pi extension paths, passed as `pi -e <path>`. **Ignored under `claude_code`/`agy`/`opencode`** — not deferred, not partially honoured — but `agents.validate()` now warns when a non-`pi` agent has this set, rather than staying silent about it. See "Harness engineering" below. |
+| `skill_engineering` | list[string] | Vendored Pocock-protocol skill file paths, composed onto the agent's system prompt. Delivered to all four coding agents — see "Skill engineering" below. |
 | `skill_token_budget` | int \| null | Soft ceiling on one agent's estimated `skill_engineering` token cost. `null` (default) = no budget, no warning, ever. Exceeding it only warns — never fails the run. Per-agent overridable, same merge rule as everything else here. |
 | `tools` | list[string] | Roster-wide tool allowlist. Every agent that omits its own `tools` inherits this. Unset = all tools usable. |
 | `protected_files` | list[string] | Paths **no** agent may modify unless it names them in its own `writes`. Default: `adws/adw_modules/`, `adws/adw_sssf_config/`, `adws/adw_*.py` — an agent must not be able to edit the machinery that decides whether its work passed. |
@@ -91,7 +91,7 @@ Mapped to Pi's reasoning effort control and honored when the model is registered
 
 ## Coding agents
 
-`coding_agent` picks the module that runs a phase. All three implement the same
+`coding_agent` picks the module that runs a phase. All four implement the same
 surface — `run(request, on_event, on_spawn, on_exit) -> PiResult`,
 `resolve_model()`, `ToolCallTracker` — so `agents.execute()` selects one and
 stops caring. The field is per-agent, so a roster can mix them: cheap read-only
@@ -188,6 +188,38 @@ explicitly — otherwise the factory would treat a stalled turn as a completed o
 **No cost data.** `agy` reports tokens but never dollars, so `PiResult.cost` stays
 0.00 for this interface. A `$0.00` in the trace means *unknown*, not *free*.
 Authentication is OAuth against the Code Assist backend, not an API key.
+
+### `opencode` — a gateway like `agy`, one CLI in front of many providers
+
+`opencode models` lists ~427 across OpenRouter, Anthropic, its own gateway,
+and more. Unlike `agy`'s bare model ids, `opencode`'s are already
+`provider/model-id` shaped (e.g.
+`openrouter/nvidia/nemotron-3-super-120b-a12b:free`), so a roster entry's
+`model:` is `opencode/<that whole string>` — the `opencode/` prefix is this
+module's own namespacing, everything after the first `/` is passed to
+`opencode run --model` verbatim.
+
+Same real weakness as `agy`: **no `--system-prompt` flag.** The system
+prompt is folded into the user turn behind a labelled delimiter, same
+`_compose()` shape as `agent_agy`, resent every turn. `--auto` is required
+for headless runs, same reasoning as `agy`'s
+`--dangerously-skip-permissions` — a headless run cannot answer a
+permission prompt.
+
+**No `--tools` allowlist flag.** `opencode` exposes its own fixed built-in
+toolset on every call — a roster entry's `tools:` field has nothing to bind
+to here. Not a security gap: `permissions.py`'s post-hoc `writes:`/
+`protected_files` tree-diff enforcement still applies regardless of tool
+surface, same backstop every other coding agent gets. But `tools:` on a
+`coding_agent: opencode` agent is currently decorative.
+
+**Real cost data, unlike `agy`.** Each `step_finish` event carries a numeric
+`cost`, summed across steps into `PiResult.cost` — this is the one place
+`opencode` is stronger than its closest sibling interface.
+
+No context-window figure from the CLI either — same posture as `agy`:
+published ceilings per model family in `agent_opencode.CONTEXT_WINDOWS`,
+wrong-but-close beats a bar that reads 0.
 
 ## Model resolution
 
@@ -305,7 +337,7 @@ Rule: **every entry in `harness_engineering` that registers a tool must have tha
 
 `harness_engineering` entries are pi extension **file paths**, passed through as `pi -e <path>`, one flag per entry, scoped to that agent only. This is where per-agent harness changes live — e.g. an output-tightening extension for an agent that keeps wrapping its envelope in prose.
 
-**Under `coding_agent: claude_code`/`agy` the field is ignored.** Not deferred, not partially honoured — `agent_cc.build_command` never reads it. `agents.validate()` prints a warning naming the agent (to stderr, before anything spawns) — see `ignored_field_warnings()` — but the run still proceeds; this is a warning, never a failure. An agent that declares `subagents.ts` and lists `subagent_create` in its `tools` still gets subagents under `claude_code`, because `_map_tools` aliases every `subagent_*` name onto Claude Code's own `Task` tool; it just is not the extension the config names. Anything else an extension would have done — new tools, output shaping, extra flags — does not happen. If a roster depends on a pi extension, that agent belongs on `coding_agent: pi`.
+**Under `coding_agent: claude_code`/`agy`/`opencode` the field is ignored.** Not deferred, not partially honoured — `agent_cc.build_command` never reads it. `agents.validate()` prints a warning naming the agent (to stderr, before anything spawns) — see `ignored_field_warnings()` — but the run still proceeds; this is a warning, never a failure. An agent that declares `subagents.ts` and lists `subagent_create` in its `tools` still gets subagents under `claude_code`, because `_map_tools` aliases every `subagent_*` name onto Claude Code's own `Task` tool; it just is not the extension the config names. Anything else an extension would have done — new tools, output shaping, extra flags — does not happen. If a roster depends on a pi extension, that agent belongs on `coding_agent: pi`.
 
 The reason it is ignored rather than translated: pi extensions are TypeScript loaded into pi's own harness. Claude Code's equivalent surfaces are MCP servers and hooks, which are a different shape and arrive through `--mcp-config` and settings, not `-e`. A faithful translation is not a mapping exercise, so the field stays pi-only until someone writes that path deliberately.
 
@@ -326,17 +358,17 @@ agents:
 
 **Composition order: the agent's own `system.md` first, then skills in the order listed — never sorted.** The agent's identity and output contract outrank any borrowed protocol; if `tdd.md` and `builder/system.md` disagree about output shape, the envelope contract wins, or the phase fails to parse and the "fix" is a JSON retry loop that costs money to discover. Order is also what keeps the composed prompt — and therefore the prompt cache — stable across runs; an unstable order is a cost regression waiting to be noticed.
 
-**Under `coding_agent: pi`/`agy` the field is ignored** — the same way, and warned about the same way, as `harness_engineering` under `claude_code` above. Skills ride in `--system-prompt`, which is a `claude_code`-specific delivery mechanism.
+**Delivered to all four coding agents, two different ways.** `claude_code` and `pi` both take the composed text as a real `--system-prompt` CLI flag — a separate channel from the conversation. `agy` and `opencode` have no such flag, so they fold it into the user turn instead (see each interface's own section above) — a weaker channel, advice inside the conversation rather than separate, but it arrives. See `skill_engineering_applies()` in `agents.py` to confirm which coding agents are covered on your version; a future fifth coding agent needs a deliberate addition there before this key does anything for it.
 
 **Cost is real and re-sent every turn.** A skill's text lands in the system prompt, so it is billed on every internal turn of a phase, on top of the ~15.5k-token Claude Code base prompt no flag removes. Set `skill_token_budget` (roster-wide via `defaults`, or per-agent) to get a warning — never a hard failure — when a composed prompt's estimated cost exceeds it. The estimate is a `chars/4` heuristic, reported as "est." everywhere it's shown, never presented as a real tokenizer count.
 
 **Enforcement stays at outcome gates only.** No gate ever attempts to prove a protocol was followed — no inspecting intermediate commits for a failing test, no requiring the envelope to cite a test written first. `tdd.md` shapes how the builder works; the suite, the linter, and the typechecker judge what came out. A gate that claims to verify process but can be satisfied by a well-worded envelope is worse than no gate.
 
-**Vendoring** — `uv run <skill>/scripts/vendor_skill.py <source>` — copies a skill file into `adws/adw_data/skill_engineering/`, stamped with a provenance header (source path, date, content hash) that's stripped before the text ever reaches a model. Re-vendoring unchanged content is a no-op. `vendor_skill.py --check <vendored-file>` reports drift against the source without touching anything. Nothing auto-updates, ever — see the [attach-a-skill cookbook](../cookbooks/attach_a_skill.md) for the full walkthrough.
+**Vendoring** — `uv run <skill>/scripts/vendor_skill.py <source>` — copies a skill file into `adws/adw_data/skill_engineering/`, stamped with a provenance header (source path, date, content hash) that's stripped before the text ever reaches a model. Re-vendoring unchanged content is a no-op. `vendor_skill.py --check <vendored-file>` reports drift against the source without touching anything. Nothing auto-updates, ever — see the [attach-a-skill cookbook](../cookbooks/attach_a_skill.md) for the full walkthrough. If a future upstream rename lands, update the vendored filenames and the planner's composed-skills section in the same commit — never one without the other, or the composed skill list and the prompt's per-skill instructions silently stop lining up.
 
 **`docs/agents/issue-tracker.md` has two owners, and it matters which.** `/setup-matt-pocock-skills` (a Pocock skill, not part of SSSF) writes this file's base — the tracker convention, `Status:`/`Blocked by:` shapes, wayfinding operations — from its own canonical template. SSSF's queue then depends on that same file also carrying its own extensions: the `claimed`/`resolved` states `adw_watch.py` writes, any repo-specific rewording of the Claim/Resolve steps to describe the queue rather than plain `/wayfinder`. Nothing owns the merge. If `/setup-matt-pocock-skills` is ever re-run in "restart from scratch" mode, it regenerates the base template and has no way to know an SSSF extension was layered on top — it silently disappears, and `adw_watch.py`'s frontier scan keeps running against whatever's left, which may no longer name the states it needs. Wrap anything SSSF added or materially reworded in `<!-- sssf:queue-extension -->` … `<!-- /sssf:queue-extension -->` markers (same idiom `vendor_skill.py` uses for its own provenance header) so the boundary is greppable, not just remembered. There is currently no tooling that re-injects a dropped block automatically — treat the markers as a diff aid for whoever re-syncs the base, not a guarantee.
 
-**Audit what's vendored and who uses it** — `just skills` (backed by `adws/adw_skills.py`, free: no agents, no trace) lists every vendored file and the agent names that actually receive it, plus anything an agent names outside the vendored directory. An agent whose `coding_agent` means the field never applies (a `pi`/`agy` agent naming a skill) shows up separately as `[ignored by: ...]`, never counted as an active user.
+**Audit what's vendored and who uses it** — `just skills` (backed by `adws/adw_skills.py`, free: no agents, no trace) lists every vendored file and the agent names that actually receive it, plus anything an agent names outside the vendored directory. An agent whose `coding_agent` means the field never applies would show up separately as `[ignored by: ...]`, never counted as an active user — presently a dead case, since `skill_engineering_applies()` covers all four known coding agents; kept in place for a future fifth coding agent that doesn't (yet) earn a place in that allowlist.
 
 **`prompt_engineering/planner/system.md`'s "On the skills composed below" section has no drift check between the shipped template and a downstream repo's live copy.** Unlike `vendor_skill.py`'s targets, this file isn't provenance-headered — a downstream repo is expected to customize it (add repo-specific ticket-detection heuristics, for instance), so a byte-identical check would be wrong. But nothing currently notices when the *shipped template* gains a fix (a new safety override, a corrected heuristic) that a downstream copy never received, or vice versa. Until there's real tooling for this, diff them by hand periodically:
 
