@@ -62,8 +62,35 @@ from pathlib import Path
 import adw_simple_sdlc
 from adw_modules import git_helper, utils
 
-STATUS_RE = re.compile(r"^Status:\s*(\S+)", re.MULTILINE)
-BLOCKED_BY_RE = re.compile(r"^Blocked by:\s*(.+)$", re.MULTILINE)
+# \*{0,2} tolerates the two real forms seen in the wild: plain "Status: X"
+# (this script's own set_status() writes) and "**Status:** X" (to-tickets'
+# own local-ticket-template, per its SKILL.md, uses bold) -- found live,
+# 2026-09-14, when to-tickets published four portfinder tickets entirely in
+# bold and every one of them was silently invisible to the frontier scan.
+# It does NOT tolerate arbitrary other markup (underscores, backticks,
+# missing colon) on purpose -- see _check_format() below, which flags those
+# loudly instead of silently accepting or silently ignoring them.
+STATUS_RE = re.compile(r"^\*{0,2}Status:\*{0,2}[ \t]*(\S+)", re.MULTILINE)
+BLOCKED_BY_RE = re.compile(r"^\*{0,2}Blocked by:\*{0,2}[ \t]*(.+)$", re.MULTILINE)
+
+# A line that looks LIKE it's trying to declare Status:/Blocked by: (starts
+# the line with the word, optionally markdown-wrapped) but isn't in one of
+# the two forms STATUS_RE/BLOCKED_BY_RE actually accept -- underscore
+# emphasis, a missing colon, wrong casing, or some other markup an agent
+# reached for. [*_\s]{0,3} on purpose, not \W*: \W excludes underscore
+# (it's a word character in Python's re), so a naive \W*-based near-miss
+# detector silently passed "_Status_:" straight through undetected -- the
+# exact silent-failure shape this detector exists to prevent, just one
+# level up. No colon required either, so a missing-colon line ("Status
+# ready-for-agent") is caught too. Scoped to issues/*.md files only (never
+# spec.md/map.md/plan.md), where a line this specific is never incidental
+# prose. No trailing \b either: \b needs a word/non-word transition, and
+# underscore IS a word character, so "Status_: ..." (closing underscore
+# emphasis right after the word) has no boundary there and would silently
+# pass a \b-anchored version straight through -- caught testing this exact
+# detector against itself.
+_STATUS_NEAR_MISS_RE = re.compile(r"^[*_\s]{0,3}status", re.MULTILINE | re.IGNORECASE)
+_BLOCKED_BY_NEAR_MISS_RE = re.compile(r"^[*_\s]{0,3}blocked\s+by", re.MULTILINE | re.IGNORECASE)
 
 READY = "ready-for-agent"
 CLAIMED = "claimed"
@@ -89,12 +116,42 @@ def read_blocked_by(text: str) -> list[str]:
     m = BLOCKED_BY_RE.search(text)
     if not m:
         return []
-    return [b.strip() for b in m.group(1).split(",") if b.strip()]
+    # Strip a trailing "(Ticket name)" annotation per comma-separated token
+    # -- "05 (Directory tables + seed)" -> "05". Found live alongside the
+    # bold-markup bug: a human-readable annotation next to the ticket number
+    # is a reasonable thing to write, but without stripping it the whole
+    # string is one unmatched fragment against is_unblocked()'s bare-number
+    # sibling keys, so the ticket never unblocks.
+    tokens = (b.strip() for b in m.group(1).split(","))
+    return [re.sub(r"\s*\([^)]*\)\s*$", "", b).strip() for b in tokens if b.strip()]
+
+
+def _check_format(text: str, path: Path) -> None:
+    """Warn loudly -- never silently -- when a Status:/Blocked by: line
+    looks intended but doesn't match either canonical form (plain or
+    **bold**). Never raises: one malformed ticket must not take the whole
+    queue down, but it must never again fail invisibly either -- that was
+    the actual bug (four real tickets silently missing from the frontier
+    scan, `just watch` reporting a clean "queue empty" with no error at
+    all)."""
+    if _STATUS_NEAR_MISS_RE.search(text) and not STATUS_RE.search(text):
+        print(f"just watch: WARNING -- {path} has a Status:-like line that "
+              "doesn't match the canonical 'Status: X' or '**Status:** X' "
+              "form. This ticket is INVISIBLE to the frontier scan until "
+              "fixed.", file=sys.stderr)
+    if _BLOCKED_BY_NEAR_MISS_RE.search(text) and not BLOCKED_BY_RE.search(text):
+        print(f"just watch: WARNING -- {path} has a Blocked by:-like line "
+              "that doesn't match the canonical 'Blocked by: NN' or "
+              "'**Blocked by:** NN' form. Blocking will not be honored for "
+              "this ticket.", file=sys.stderr)
 
 
 def discover_issues(scratch_dir: Path) -> list[Issue]:
-    """Every `.scratch/<feature>/issues/*.md` file that carries a Status: line.
-    A file with no Status: is not a tracked issue -- skip it rather than guess.
+    """Every `.scratch/<feature>/issues/*.md` file that carries a Status: line
+    in either canonical form (plain or **bold**; see STATUS_RE). A file with
+    neither is not a tracked issue -- skip it rather than guess -- but first
+    check whether it merely LOOKS like one that's malformed (_check_format):
+    that gets a loud warning instead of a silent skip.
     """
     issues: list[Issue] = []
     if not scratch_dir.is_dir():
@@ -105,6 +162,7 @@ def discover_issues(scratch_dir: Path) -> list[Issue]:
             continue
         for f in sorted(issues_dir.glob("*.md")):
             text = f.read_text()
+            _check_format(text, f)
             status = read_status(text)
             if status is None:
                 continue

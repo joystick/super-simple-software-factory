@@ -57,6 +57,104 @@ def test_read_blocked_by_returns_empty_list_when_absent():
     assert adw_watch.read_blocked_by("Status: ready-for-agent\n") == []
 
 
+# ── bold-markup tolerance -- found live, 2026-09-14: to-tickets publishes
+#    its own local-ticket-template with **Status:**/**Blocked by:**, which
+#    the original plain-only regex never matched, so four real portfinder
+#    tickets were silently invisible to the frontier scan with no error ──
+
+def test_read_status_accepts_the_bold_form_to_tickets_actually_writes():
+    assert adw_watch.read_status("**Status:** ready-for-agent\n") == "ready-for-agent"
+
+
+def test_read_blocked_by_accepts_the_bold_form():
+    assert adw_watch.read_blocked_by("**Blocked by:** 01, 02\n") == ["01", "02"]
+
+
+def test_read_blocked_by_strips_a_trailing_parenthetical_annotation():
+    # "05 (Directory tables + seed)" -> "05" -- found alongside the bold-markup
+    # bug: without stripping, the whole string is one fragment that never
+    # matches is_unblocked()'s bare-number sibling keys.
+    text = "Blocked by: 05 (Directory tables + seed), 06 (Search route)\n"
+    assert adw_watch.read_blocked_by(text) == ["05", "06"]
+
+
+def test_discover_issues_finds_bold_form_tickets(tmp_path):
+    issues_dir = tmp_path / "portfinder" / "issues"
+    issues_dir.mkdir(parents=True)
+    (issues_dir / "05-seed.md").write_text(
+        "# 05: Seed\n\n**What to build:** the thing.\n\n**Status:** ready-for-agent\n")
+
+    found = adw_watch.discover_issues(tmp_path)
+
+    assert len(found) == 1
+    assert found[0].status == "ready-for-agent"
+
+
+def test_set_status_on_a_bold_ticket_normalizes_it_to_plain(tmp_path):
+    # STATUS_RE.sub() rewrites whatever it matched with plain "Status: X" --
+    # so the very first claim/resolve a bold ticket goes through self-heals
+    # its format for good, no separate migration needed.
+    path = tmp_path / "ticket.md"
+    path.write_text("# Ticket\n\n**Status:** ready-for-agent\n")
+
+    adw_watch.set_status(path, adw_watch.CLAIMED)
+
+    text = path.read_text()
+    assert "Status: claimed" in text
+    assert "**Status:**" not in text
+
+
+# ── _check_format: loud warning, never silent, never fatal, for a
+#    Status:/Blocked by: line that looks intended but matches neither
+#    canonical form ──
+
+def test_check_format_warns_on_underscore_emphasis(capsys):
+    # \b (word boundary) fails right after "Status_" because underscore IS
+    # a word character in Python's re -- a \b-anchored near-miss detector
+    # would silently let this straight through, the exact failure class
+    # this detector exists to catch.
+    adw_watch._check_format("_Status_: ready-for-agent\n", "fake.md")
+    assert "WARNING" in capsys.readouterr().err
+
+
+def test_check_format_warns_on_a_missing_colon(capsys):
+    adw_watch._check_format("Status ready-for-agent\n", "fake.md")
+    assert "WARNING" in capsys.readouterr().err
+
+
+def test_check_format_warns_on_malformed_blocked_by(capsys):
+    adw_watch._check_format("_Blocked by_: 01\n", "fake.md")
+    assert "WARNING" in capsys.readouterr().err
+
+
+def test_check_format_silent_on_plain(capsys):
+    adw_watch._check_format("Status: ready-for-agent\n", "fake.md")
+    assert capsys.readouterr().err == ""
+
+
+def test_check_format_silent_on_bold(capsys):
+    adw_watch._check_format("**Status:** ready-for-agent\n", "fake.md")
+    assert capsys.readouterr().err == ""
+
+
+def test_check_format_silent_on_unrelated_prose(capsys):
+    # "status" appearing mid-sentence, not at true line start, must never
+    # false-positive -- issues/*.md files carry plenty of free-form prose.
+    adw_watch._check_format("The migration status changed recently.\n", "fake.md")
+    assert capsys.readouterr().err == ""
+
+
+def test_discover_issues_warns_on_a_near_miss_file_but_does_not_crash(tmp_path, capsys):
+    issues_dir = tmp_path / "feature" / "issues"
+    issues_dir.mkdir(parents=True)
+    (issues_dir / "01-broken.md").write_text("# Broken\n\n_Status_: ready-for-agent\n")
+
+    found = adw_watch.discover_issues(tmp_path)
+
+    assert found == []  # still correctly not a tracked issue -- doesn't parse
+    assert "WARNING" in capsys.readouterr().err  # but the operator is told why
+
+
 # ── frontier ─────────────────────────────────────────────────────────────
 
 def test_frontier_picks_the_only_ready_and_unblocked_issue(tmp_path):
