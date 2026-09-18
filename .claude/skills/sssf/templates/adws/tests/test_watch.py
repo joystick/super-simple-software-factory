@@ -78,6 +78,45 @@ def test_read_blocked_by_strips_a_trailing_parenthetical_annotation():
     assert adw_watch.read_blocked_by(text) == ["05", "06"]
 
 
+def test_read_blocked_by_strips_a_parenthetical_with_trailing_punctuation():
+    # "09 (Directory fallback in endpoint resolution)." -- a period AFTER the
+    # closing paren. Found live: the first fix's $-anchored strip only fired
+    # when the parenthetical was the true end of the string, so this never
+    # matched and "09 (...)." sat as one permanently-unresolvable fragment.
+    text = "Blocked by: 09 (Directory fallback in endpoint resolution).\n"
+    assert adw_watch.read_blocked_by(text) == ["09"]
+
+
+def test_read_blocked_by_treats_bare_none_as_no_blockers():
+    assert adw_watch.read_blocked_by("Blocked by: None\n") == []
+
+
+def test_read_blocked_by_treats_none_with_explanatory_parenthetical_as_no_blockers():
+    # Found live: "None (port_directory tables ship; this only reads them)."
+    # was kept as one literal, permanently-unmatched token -- an explicitly
+    # UNblocked ticket sat invisible to the frontier, the identical failure
+    # shape as the original bug, just via a different value.
+    text = "Blocked by: None (port_directory tables ship; this only reads them).\n"
+    assert adw_watch.read_blocked_by(text) == []
+
+
+def test_read_blocked_by_warns_on_a_value_that_is_not_a_bare_ticket_number(tmp_path, capsys):
+    path = tmp_path / "ticket.md"
+    text = "Blocked by: the migration ticket\n"
+
+    result = adw_watch.read_blocked_by(text, path)
+
+    assert result == ["the migration ticket"]  # kept, not dropped -- safe default
+    assert "WARNING" in capsys.readouterr().err
+
+
+def test_read_blocked_by_no_warning_without_a_path(capsys):
+    # discover_issues() always passes path; direct callers (e.g. tests) may
+    # not care about the warning -- must not crash when path is omitted.
+    assert adw_watch.read_blocked_by("Blocked by: garbage\n") == ["garbage"]
+    assert capsys.readouterr().err == ""
+
+
 def test_discover_issues_finds_bold_form_tickets(tmp_path):
     issues_dir = tmp_path / "portfinder" / "issues"
     issues_dir.mkdir(parents=True)

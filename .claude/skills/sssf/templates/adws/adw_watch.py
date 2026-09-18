@@ -112,18 +112,46 @@ def read_status(text: str) -> str | None:
     return m.group(1) if m else None
 
 
-def read_blocked_by(text: str) -> list[str]:
+_NONE_RE = re.compile(r"^none\b|^n/a\b", re.IGNORECASE)
+_TICKET_NUMBER_RE = re.compile(r"^\d+$")
+
+
+def read_blocked_by(text: str, path: Path | None = None) -> list[str]:
     m = BLOCKED_BY_RE.search(text)
     if not m:
         return []
-    # Strip a trailing "(Ticket name)" annotation per comma-separated token
-    # -- "05 (Directory tables + seed)" -> "05". Found live alongside the
-    # bold-markup bug: a human-readable annotation next to the ticket number
-    # is a reasonable thing to write, but without stripping it the whole
-    # string is one unmatched fragment against is_unblocked()'s bare-number
-    # sibling keys, so the ticket never unblocks.
     tokens = (b.strip() for b in m.group(1).split(","))
-    return [re.sub(r"\s*\([^)]*\)\s*$", "", b).strip() for b in tokens if b.strip()]
+    result = []
+    for raw in tokens:
+        if not raw:
+            continue
+        # Strip a "(Ticket name)" annotation anywhere in the token, not just
+        # at the very end -- "09 (Directory fallback...)." has trailing
+        # punctuation AFTER the closing paren, so a $-anchored strip (the
+        # first version of this fix) never fires on it at all.
+        cleaned = re.sub(r"\s*\([^)]*\)", "", raw).strip()
+        cleaned = cleaned.rstrip(".;:,").strip()
+        if not cleaned or _NONE_RE.match(cleaned):
+            # "None" (with or without an explanatory parenthetical) means no
+            # blocker, same as omitting the line -- found live: "None
+            # (port_directory tables ship; this only reads them)." was being
+            # kept as one literal unmatched-forever token, so an explicitly
+            # UNblocked ticket sat permanently invisible to the frontier,
+            # identical in effect to the bug this was meant to fix the first
+            # time. The playbook's own "no real blocker -> omit the line
+            # entirely" convention is still correct authoring advice; this
+            # is defense for when that advice isn't followed.
+            continue
+        if not _TICKET_NUMBER_RE.match(cleaned) and path is not None:
+            print(f"just watch: WARNING -- {path} has a Blocked by: value "
+                  f"{cleaned!r} that doesn't look like a bare ticket number "
+                  "after cleanup. It will be kept as a blocker (safe default:"
+                  " never silently unblocks something that might genuinely "
+                  "be blocked) but will never resolve, so this ticket is "
+                  "stuck at ready-for-agent forever until the line is fixed.",
+                  file=sys.stderr)
+        result.append(cleaned)
+    return result
 
 
 def _check_format(text: str, path: Path) -> None:
@@ -168,7 +196,7 @@ def discover_issues(scratch_dir: Path) -> list[Issue]:
                 continue
             number = f.stem.split("-", 1)[0]
             issues.append(Issue(path=f, number=number, feature=feature_dir.name,
-                                status=status, blocked_by=read_blocked_by(text)))
+                                status=status, blocked_by=read_blocked_by(text, f)))
     return issues
 
 
