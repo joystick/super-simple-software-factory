@@ -232,8 +232,17 @@ def frontier(issues: list[Issue]) -> Issue | None:
 
 def set_status(path: Path, new_status: str) -> None:
     text = path.read_text()
-    if STATUS_RE.search(text):
-        text = STATUS_RE.sub(f"Status: {new_status}", text, count=1)
+    m = STATUS_RE.search(text)
+    if m:
+        # Splice in only the captured value (group 1) -- preserve the key's
+        # own formatting (plain "Status:" or **bold**) exactly as written.
+        # A prior version replaced the WHOLE match with a hardcoded plain
+        # "Status: X", silently stripping bold formatting on every
+        # claim/resolve -- an unrequested side effect, not a deliberate
+        # normalization: a ticket authored **Status:** should read
+        # **Status:** claimed after the watcher claims it, not have its
+        # formatting rewritten out from under it.
+        text = text[:m.start(1)] + new_status + text[m.end(1):]
     else:
         text = f"Status: {new_status}\n\n" + text
     path.write_text(text)

@@ -129,18 +129,31 @@ def test_discover_issues_finds_bold_form_tickets(tmp_path):
     assert found[0].status == "ready-for-agent"
 
 
-def test_set_status_on_a_bold_ticket_normalizes_it_to_plain(tmp_path):
-    # STATUS_RE.sub() rewrites whatever it matched with plain "Status: X" --
-    # so the very first claim/resolve a bold ticket goes through self-heals
-    # its format for good, no separate migration needed.
+def test_set_status_preserves_bold_key_formatting_only_changing_the_value(tmp_path):
+    # Only the VALUE changes -- the key's own formatting (bold, here) is not
+    # this function's business to rewrite. A prior version replaced the
+    # WHOLE matched span with a hardcoded plain "Status: X", silently
+    # stripping bold formatting on every claim/resolve as an unrequested
+    # side effect.
     path = tmp_path / "ticket.md"
     path.write_text("# Ticket\n\n**Status:** ready-for-agent\n")
 
     adw_watch.set_status(path, adw_watch.CLAIMED)
 
     text = path.read_text()
+    assert "**Status:** claimed" in text
+    assert "ready-for-agent" not in text
+
+
+def test_set_status_preserves_plain_key_formatting(tmp_path):
+    path = tmp_path / "ticket.md"
+    path.write_text("# Ticket\n\nStatus: ready-for-agent\n")
+
+    adw_watch.set_status(path, adw_watch.CLAIMED)
+
+    text = path.read_text()
     assert "Status: claimed" in text
-    assert "**Status:**" not in text
+    assert "**" not in text
 
 
 # ── _check_format: loud warning, never silent, never fatal, for a
