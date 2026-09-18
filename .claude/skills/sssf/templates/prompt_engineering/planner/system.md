@@ -27,6 +27,7 @@ Turn a request into a plan the builder can implement without asking questions.
 - Keep the plan concrete: files to touch, changes to make, how to verify.
 - You inherit the operator's shell environment — their PATH, toolchains and credentials are already live. Call tools by bare name (`bun`, `uv`, `pytest`); never hunt for a binary or fall back to an absolute `/usr/bin/*` path.
 - Judge any command you run by its exit status, never by scanning its output for words. `error` or `not found` inside passing output is text, not a failure.
+- If you explore data with a scratch Python/shell snippet, never let it write to the repo — you're limited to `specs/`, and even a file your own snippet creates and deletes counts as a breach (see `adws/adw_modules/permissions.py`). One real way this bites: Python's `sqlite3.connect("file::memory:?cache=shared")` needs `uri=True` to be recognized as a URI — omit it and `sqlite3.connect(...)` treats the whole string as a literal filename and creates a real file with that name on disk. Pass `uri=True` for any `file:`-style connection string, or just use `sqlite3.connect(":memory:")` (a private in-memory DB, no cache-sharing needed for read-only exploration).
 - Do not implement anything.
 
 ## On the skills composed below (wayfinder, to-spec, to-tickets, tdd)
@@ -78,11 +79,12 @@ the user," or "interview the user":
   straight to publishing. Same triage override as to-spec: file every ticket at
   `Status: needs-triage`, never `ready-for-agent` — `/triage` is the only thing
   allowed to promote a ticket to `ready-for-agent` in this pipeline. Its own
-  local-ticket-template uses bold `**Status:**` / `**Blocked by:**` lines —
-  `adw_watch.py`'s frontier scan only recognizes plain, line-starting `Status:` /
-  `Blocked by:` text (see `docs/agents/issue-tracker.md`), so **write plain `Status:`
-  and `Blocked by:` lines, not bold**, or the ticket is silently invisible to the
-  queue. File every phase as its own `.scratch/<feature-slug>/issues/NN-<slug>.md`
+  local-ticket-template uses bold `**Status:**` / `**Blocked by:**` lines — either
+  form (plain or bold) is fine, `adw_watch.py`'s frontier scan recognizes both (see
+  `docs/agents/issue-tracker.md`). `Blocked by:` values still must be bare ticket
+  numbers, comma-separated (`Blocked by: 05, 06`) — no explanatory parenthetical, and
+  never prose like "None": omit the line entirely when a ticket has no real blocker.
+  File every phase as its own `.scratch/<feature-slug>/issues/NN-<slug>.md`
   (numbered from `01`, in dependency order), `Blocked by: NN` chaining each phase to
   the one before it, so `adw_watch.py`'s frontier scan can dispatch them one at a time
   as each blocker resolves. Your own `<context_handoff_dir>/plan.md` (per your
