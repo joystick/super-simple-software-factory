@@ -1,7 +1,7 @@
 ---
 title: docs/reference (full SSSF concept glossary) + docs/training (playbook + full learning arc)
 created: 2026-09-24
-status: planned
+status: in-progress
 ---
 
 # docs/reference + docs/training — supersedes the earlier handbook/reference split
@@ -337,16 +337,45 @@ docs-training-test/
       dedicated follow-up fix + test, same pattern as this session's other
       `adw_watch.py` hardening.
 
+### Step 7 — real-fork application (done, 2026-09-24)
+- [x] Test scripts written for real: `scripts/docs-check/{check_reference_manifest,
+      check_markdown_links}.py`, wired to `just docs-check`. Both genuinely pass
+      against the isolated workspace, verified by running them (not inspection) --
+      caught and fixed a real regex bug (false "authored" matches), a real citation
+      bug (`ignored_field_warnings` pointed at config source, not a doc), and 4 real
+      anchor typos (double-hyphen slugs) along the way.
+- [x] `docs/reference/` and `docs/training/` applied to the real fork (commits
+      `db87e15`, `4cac036`), root `justfile` added (`training-*` recipes +
+      `docs-check`), `.gitignore` updated, `learn/` removed
+      (confirmed disposable, see `docs/training/retirement-notes.md`)
+- [x] `just training-install` + `just training-build` run for real from the fork:
+      58 pages, 0 errors
+- [x] `just docs-check` run for real from the fork after commit: both checks pass
+- [x] Pushed to `origin/main` (`4cac036`)
+- [x] `sssf-learn`'s local clone removed -- GitHub (`ff8d696`) re-confirmed reachable
+      and matching local before deletion; GitHub repo itself untouched
+- [x] Isolated test workspace (`_scratch/docs-training-test/`) removed, its job done
+
 ### Explicitly NOT this pass's definition of done
-- [ ] Full authoring of all ~20 net-new lessons (2 of 20 done as the sample)
-- [ ] Full authoring of all ~75 reference pages (~10 of 75 done as the sample)
-- [ ] Applying the verified structure to the real fork / deleting `sssf-learn`
-      (that's step 7, a deliberate separate go/no-go after this pass lands)
+- [ ] Full authoring of all ~20 net-new lessons (2 of 20 done as the sample, 18
+      honest stubs remain)
+- [ ] Full authoring of all 44 own-page reference rows (10 of 44 done as the
+      sample, 34 remain)
+- [ ] The `read_blocked_by()` comma-inside-parenthetical bug found while writing
+      the sample queue lesson (see above) -- real, confirmed, not yet fixed
+- [ ] `training/`'s screencast scripts -> `03-screencasts` conversion (Phase 2 of
+      the site-move mechanics, Open Question 2 -- deliberately deferred, `training/`
+      is untouched)
+- [ ] The `docs/training/`-internal course pages (11 files: MISSION/NOTES/
+      CONTRIBUTING/README/justfile/plans/site's own mission-notes-index) that still
+      say "sssf-learn" in historical prose -- left as-is per the plan's own
+      "leave as historical narrative" allowance, not a functional break
 
 ## Version history
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0 | 2026-09-24 | Step 7 (real-fork application) done: wrote and ran the standing test scripts for real (`scripts/docs-check/`, wired to `just docs-check`), found and fixed a fresh batch of real bugs running them (a regex over-match, a genuine citation-shape error, 4 anchor typos); applied `docs/reference/` and `docs/training/` to the real fork in two coherent commits, added the root `justfile` (`training-*` recipes) and `.gitignore` rules, removed `learn/`; `npm install`/`npm run build` run for real from the fork (58 pages, 0 errors); pushed to `origin/main`; removed `sssf-learn`'s local clone only after re-confirming GitHub still has the full history; removed the now-done isolated test workspace. Marked `in-progress` rather than `done` -- the explicit follow-ups (remaining lesson/reference authoring, the `read_blocked_by()` bug, the screencast conversion) are real, tracked, and none of them were silently claimed complete. |
 | 0.3 | 2026-09-24 | Isolated test implementation built (3 builder passes: site move + baseline build, reference glossary, chapters 3-7 scaffold) and reviewed by a fable pass (`a6173d4265a575410`), which found several real issues — most notably a stale claim in the bootstrap lesson directly contradicting this session's own earlier `adw_watch.py` fix, and a genuinely new follow-up bug in `read_blocked_by()` discovered while verifying one of the review's findings (a comma inside a "none (explanation)" parenthetical still breaks resolution). All findings fixed except the new bug, which is tracked as an explicit follow-up. `npm run build` clean (58 pages) after fixes. Not yet: automated test scripts (link-checker, concept-completeness check) as standing scripts, and step 7 (real-fork application + `sssf-learn` deletion) — both still open, pending go-ahead. |
 | 0.2 | 2026-09-24 | Revised per fable critique (`a9afe766faa44234c`): fixed 2 citation errors (sssf.config.yaml's real path; Visualizer is an app, not a module class) and a category-count label error (7, not 6); marked categories 5 (gates/permissions) and 7 (the queue) as NET-NEW rather than "reorganize existing" (confirmed near-zero coverage in references/*.md); resolved the references/*.md fate as LINK-not-move (moving breaks SKILL.md's citations, copying creates divergence — the exact problem this project exists to fix); added an explicit fork-glossary-vs-course-reference rule to prevent a second duplication; swapped the Ch4 "reading real cost" sample lesson (found to mostly duplicate existing lesson 0008) for a Ch6 "bootstrap vocabulary" pick that exercises the prose->lesson conversion for real; added the 75-row concept-manifest as a required pre-build artifact so "every concept has a page" is actually checkable; moved the isolated workspace off /private/tmp (macOS periodic cleanup risk) to a git-init'd _scratch/ directory. |
 | 0.1 | 2026-09-24 | Initial plan, superseding `2026-09-24-consolidate-learning-content.md`'s target layout (docs/handbook -> docs/training, thin-pointer reference -> full concept glossary). Grounded in two fable research passes: a ~75-concept inventory and a gap analysis finding ~20 net-new lessons needed across 5 new chapters. Not yet critiqued or executed. |
