@@ -1,0 +1,214 @@
+---
+// Narrated-lecture player. On a page with a generated manifest
+// (/audio/<route>/lecture.json) it renders a transport bar + a voice toggle and
+// keeps the "On this page" panel in sync with the narration. The manifest lists
+// one neural voice per option (amy/ryan), each with its own cue map. Renders
+// nothing (stays hidden) on pages without a manifest.
+---
+
+<div class="audio-lecture" data-testid="audio-lecture" hidden>
+  <audio preload="metadata"></audio>
+  <div class="al-transport">
+    <button type="button" class="al-btn" data-testid="audio-prev" aria-label="Previous section">⏮</button>
+    <button type="button" class="al-btn al-play" data-testid="audio-play" aria-label="Play" aria-pressed="false">
+      <span class="al-i-play">▶</span><span class="al-i-pause">❚❚</span>
+    </button>
+    <button type="button" class="al-btn" data-testid="audio-next" aria-label="Next section">⏭</button>
+    <span class="al-time" data-testid="audio-time"><span class="al-cur">0:00</span></span>
+    <input type="range" class="al-seek" data-testid="audio-seek" min="0" max="1000" value="0" step="1" aria-label="Seek" />
+    <span class="al-time al-total">0:00</span>
+    <button type="button" class="al-btn al-mute" data-testid="audio-mute" aria-label="Mute">🔊</button>
+    <input type="range" class="al-vol" data-testid="audio-volume" min="0" max="100" value="100" step="1" aria-label="Volume" />
+    <button type="button" class="al-btn al-voice" data-testid="audio-voice" aria-label="Switch voice">🎙 Amy</button>
+  </div>
+  <div class="al-now">🎧 <span class="al-now-label">Lecture</span> · <span class="al-now-title" data-testid="audio-now">Introduction</span></div>
+</div>
+
+<style>
+  .audio-lecture {
+    margin: 0.75rem 0 1.75rem;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.6rem;
+    background: var(--sl-color-gray-6, var(--sl-color-black));
+    padding: 0.6rem 0.8rem;
+  }
+  .al-transport { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+  .al-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 2rem; height: 2rem; padding: 0 0.5rem;
+    font: inherit; font-size: 0.9rem; cursor: pointer;
+    border: 1px solid var(--sl-color-gray-4); border-radius: 999px;
+    background: var(--sl-color-bg); color: var(--sl-color-text); white-space: nowrap;
+  }
+  .al-btn:hover { border-color: var(--sl-color-text-accent); }
+  .al-play { width: 2.4rem; font-size: 0.85rem; }
+  .al-voice { font-size: 0.78rem; }
+  .al-i-pause { display: none; }
+  .audio-lecture.is-playing .al-i-play { display: none; }
+  .audio-lecture.is-playing .al-i-pause { display: inline; }
+  .al-time { font-variant-numeric: tabular-nums; font-size: 0.8rem; color: var(--sl-color-gray-2); }
+  .al-seek { flex: 1 1 8rem; min-width: 6rem; accent-color: var(--sl-color-text-accent); cursor: pointer; }
+  .al-vol { flex: 0 0 4.5rem; accent-color: var(--sl-color-text-accent); cursor: pointer; }
+  .al-now { margin-top: 0.5rem; font-size: 0.8rem; color: var(--sl-color-gray-2); }
+  .al-now-title { color: var(--sl-color-text); font-weight: 600; }
+
+  @media (max-width: 34rem) {
+    .al-vol { display: none; }
+    .al-seek { flex-basis: 100%; order: 5; }
+  }
+
+  :global(starlight-toc a[data-audio-current]) {
+    position: relative;
+    font-weight: 700;
+    color: var(--sl-color-text-accent);
+  }
+  :global(starlight-toc a[data-audio-current])::before {
+    content: '▶';
+    position: absolute;
+    left: -0.9rem;
+    font-size: 0.7em;
+    color: var(--sl-color-text-accent);
+  }
+</style>
+
+<script>
+  type Cue = { id: string; title: string; start: number; dur: number }
+  type Voice = { id: string; label: string; gender?: string; src: string; duration: number; cues: Cue[] }
+  type Manifest = { engine: string; default: string; voices: Voice[] }
+
+  const VOICE_KEY = 'sssf-lecture-voice'
+
+  function fmt(t: number) {
+    if (!isFinite(t)) return '0:00'
+    const m = Math.floor(t / 60)
+    const s = Math.floor(t % 60)
+    return `${m}:${String(s).padStart(2, '0')}`
+  }
+
+  async function initAudioLecture() {
+    const el = document.querySelector<HTMLElement>('.audio-lecture[data-testid="audio-lecture"]')
+    if (!el || el.dataset.wired) return
+    el.dataset.wired = 'true'
+
+    const route = location.pathname.endsWith('/') ? location.pathname : location.pathname + '/'
+    let manifest: Manifest | null = null
+    try {
+      const res = await fetch(`/audio${route}lecture.json`)
+      if (!res.ok) return
+      manifest = await res.json()
+    } catch {
+      return
+    }
+    if (!manifest || !manifest.voices?.length) return
+
+    const audio = el.querySelector('audio')!
+    const playBtn = el.querySelector<HTMLButtonElement>('[data-testid="audio-play"]')!
+    const prevBtn = el.querySelector<HTMLButtonElement>('[data-testid="audio-prev"]')!
+    const nextBtn = el.querySelector<HTMLButtonElement>('[data-testid="audio-next"]')!
+    const seek = el.querySelector<HTMLInputElement>('[data-testid="audio-seek"]')!
+    const vol = el.querySelector<HTMLInputElement>('[data-testid="audio-volume"]')!
+    const muteBtn = el.querySelector<HTMLButtonElement>('[data-testid="audio-mute"]')!
+    const voiceBtn = el.querySelector<HTMLButtonElement>('[data-testid="audio-voice"]')!
+    const curEl = el.querySelector('.al-cur')!
+    const totalEl = el.querySelector('.al-total')!
+    const nowEl = el.querySelector('[data-testid="audio-now"]')!
+
+    const voices = manifest.voices
+    const stored = localStorage.getItem(VOICE_KEY)
+    let vi = Math.max(0, voices.findIndex((v) => v.id === (stored || manifest!.default)))
+    if (vi < 0) vi = 0
+    let cues: Cue[] = voices[vi].cues
+
+    const tocLink = (id: string) => document.querySelector<HTMLElement>(`starlight-toc a[href="#${CSS.escape(id)}"]`)
+    let activeId = ''
+    const setActive = (cue: Cue) => {
+      nowEl.textContent = cue.title
+      if (cue.id === activeId) return
+      activeId = cue.id
+      document.querySelectorAll('starlight-toc a[data-audio-current]').forEach((a) => a.removeAttribute('data-audio-current'))
+      tocLink(cue.id)?.setAttribute('data-audio-current', 'true')
+    }
+    const cueAt = (t: number) => {
+      let c = cues[0]
+      for (const cue of cues) if (cue.start <= t + 0.001) c = cue
+      return c
+    }
+    const cueIndex = () => cues.indexOf(cueAt(audio.currentTime))
+
+    const loadVoice = (index: number, { keepTime = false, resume = false } = {}) => {
+      vi = index
+      const v = voices[vi]
+      cues = v.cues
+      localStorage.setItem(VOICE_KEY, v.id)
+      voiceBtn.textContent = `🎙 ${v.label}`
+      voiceBtn.setAttribute('aria-label', `Voice: ${v.label} — switch`)
+      totalEl.textContent = fmt(v.duration)
+      const t = keepTime ? Math.min(audio.currentTime, v.duration) : 0
+      audio.src = v.src
+      audio.addEventListener('loadedmetadata', () => { audio.currentTime = t }, { once: true })
+      activeId = ''
+      setActive(cueAt(t))
+      if (resume) audio.play().catch(() => {})
+    }
+
+    audio.preload = 'metadata'
+    el.hidden = false
+    loadVoice(vi)
+
+    voiceBtn.addEventListener('click', () => {
+      loadVoice((vi + 1) % voices.length, { keepTime: true, resume: !audio.paused })
+    })
+    playBtn.addEventListener('click', () => (audio.paused ? audio.play() : audio.pause()))
+    audio.addEventListener('play', () => {
+      el.classList.add('is-playing')
+      playBtn.setAttribute('aria-pressed', 'true')
+      playBtn.setAttribute('aria-label', 'Pause')
+    })
+    audio.addEventListener('pause', () => {
+      el.classList.remove('is-playing')
+      playBtn.setAttribute('aria-pressed', 'false')
+      playBtn.setAttribute('aria-label', 'Play')
+    })
+    prevBtn.addEventListener('click', () => {
+      const i = cueIndex()
+      audio.currentTime = audio.currentTime - cues[i].start > 2 ? cues[i].start : cues[Math.max(0, i - 1)].start
+    })
+    nextBtn.addEventListener('click', () => {
+      const i = cueIndex()
+      if (i < cues.length - 1) audio.currentTime = cues[i + 1].start
+    })
+    audio.addEventListener('timeupdate', () => {
+      curEl.textContent = fmt(audio.currentTime)
+      if (audio.duration) seek.value = String(Math.round((audio.currentTime / audio.duration) * 1000))
+      setActive(cueAt(audio.currentTime))
+    })
+    seek.addEventListener('input', () => {
+      if (audio.duration) audio.currentTime = (Number(seek.value) / 1000) * audio.duration
+    })
+    vol.addEventListener('input', () => {
+      audio.volume = Number(vol.value) / 100
+      audio.muted = false
+      muteBtn.textContent = audio.volume === 0 ? '🔇' : '🔊'
+    })
+    muteBtn.addEventListener('click', () => {
+      audio.muted = !audio.muted
+      muteBtn.textContent = audio.muted ? '🔇' : '🔊'
+      muteBtn.setAttribute('aria-label', audio.muted ? 'Unmute' : 'Mute')
+    })
+
+    document.querySelectorAll<HTMLAnchorElement>('starlight-toc a[href^="#"]').forEach((a) => {
+      a.addEventListener('click', () => {
+        const id = decodeURIComponent(a.getAttribute('href')!.slice(1))
+        const cue = cues.find((c) => c.id === id)
+        if (cue) {
+          audio.currentTime = cue.start
+          if (audio.paused) audio.play().catch(() => {})
+        }
+      })
+    })
+  }
+
+  initAudioLecture()
+  document.addEventListener('DOMContentLoaded', initAudioLecture)
+  document.addEventListener('astro:page-load', initAudioLecture)
+</script>

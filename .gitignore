@@ -158,3 +158,11 @@ sssf.db*
 apps/inkwell/inkwell.db*
 
 *.mov
+
+# docs/training/site-starlight -- an Astro Starlight site. node_modules/,
+# dist/, and .env.* are already covered by the unanchored rules above; these
+# two are specific to Astro's own build cache and the Piper TTS pipeline's
+# generated narration audio (137 MB uncompressed -- never meant to be
+# committed, regenerated locally via `just training-audio`).
+docs/training/site-starlight/.astro/
+docs/training/site-starlight/public/audio/

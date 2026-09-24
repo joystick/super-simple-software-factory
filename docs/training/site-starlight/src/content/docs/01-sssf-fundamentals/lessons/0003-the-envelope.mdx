@@ -1,0 +1,214 @@
+---
+title: "The Envelope"
+description: "The only thing that crosses a phase seam. Gates check it, the next agent reads it, and none of it is a conversation."
+sidebar:
+  order: 3
+---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>You can look at any run's `envelope.json` and say exactly what one phase told the next —
+  and why that hand-off is a typed file on disk rather than a message in a chat. You will
+  know which parts of an envelope a gate can check, which it cannot, and how to watch the
+  check fail.</p>
+</Callout>
+
+## The seam problem
+
+<p>A factory run is a chain of phases: a planner writes a spec, a builder implements it, a
+reviewer judges it. Each is a <em>separate</em> agent call — a fresh context. So how does
+the builder learn what the planner decided?</p>
+
+<p>The tempting answer is "they share a conversation." SSSF refuses it. The planner's chat
+transcript never reaches the builder. Exactly one thing crosses the seam: a typed JSON
+object called the <strong>envelope</strong>.</p>
+
+<Callout kind="why" label="Context transfers in code, not in conversation">
+<p>An agent has exactly two output channels: reference files it writes into
+  `context_handoff/`, and one final valid-JSON response parsed against the output type its
+  call declared. Code persists that response as `envelope.json`, records it in the trace,
+  and injects it into the next agent's prompt.</p>
+<p>The seam is owned by code, not by the model. That is "agent proposes, code disposes"
+  applied to <strong>the hand-off</strong> — the same move Lesson 1 made for the verdict.</p>
+</Callout>
+
+## A real hand-off
+
+<p>Here is an actual planner envelope from a real run (session `b16c5c29`), verbatim but for
+trimming the long `notes_for_next_agent`. The task was to add a `CouponDiscount` rule to the
+pricing engine:</p>
+
+```json
+{
+  "agent_name": "planner",
+  "output_type": "PlanOutput",
+  "status": "success",
+  "summary": "Plan to add a CouponDiscount rule to app/pricing.py with a coupon_code parameter on price_cart, extending existing rules with **_kwargs for forward compatibility, plus four tests in tests/test_pricing.py.",
+  "artifacts": [
+    "adws/adw_data/sessions/b16c5c29/context_handoff/plan.md",
+    "specs/b16c5c29_coupon-discount.md"
+  ],
+  "notes_for_next_agent": "The plan requires changes to two files only: app/pricing.py and tests/test_pricing.py. Key points: (1) Add **_kwargs to MemberDiscount.apply and BulkDiscount.apply so they accept-and-ignore the new coupon_code keyword. (2) Insert the CouponDiscount class after BulkDiscount. (3) Add coupon_code to price_cart's keyword-only params and pass it through. (4) Add four new tests. Run pytest to verify.",
+  "commit_message": "Add spec for coupon discount support in the pricing engine"
+}
+```
+
+<p>Everything the builder needs is here, and nothing else is. The planner's reasoning, its
+false starts, the messages it took to get here — none of that crosses. The builder is
+handed `notes_for_next_agent` and pointed at the `artifacts`. That is the whole context
+transfer.</p>
+
+<p>The builder's own envelope, from the same chain, closes the loop by <em>reporting</em>
+what it did:</p>
+
+```json
+{
+  "agent_name": "builder",
+  "output_type": "BuildOutput",
+  "status": "success",
+  "summary": "Added CouponDiscount rule with code-matching logic to the pricing engine, updated price_cart to accept coupon_code, added **_kwargs to existing rules for forward compatibility, and added four tests covering match, mismatch, no code, and invalid percent.",
+  "changed_files": ["app/pricing.py", "tests/test_pricing.py"],
+  "notes_for_next_agent": "Run `.venv/bin/python -m pytest tests/test_pricing.py -v` to verify all 32 tests pass. The CouponDiscount class is in app/pricing.py after BulkDiscount.",
+  "commit_message": "Add CouponDiscount rule and coupon_code support to price_cart"
+}
+```
+
+## The typed shape
+
+<p>Every envelope extends one base. The base is deliberately tiny:</p>
+
+```python
+class EnvelopeBase(BaseModel):
+    status: Literal["success", "fail"]
+    summary: str = ""
+    artifacts: list[str] = []           # files this phase produced
+    notes_for_next_agent: str = ""      # the hand-off, in prose
+```
+
+<p>Each phase declares a subtype that adds only what <em>that</em> phase is accountable for:</p>
+
+<table>
+  <tr><th>Output type</th><th>Adds</th><th>Why that field</th></tr>
+  <tr><td>`PlanOutput`</td><td>`commit_message`</td><td>the spec file it wrote is committed on its own</td></tr>
+  <tr><td>`BuildOutput`</td><td>`changed_files`</td><td>the exact files the diff should contain</td></tr>
+  <tr><td>`ReviewOutput`</td><td>`approved`, `findings`, `blocking`</td><td>a verdict with its evidence</td></tr>
+  <tr><td>`ScoutOutput`</td><td>`findings`</td><td>read-only recon, one note per file</td></tr>
+</table>
+
+<p>The `output_type` on the call is a contract. If the agent's final message does not parse
+into that type — a missing field, a wrong shape, not even JSON — the response is rejected.</p>
+
+<Callout kind="why" label="A rejected envelope is a correction, not a restart">
+<p>When the JSON does not parse to the declared type, <strong>nothing restarts</strong>. The
+  harness re-prompts the <em>same</em> session naming exactly what was wrong, and the
+  context window stays intact. A cold restart throws away everything the agent learned; a
+  correction costs one message.</p>
+<p>This is the same fix-loop machinery Lesson 2's envelope gates feed. The envelope is what
+  they feed it <em>with</em>.</p>
+</Callout>
+
+## Why gates read the envelope, not the agent
+
+<p>Recall from Lesson 2: an envelope gate has the signature `gate(envelope, run) ->
+GateReport`. Now you can see what it is handed. Nobody knows which files an agent will
+touch before it finishes, so gates run <strong>after</strong> the fact against the
+envelope's own declarations:</p>
+
+```python
+def diff_matches_claims(envelope, run) -> GateReport:
+    report = GateReport()
+    for f in envelope.changed_files:        # the builder's own claim
+        p = Path(f)
+        report.check(f, p.exists(),
+                     "in the diff" if p.exists()
+                     else "claimed changed but not on disk")
+    return report
+```
+
+<p>The builder <em>said</em> it changed `app/pricing.py`. `diff_matches_claims` reads that
+claim straight out of the envelope and checks it against reality. `artifacts_exist` does the
+same for the planner's `artifacts`. The envelope is the surface every claim gate stands on.</p>
+
+<Callout kind="trap" label="An envelope is a set of claims, not a set of facts">
+<p>Producing this JSON requires none of it to be true. `status: "success"` is a string the
+  agent chose. `notes_for_next_agent` can describe a file that was never written.
+  `changed_files` can name a file the diff does not contain.</p>
+<p>Gates check the <strong>mechanically checkable</strong> part — did the file appear, is it
+  non-empty, is the claimed change on disk. Whether the plan is any <em>good</em> is a
+  reviewer's job. And whether a gate that reads a claim can actually fail is <strong>your</strong>
+  job to verify — the Lesson 1 ritual, one level up.</p>
+</Callout>
+
+## Your turn
+
+<p><em>Reps are tagged <strong>[read]</strong> (inspect a real file, no setup) or <strong>[run]</strong> (drive the <a href="/01-sssf-fundamentals/reference/0004-wiring-your-factory/">wired factory</a>).</em></p>
+
+
+<ol class="steps">
+  <li>
+    <p><strong>[read]</strong> <strong>Read a real one.</strong> In `~/Projects/training/sssf-play`, open any
+    `adws/adw_data/sessions/&lt;id&gt;/planner/envelope.json` and the `builder/envelope.json`
+    beside it. Name the one field the planner used to steer the builder, and the one field
+    the builder used to report back.</p>
+  </li>
+  <li>
+    <p><strong>[read]</strong> <strong>Trace a claim into a gate.</strong> Take the builder's `changed_files` and
+    run `diff_matches_claims` against it in your head: which check passes, which note would
+    each entry produce?</p>
+  </li>
+  <li>
+    <p><strong>[run]</strong> <strong>Watch it fail.</strong> Copy a real `envelope.json`, add a file to
+    `changed_files` that does not exist (or an `artifacts` path you never wrote), and run the
+    matching gate. It must go red with a <em>specific</em> note — and the other gates must
+    stay green. A claim gate you have not watched reject a false claim is not a gate.</p>
+  </li>
+</ol>
+
+## Check yourself
+
+<Quiz
+  question="What actually crosses the seam from the planner phase to the builder phase?"
+  choices={["The planner's full conversation transcript", "A shared memory both agents can write", "One typed JSON envelope, persisted by code", "Nothing — the builder replans from scratch"]}
+  answerIndex={2}
+  correctFeedback="Exactly one typed object crosses. Code persists it as envelope.json and injects it into the next prompt; the chat never travels."
+  wrongFeedback="The transcript never crosses. Context transfers in code, as a typed envelope — that is the whole point of the seam."
+/>
+
+<Quiz
+  question="An agent returns text that is not valid JSON for its output type. What happens?"
+  choices={["The whole run restarts from the first phase", "The same session is re-prompted with the error", "The envelope is stored with a null payload", "The phase is skipped and the chain moves on"]}
+  answerIndex={1}
+  correctFeedback="Nothing restarts. The harness corrects the same live session, naming what was wrong — the context window stays intact."
+  wrongFeedback="A restart throws away what the agent learned. The harness re-prompts the same session instead, for one message's cost."
+/>
+
+<Quiz
+  question="Why can a claim gate check <code>changed_files</code> but not whether the plan is good?"
+  choices={["Good plans are checked by the quality blocks", "The reviewer runs before any gate can see it", "A gate has no access to the envelope's fields", "Only file-on-disk is mechanically checkable"]}
+  answerIndex={3}
+  correctFeedback="A gate verifies the mechanical claim — the file the envelope names is, or is not, on disk. Judgement of quality is a reviewer's job, not a gate's."
+  wrongFeedback="The gate reads the envelope fine. What it cannot do is judge meaning — it can only check what is mechanically true or false."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> `adws/adw_modules/data_types.py` in `sssf-play` — the
+`EnvelopeBase` class and its subtypes are twenty lines and define the entire contract. Then
+the claim gates in `gates.py` that read them, which you met in Lesson 2.</p>
+
+<p>For the idea behind typed boundaries between untrusted steps, Martin Fowler's
+<a href="https://martinfowler.com/articles/data-monolith-to-mesh.html">notion of a
+data contract</a> is the same instinct at system scale: the interface is the promise, and
+it is checked, not trusted.</p>
+
+## Where this goes next
+
+<p>You have seen the object that crosses a seam. Next: the seams themselves — <strong>phases
+and the run</strong>. What a phase is, the three lanes it can belong to, and why the phase
+list lives in Python instead of inside a prompt. The envelope is what moves between phases;
+the run is the spine it moves along.</p>
+
+<p><strong>Ask me things.</strong> Bring me an `envelope.json` from a run you did not
+understand, and we will read it together — the fields the next agent saw, and the ones a
+gate could have caught if it had been watching.</p>

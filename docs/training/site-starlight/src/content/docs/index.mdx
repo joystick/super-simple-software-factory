@@ -1,0 +1,38 @@
+---
+title: sssf-learn
+description: The course on operating SSSF, consolidated from two source repos into one place.
+---
+
+The course on operating SSSF, consolidated from two source repos into one place. See
+[Mission](/mission/) for objectives and [Notes](/notes/) for how this learner learns.
+
+## Chapters
+
+- [Chapter 1 — SSSF Fundamentals](/01-sssf-fundamentals/lessons/0000-agent-proposes-code-disposes/)
+- [Chapter 2 — Gates, Deep Dive](/02-gates-deep-dive/lessons/0001-three-gates-you-have-watched-fail/)
+
+## Why two chapters, not two courses
+
+Gates are the cornerstone of the whole factory — everything else rests on the guarantee that a claim was
+checked, not merely reported. Chapter 1 introduces that guarantee and its two gate families in the
+playground's native language (Python). Chapter 2 does not introduce a new topic; it re-proves the same
+guarantee in a second language end to end — domain modelling, porting, TDD — so the lesson is shown to survive
+a change of toolchain rather than being an artifact of one.
+
+Read them in order. Chapter 2 assumes Chapter 1's vocabulary (gate, envelope, `quality.py`, "watched
+failing") without re-explaining it.
+
+## Where the code these lessons are about actually lives
+
+This directory holds course material only — no application code. The lessons reference and were built
+against:
+
+- `~/Projects/training/sssf-play` — the Python playground: skill source, stamped factory, and the
+  cart-pricing target app the fundamentals chapter uses.
+- `~/Projects/training/pricing-ts` — the Deno/TypeScript rebuild of the same pricing engine, with
+  its own stamped factory, used by the gates-deep-dive chapter.
+
+Both remain independent, runnable repos. Nothing here duplicates their code — only the teaching material has
+moved here.
+
+See also: [Resources](/02-gates-deep-dive/resources/) (Chapter 2's external sources).

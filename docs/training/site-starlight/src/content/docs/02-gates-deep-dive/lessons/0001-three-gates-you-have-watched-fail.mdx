@@ -1,0 +1,218 @@
+---
+title: "Three Gates You Have Watched Fail"
+description: "Before a factory may write TypeScript for you, you need checks that can say no. This lesson builds the smallest Deno project that has three of them — and makes each one fail in front of you."
+sidebar:
+  order: 1
+---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>By the end you will have a Deno project with a passing test suite, a linter and a
+  type-checker, and you will have <em>personally seen</em> each of the three go red on a
+  defect the other two could not detect. That is the thing an SSSF `quality.py`
+  gets wired to in a later lesson.</p>
+</Callout>
+
+## Why this comes first
+
+    <p>A freshly stamped SSSF factory ships every quality check as a shell `echo`
+that exits `0`. Point a workflow at it and the run reports every phase green,
+having checked nothing at all.</p>
+
+    <Callout kind="why" label="The reason">
+<p>That is worse than having no factory. A factory with fake gates does not merely fail
+  to catch mistakes — it <strong>manufactures confidence</strong>. You get a green banner,
+  a tidy trace, and a commit, and none of it is evidence.</p>
+      <p>So the rule is: <strong>a gate you have not watched fail is not a gate.</strong>
+  Everything else in this course sits on top of that.</p>
+</Callout>
+
+## The Deno trio
+
+    <p>Deno gives you three independent checks with no dependencies to install. They catch
+genuinely different things, which is the whole point of having three:</p>
+
+    <table>
+      <tr>
+        <th>Command</th>
+        <th>Catches</th>
+        <th>Blind to</th>
+      </tr>
+      <tr>
+        <td>`deno test`</td>
+        <td>Wrong behaviour — the code runs and produces the wrong answer</td>
+        <td>Unused code, sloppy types</td>
+      </tr>
+      <tr>
+        <td>`deno lint`</td>
+        <td>Dead code, unused variables, suspicious patterns</td>
+        <td>Whether the answer is correct</td>
+      </tr>
+      <tr>
+        <td>`deno check`</td>
+        <td>Type errors, without running anything</td>
+        <td>Logic that type-checks and is still wrong</td>
+      </tr>
+    </table>
+
+    <p>`deno fmt` is a fourth, but formatting is not a gate — it is a fix. Never
+gate on it; run it.</p>
+
+## Build it
+
+    <ol class="steps">
+      <li>
+        <p>Open a terminal in the workspace and confirm your toolchain:</p>
+        
+```
+cd ~/Projects/training/pricing-ts
+deno --version
+```
+
+        <p>You want Deno 2.x. Everything below is built in.</p>
+      </li>
+
+      <li>
+        <p>Look at the spec you have been handed. `tests/line-item.test.ts` already
+    exists and describes a `LineItem`: it holds a SKU, a unit price in
+    <strong>integer cents</strong>, and a quantity; it rejects nonsense; and it can total
+    itself.</p>
+        <p>Read it before writing anything. In this course the test is the specification.</p>
+      </li>
+
+      <li>
+        <p>Run the suite and watch it fail:</p>
+        
+```
+deno task test
+```
+
+        <p>Red. `src/pricing.ts` is a stub that throws. This is the correct
+    starting state — you have a check that is demonstrably capable of failing.</p>
+      </li>
+
+      <li>
+        <p>Now make it pass. Open `src/pricing.ts` and implement
+    `LineItem` so every test goes green.</p>
+        <p>Constraints, which are design decisions rather than style preferences:</p>
+        <ul>
+          <li>Money is <strong>integer cents</strong>. No floats anywhere near a total.</li>
+          <li>An invalid line item must <strong>throw</strong>, not return a null or a flag.
+      An unpriceable cart is not a cart.</li>
+          <li>Reach for `readonly`. A priced line that mutates underneath you is a
+      bug you will spend an afternoon on.</li>
+        </ul>
+        <p>Stuck? Ask me — that is what I am here for. Do not read ahead to the Python
+    original; the struggle is where the learning is.</p>
+      </li>
+
+      <li>
+        <p>Green? Now run all three gates:</p>
+        
+```
+deno task test && deno task lint && deno task check && echo "ALL GREEN"
+```
+
+      </li>
+
+      <li>
+        <p><strong>The part that matters.</strong> Break exactly one thing at a time and
+    confirm that <em>exactly one</em> gate notices. Restore between each.</p>
+        <table>
+          <tr>
+            <th>Break this</th>
+            <th>Measured result</th>
+          </tr>
+          <tr>
+            <td>Add `const unused = 42;` inside `totalCents`</td>
+            <td>`lint` red &nbsp;·&nbsp; test green &nbsp;·&nbsp; check green</td>
+          </tr>
+          <tr>
+            <td>Change the constructor's `sku` parameter to `number`</td>
+            <td>`check` red <strong>and `test` red</strong> &nbsp;·&nbsp; lint green</td>
+          </tr>
+          <tr>
+            <td>Return `this.unitPriceCents * this.quantity + 1`</td>
+            <td>`test` red &nbsp;·&nbsp; lint green &nbsp;·&nbsp; check green</td>
+          </tr>
+        </table>
+      </li>
+    </ol>
+
+    <Callout kind="why" label="Two gates overlap — and that is worth knowing">
+<p>The middle row does not behave the way the tidy story would suggest. A type error
+  turns <em>two</em> gates red, because <strong>`deno test` type-checks your
+  code before running it.</strong> There is no separate compile step in Deno to forget.</p>
+      <p>So why keep `deno check` as its own gate at all? Two reasons. It is much
+  faster, so it fails you sooner. And it covers files that <em>no test imports</em> —
+  which, in a growing codebase, is where type rot actually accumulates.</p>
+      <p>This is a real divergence from the Python original, where `pytest` and
+  `mypy` know nothing about each other and the three gates are genuinely
+  independent. Carry the difference in your head: in Deno, `test` is the
+  superset and `check` is the fast subset.</p>
+      <p
+        class="disclosure"><em>How this table got here:</em> the first draft of this lesson
+  claimed the type error would trip `check` alone. It was run before it was
+  published, the claim turned out to be wrong, and the table now records what actually
+  happened. That is the same discipline the lesson is asking of you.</p>
+</Callout>
+
+    <Callout kind="trap" label="The trap">
+<p>If you break something and the gate you expected <strong>stays green</strong>, do not
+  shrug and move on. You have just learned that the check does not reach that defect.</p>
+      <p>This happened twice in the Python original. Once, a clamp was deleted and the suite
+  stayed green — the test used two 100&nbsp;% discounts, and the first alone hit the
+  ceiling before the clamp was ever consulted. Once, exact-decimal maths was swapped for
+  floating point and nothing failed — every percentage in the suite happened to be exactly
+  representable in binary.</p>
+      <p><strong>When a deliberate break does not fail, suspect the test, not the tool.</strong></p>
+</Callout>
+
+## Check yourself
+
+    <Quiz
+  question="Your suite passes. What has that established?"
+  choices={["That the code is correct and free of defects", "That the tests you wrote did not detect a fault", "That the types and the runtime agree fully", "That the module is ready to be published now"]}
+  answerIndex={1}
+  correctFeedback="A green suite is evidence about your tests as much as your code. It bounds the defects you looked for, and says nothing about the ones you did not."
+  wrongFeedback="Green means no test detected a fault. Whether faults exist depends entirely on what you thought to check."
+/>
+
+    <Quiz
+  question="You delete a guard clause and every gate stays green. What is most likely?"
+  choices={["The guard clause was truly dead code", "The linter needs stricter rules enabled", "No test exercises the path it guarded", "The type checker already proves it safe"]}
+  answerIndex={2}
+  correctFeedback="This is exactly the clamp bug from the Python original: the assertion existed, but no test drove the code down the path it protected."
+  wrongFeedback="Any of these is possible, but the overwhelmingly common cause is that nothing exercises the guarded path. Suspect the test first."
+/>
+
+    <Quiz
+  question="Why should formatting never be one of your gates?"
+  choices={["It is automatically fixable, so it is not a judgement", "It runs far too slowly to be worth the wait", "It disagrees with the linter about most rules", "It cannot be run in a continuous integration job"]}
+  answerIndex={0}
+  correctFeedback="A gate should answer a question that needs a decision. Formatting has one right answer a tool can apply, so run `deno fmt` — do not fail a build over it."
+  wrongFeedback="Formatting is deterministic and auto-fixable. Gating on it turns a fix into a failure and trains people to ignore red."
+/>
+
+## Read this next
+
+    <p><strong>Primary source:</strong>
+<a href="https://docs.deno.com/runtime/fundamentals/testing/">Deno — Testing</a>.
+Read as far as “Running Tests”; the rest is reference for later. It is the authoritative
+description of the runner you just used, including per-test permissions, which no other
+JavaScript test runner has.</p>
+
+    <p>Then skim <a href="https://jsr.io/@std/assert">@std/assert on JSR</a> — the assertion
+library the spec imports.</p>
+
+## Where this is going
+
+    <p>Next lesson takes the second slice — `Discount` and the money arithmetic —
+and meets the question the Python version answered with `Decimal`: what do you
+do about rounding when TypeScript has no decimal type at all? That is where objective 2
+properly starts.</p>
+
+    <p><strong>I am your teacher here — ask me questions.</strong> If a step did not work, if
+  the wording of a test is unclear, or if you want to know why a constraint exists, say so.
+  A confusion left unresolved becomes tomorrow's wrong mental model.</p>

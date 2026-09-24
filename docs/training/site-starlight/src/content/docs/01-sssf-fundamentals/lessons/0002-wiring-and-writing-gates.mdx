@@ -1,0 +1,238 @@
+---
+title: "Wiring and Writing Gates"
+description: "Two different acts, and two different families of gate. Lesson 1 covered half of one of them."
+sidebar:
+  order: 2
+---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>You can wire a quality block to a real command, and write a gate function from
+  scratch. By the end you will have written one that fails a run whose own quality blocks
+  are still placeholders — a gate that checks your gates.</p>
+</Callout>
+
+## The vocabulary
+
+<table>
+  <tr><th>Act</th><th>Means</th><th>Where</th></tr>
+  <tr><td><strong>Wiring</strong></td><td>pointing a block at a command that already exists</td><td>`quality.py`</td></tr>
+  <tr><td><strong>Writing</strong> a check</td><td>authoring the command itself — usually a test</td><td>your test suite</td></tr>
+  <tr><td><strong>Writing</strong> a gate</td><td>authoring a function that judges an agent's claims</td><td>`gates.py`</td></tr>
+</table>
+
+## The two families
+
+<table>
+  <tr><th></th><th>Quality blocks</th><th>Envelope gates</th></tr>
+  <tr><td>Lives in</td><td>`adw_modules/quality.py`</td><td>`adw_modules/gates.py`</td></tr>
+  <tr><td>Judges</td><td><strong>the code</strong></td><td><strong>the agent's claims</strong></td></tr>
+  <tr><td>Shape</td><td>a command + exit code</td><td>`gate(envelope, run) -> GateReport`</td></tr>
+  <tr><td>Runs</td><td>in a `kind="code"` phase</td><td>after every agent call, per `AgentCall`</td></tr>
+  <tr><td>On failure</td><td>feeds the fix loop</td><td>sends a correction into the <strong>same</strong> agent session</td></tr>
+  <tr><td>Answers</td><td>"do the tests pass?"</td><td>"did you actually write the file you said you wrote?"</td></tr>
+</table>
+
+<Callout kind="why" label="Why the second family exists">
+<p>An agent's envelope is a set of claims: <em>status success, summary "added the
+  endpoint", artifacts ["specs/plan.md"]</em>. Nothing about producing that JSON requires
+  any of it to be true.</p>
+  <p>Envelope gates are "agent proposes, code disposes" applied to the <strong>report</strong>
+  rather than the code. They check what is mechanically checkable — did the file appear,
+  is it non-empty, does the diff contain what was claimed. Whether the plan is any
+  <em>good</em> is a reviewer's job, not a gate's.</p>
+</Callout>
+
+## Part 1 — wiring a quality block
+
+<p>Open `adw_modules/quality.py`. Each block is a function returning a
+`QualityCheckSpec`. Wiring one means replacing the placeholder argv:</p>
+
+
+```
+def test(run) -> QualityCheckResult:
+    return _run(QualityCheckSpec(
+        name="test",
+        area="backend",
+        operation="build",
+        argv=["deno", "test", "--doc"],     # <- the whole job
+        timeout_seconds=600,
+    ), run)
+```
+
+
+### Four rules, each earned the hard way
+
+<ol>
+  <li><p><strong>`argv` is a list, never a shell string.</strong> A list means no
+  shell — so no pipe can replace your exit code. `deno test | tee log` is a gate
+  that can never fail, because `tee` succeeds.</p></li>
+  <li><p><strong>Call binaries by bare name.</strong> These run with the operator's
+  environment, so `deno` resolves the way it does in your terminal. An absolute
+  path bakes your machine into the trace.</p></li>
+  <li><p><strong>Scope lives in the config file, not the argv.</strong> Put includes in
+  `deno.json` or `pyproject.toml`. Then the gate and your local run
+  cannot disagree — which is the whole reason to have a gate.</p></li>
+  <li><p><strong>Delete blocks you do not have.</strong> Remove them from the list in
+  `run_quality()` too. A block running `echo` reports a check that
+  never happened.</p></li>
+</ol>
+
+<Callout kind="trap" label="Then verify — lesson 1's procedure">
+<p>Wiring is not finishing. Introduce a defect of the class that tool catches, confirm
+  that gate goes red and the others stay green, restore. A wired gate you have not watched
+  fail is still not a gate.</p>
+</Callout>
+
+## Part 2 — writing an envelope gate
+
+<p>The whole contract is one line:</p>
+
+
+```
+def my_gate(envelope: EnvelopeBase, run) -> GateReport
+```
+
+
+<p>Build a `GateReport` by calling `report.check(item, ok, note)` once
+per thing you looked at. Violations are derived from the failed checks — you never build
+them yourself.</p>
+
+
+```
+def artifacts_exist(envelope: EnvelopeBase, run) -> GateReport:
+    report = GateReport()
+    for a in envelope.artifacts:
+        p = Path(a)
+        report.check(a, p.exists(),
+                     f"exists, {_size(p)}" if p.exists()
+                     else "declared artifact does not exist")
+    return report
+```
+
+
+<p>A gate is a loop and a return. That is the entire pattern.</p>
+
+### Why one check per item
+
+<p>Every check is recorded whether it passed or failed, so a <em>green</em> gate says
+<strong>what it verified</strong>, not merely that it passed:</p>
+
+
+```
+OK    justfile          exists, 4.4KB
+FAIL  specs/ghost.md    declared artifact does not exist
+```
+
+
+<p>Compare with a gate that returns a bare boolean. Green would tell you nothing — the
+exact problem from lesson 1, reproduced one level up.</p>
+
+### The `note` is the message the agent receives
+
+<p>On a failed check, `note` becomes the violation text, and violations are sent
+back into the <strong>same agent session</strong> as a correction — bounded by the phase's
+`retries`. Write notes for the agent that must act on them:</p>
+
+<table>
+  <tr><th>Poor</th><th>Good</th></tr>
+  <tr><td>`"failed"`</td><td>`"declared artifact does not exist"`</td></tr>
+  <tr><td>`"bad diff"`</td><td>`"claimed changed but not in the diff"`</td></tr>
+</table>
+
+### What ships already
+
+<table>
+  <tr><th>Gate</th><th>Checks</th></tr>
+  <tr><td>`artifacts_exist`</td><td>every declared artifact is on disk</td></tr>
+  <tr><td>`files_non_empty`</td><td>…and is not zero bytes</td></tr>
+  <tr><td>`json_parses`</td><td>declared JSON actually parses</td></tr>
+  <tr><td>`diff_matches_claims`</td><td>every file claimed changed exists</td></tr>
+  <tr><td>`verdict_consistent`</td><td>a review's verdict agrees with its own findings</td></tr>
+  <tr><td>`tests_pass(command)`</td><td>gate factory — the given command must exit 0</td></tr>
+</table>
+
+<p>Attach them per call, in the ADW:</p>
+
+
+```
+plan = ph.call(AgentCall(output_type=PlanOutput, prompt=prompt,
+                         gates=[gates.artifacts_exist, gates.files_non_empty]))
+```
+
+
+## Your turn
+
+<p><em>Reps are tagged <strong>[read]</strong> (inspect a real file, no setup) or <strong>[run]</strong> (drive the <a href="/01-sssf-fundamentals/reference/0004-wiring-your-factory/">wired factory</a>).</em></p>
+
+
+<ol class="steps">
+  <li>
+    <p><strong>[run]</strong> Write `no_placeholder_blocks(envelope, run)` in `gates.py`. It
+    should read `adws/adw_modules/quality.py` and fail if any block still calls
+    `_placeholder(`.</p>
+    <p>One check per block name found. A gate that checks your gates.</p>
+  </li>
+  <li>
+    <p><strong>[run]</strong> Verify it the only way that counts. Point it at this repo — it should pass. Then
+    point it at a freshly stamped one, where every block is a placeholder, and watch it
+    fail with one violation per block.</p>
+
+```
+T=/tmp/fresh; rm -rf $T; mkdir -p $T; cd $T; git init -q .
+uv run /path/to/.claude/skills/sssf/scripts/install.py
+```
+
+  </li>
+  <li>
+    <p><strong>[read]</strong> Ask yourself what it does <em>not</em> catch — and write that limitation as a
+    comment. It is a real one, and it matters.</p>
+  </li>
+</ol>
+
+## Check yourself
+
+<Quiz
+  question="What does an envelope gate judge that a quality block cannot?"
+  choices={["Whether the code compiles under strict settings", "Whether the agent's claims match what exists", "Whether the test suite covers the changed lines", "Whether the model chose an appropriate approach"]}
+  answerIndex={1}
+  correctFeedback="Quality blocks judge the code. Envelope gates judge the report — did the file it claimed actually appear."
+  wrongFeedback="Both of those are code questions. The envelope gate's job is the agent's claims about its own work."
+/>
+
+<Quiz
+  question="Why must <code>argv</code> be a list rather than a shell string?"
+  choices={["Lists are faster for the runner to execute", "Strings cannot express multi-word arguments", "A shell lets a pipe replace the exit code", "The tracer cannot serialise a plain string"]}
+  answerIndex={2}
+  correctFeedback="`cmd | tee log` returns tee's status. A list means no shell, so nothing can eat the verdict."
+  wrongFeedback="It is about the exit code. Any shell metacharacter can replace the verdict with a different command's."
+/>
+
+<Quiz
+  question="Why does a gate record passing checks, not just failures?"
+  choices={["The tracer requires a fixed number of rows", "Passing checks are needed to compute a score", "Agents read them to learn what is expected", "So a green gate says what it actually verified"]}
+  answerIndex={3}
+  correctFeedback="Otherwise green is indistinguishable from a gate that examined nothing — lesson 1's problem, one level up."
+  wrongFeedback="It is the same reason as lesson 1: a bare pass carries no information about what was looked at."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> the module docstring at the top of
+`adws/adw_modules/gates.py` — nine lines, and the clearest statement of the
+contract. Then the banner in `quality.py`, which is the wiring rules in the
+authors' own words.</p>
+
+<p>For the wider idea, <a href="https://martinfowler.com/bliki/SelfTestingCode.html">Fowler
+on self-testing code</a> is still the best short piece.</p>
+
+## Where this goes next
+
+<p>Gates check something at a seam — but what actually crosses that seam between two
+phases? Next: the envelope, the one typed object a gate reads and the next agent
+receives, and why it is a file on disk and not a message in a shared chat.</p>
+
+<p><strong>Ask me things.</strong> Bring me the gate you write in step 1 — I will tell
+  you whether it would survive the thing it is meant to catch, which is the only property
+  that matters.</p>

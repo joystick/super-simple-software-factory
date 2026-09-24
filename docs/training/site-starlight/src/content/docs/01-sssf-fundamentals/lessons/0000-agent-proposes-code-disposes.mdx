@@ -1,0 +1,85 @@
+---
+title: "Agent Proposes, Code Disposes"
+description: "The one idea the whole factory rests on, and the map for everything that follows. Read this first; it is the gentlest page in the course."
+sidebar:
+  order: 0
+---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>Before any mechanism, one sentence and a map. By the end of this short page you can say
+  what a "software factory" is <em>for</em>, why it is built the way it is, and where each of
+  the lessons that follow fits. Nothing here is hard — it is the orientation that makes the
+  hard parts land.</p>
+</Callout>
+
+## The one idea
+
+<p>Hand a capable model your entire job — "build the feature, test it, review it, ship it" —
+and you get a machine with no seams. There is no phase boundary, so you cannot say which step
+failed. There is no acceptance criterion you can name, so "done" means "the agent stopped
+talking." A retry is a cold start that throws away everything the agent just learned. And the
+only record is a transcript you have to read like a novel. Run it twice, get two different
+systems.</p>
+
+<p>The fix is not a cleverer prompt. It is a deliberate division of labour:</p>
+
+<Callout kind="why" label="Agent proposes, code disposes">
+<p><strong>Code owns sequencing, retries, and acceptance. The agent owns only the work inside
+  one bounded phase.</strong> The model proposes work; deterministic code decides whether that
+  work is acceptable before anything proceeds. Every other idea in this course falls out of
+  that one line.</p>
+</Callout>
+
+## What falls out of it
+
+<p>Once code owns the loop and the agent owns a single phase, four things follow — and they
+are, not by coincidence, the next several lessons:</p>
+
+<table>
+  <tr><th>Because…</th><th>…this becomes a thing</th><th>Lesson</th></tr>
+  <tr><td>work is split into named phases</td><td>a <strong>phase</strong> is the unit of the trace</td><td>L4</td></tr>
+  <tr><td>the agent's word is not trusted</td><td>a <strong>gate</strong> is the definition of done</td><td>L1–L2</td></tr>
+  <tr><td>context cannot live in a shared chat</td><td>an <strong>envelope</strong> carries it across each seam</td><td>L3</td></tr>
+  <tr><td>a failure should not waste what was learned</td><td>a <strong>fix loop</strong> corrects in place</td><td>L5</td></tr>
+</table>
+
+<p>The rest builds outward from there: who an agent is allowed to touch (L6, bounding), carrying
+a workflow protocol in on purpose (L7, vendoring a skill), the record it all leaves behind (L8,
+the trace), how to compose your own workflow (L9, chains), and running the whole thing on real
+work (L10, the capstone).</p>
+
+## How to read this course
+
+<ul>
+  <li><strong>Lessons</strong> teach one mechanism each and end with a short quiz and a
+  hands-on rep. Take them in order — each leans on the one before.</li>
+  <li><strong>Reference</strong> pages are lookups you return to, not front-to-back reading.</li>
+  <li><strong>Learning records</strong> are transcripts of real teaching dialogue — context,
+  not practice.</li>
+</ul>
+
+<Callout kind="trap" label="The one habit that makes the rest work">
+<p>The course has a rule it applies to itself: <strong>never trust a check you have not watched
+  fail.</strong> A green result only means something once you have seen the thing that produced
+  it go red on purpose. You will meet this on page one (L1) and in every lesson after. It is
+  the whole game.</p>
+</Callout>
+
+## Check yourself
+
+<Quiz
+  question="In one line, what does &ldquo;agent proposes, code disposes&rdquo; mean?"
+  choices={["The agent writes code and then also grades it", "Code decides; the agent only does bounded work", "The agent plans and code writes all the tests", "Code writes the prompt the agent then follows"]}
+  answerIndex={1}
+  correctFeedback="Exactly. Deterministic code owns sequencing, retries, and acceptance; the agent owns only the work inside one bounded phase."
+  wrongFeedback="The split is about authority: code decides what is acceptable, the agent only proposes work inside one phase. It never grades itself."
+/>
+
+## Where this goes next
+
+<p>Straight to the cornerstone. The first thing code "disposes" with is a <strong>gate</strong>
+— and the first lesson shows why a gate's green light carries almost no information until you
+have watched it fail. It is the hardest idea in the course, taught first on purpose. You now
+have the map for it.</p>

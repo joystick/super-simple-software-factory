@@ -1,0 +1,228 @@
+---
+title: "Money Without a Decimal Type"
+description: "Python reached for <code>Decimal</code>. TypeScript has no decimal type and no plans to get one soon. This lesson works out what to do instead — and the answer is not 'be careful'."
+sidebar:
+  order: 2
+---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>A `percentOf` that is exact for every percentage a shop will ever quote,
+  built from integers only, with the one case that breaks the obvious implementation
+  pinned by a test.</p>
+</Callout>
+
+## The problem, in one line
+
+    
+```
+> 0.1 + 0.2
+0.30000000000000004
+```
+
+
+    <p>Binary floating point cannot represent most decimal fractions, exactly as decimal
+cannot represent ⅓. This is not a JavaScript flaw — it is
+<a href="https://floating-point-gui.de/">IEEE 754</a>, and Python's `float`
+does the same thing. Python simply ships a `Decimal` type in its standard
+library, and JavaScript does not.</p>
+
+    <p>You already dodged this in lesson 1 by storing money as <strong>integer cents</strong>.
+£10.00 is `1_000`. Integers are exact, so addition and multiplication are exact,
+and a cart's subtotal cannot drift.</p>
+
+    <Callout kind="why" label="But percentages bring it straight back">
+<p>A discount is not addition. `amountCents * 8.7 / 100` puts a
+  <em>float</em> — `8.7` — back into the middle of your exact integer
+  arithmetic. Everything downstream of that multiplication is approximate again.</p>
+</Callout>
+
+## How badly? Measured, not guessed
+
+    <p>8.7&nbsp;% of 1500c is exactly 130.5c. Half-up, the customer is owed <strong>131c</strong>:</p>
+
+    
+```
+> 1500 * 8.7
+13049.999999999998
+> 1500 * 8.7 / 100
+130.49999999999998
+> Math.round(1500 * 8.7 / 100)
+130            // a cent, taken off the customer
+```
+
+
+    <p>A sweep of eight fractional percentages against every amount from 1c to 2000c —
+16,000 combinations — found <strong>105 disagreements</strong> between the float route and
+exact arithmetic. Every one of them a cent, always in the same direction.</p>
+
+    <Callout kind="trap" label="Why this hides so well">
+<p>Try the obvious probe and it looks fine: `500 * 8.7 / 100` gives exactly
+  `43.5`, because that particular rounding error happens to cancel. So the bug
+  is not reliably reproducible from the first example you think of.</p>
+      <p>This is the same shape as the trap in the Python original, where every percentage the
+  test suite used — 5, 12.5, 7.25, 7.0 — was exactly representable in binary, so the
+  suite could not see the defect at all. <strong>An intermittent-looking numeric bug is
+  usually a systematic one you have sampled badly.</strong></p>
+</Callout>
+
+## The fix: stop having a float at all
+
+    <p>If a float in the multiplication is the problem, remove the float. Hold the percentage
+as an integer too, in <strong>basis points</strong>: 1&nbsp;bp = 0.01&nbsp;%, so
+8.7&nbsp;% is `870` and 100&nbsp;% is `10_000`.</p>
+
+    
+```
+> 1500 * 870          // integer × integer, exact
+1305000
+> 1305000 / 10000     // one division, at the very end
+130.5
+> Math.round(130.5)
+131                   // correct
+```
+
+
+    <p>The rule generalises: <strong>do all arithmetic in integers and divide once, last.</strong>
+Basis points are just the unit that lets you keep that promise for percentages.</p>
+
+### Why basis points and not "a Decimal library"
+
+    <table>
+      <tr>
+        <th>Option</th>
+        <th>Cost</th>
+      </tr>
+      <tr>
+        <td>Basis points</td>
+        <td>No dependency. Exact. Precision fixed at 0.01&nbsp;%.</td>
+      </tr>
+      <tr>
+        <td>A decimal library</td>
+        <td>A dependency in your hot path, and an API everyone must remember to use.</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/tc39/proposal-decimal">TC39 decimal</a></td>
+        <td>Not shipped. Watch it; do not wait for it.</td>
+      </tr>
+    </table>
+
+    <p>0.01&nbsp;% is finer than any discount a shop quotes, so the precision floor costs you
+nothing real. Choosing it deliberately is the point — an unstated precision limit is how
+you end up with 267.49999 basis points.</p>
+
+## Rounding: half-up, and a caveat
+
+    <p>Half-up, not banker's rounding: a customer owed half a cent gets it. `Math.round`
+is half-up already — but only on the positive side:</p>
+
+    
+```
+> Math.round(2.5)    // 3
+> Math.round(3.5)    // 4
+> Math.round(-2.5)   // -2   <- toward +Infinity, NOT away from zero
+```
+
+
+    <Callout kind="trap" label="Carry this one">
+<p>`Math.round` rounds <em>toward +Infinity</em> on a tie, which is half-up
+  for positive money and something else entirely for negative money. Discounts here are
+  positive, so it is safe — but the day you compute a refund, this is the line that bites.</p>
+</Callout>
+
+## Build it
+
+    <ol class="steps">
+      <li>
+        <p>Read the new spec, `tests/money.test.ts`. Two functions:
+    `basisPoints(percent)` converts a human percentage to whole bp, and
+    `percentOf(amountCents, points)` takes that share of an amount.</p>
+      </li>
+      <li>
+        <p>Confirm you are red — and that lesson 1 is still green:</p>
+        
+```
+deno task test        # 9 passed, 11 failed
+```
+
+        <p>Those 9 are your `LineItem`. A new slice must never break an old one;
+    that is what a suite is <em>for</em>.</p>
+      </li>
+      <li>
+        <p>Implement both in `src/pricing.ts`. Points to get right:</p>
+        <ul>
+          <li>Reject a percentage outside 0–100 with a `PricingError`.</li>
+          <li>Guard `amountCents` with `Number.isInteger`. A caller who
+      has not read this file will eventually hand you `10.5`.</li>
+          <li>Multiply first, divide once, round last.</li>
+        </ul>
+      </li>
+      <li>
+        <p>Green? Run all three gates, then prove the money gate is real: change your
+    `Math.round` to `Math.floor` and confirm the half-up tests go
+    red. Restore.</p>
+        
+```
+deno task gates
+```
+
+      </li>
+    </ol>
+
+    <Callout kind="trap" label="One subtlety you may hit">
+<p>Converting the percentage is itself float arithmetic: `8.7 * 100` is
+  `869.9999999999999`. `Math.round` rescues that particular case, but
+  if you want a form that provably matches exact decimal shifting across every value from
+  0.00 to 100.00, round the <em>precision-normalised</em> product:
+  `Math.round(Number((percent * 100).toPrecision(15)))`. That was checked
+  against all 10,001 values; zero mismatches.</p>
+</Callout>
+
+## Check yourself
+
+    <Quiz
+  question="Why store money as integer cents rather than as a decimal number?"
+  choices={["Integers use noticeably less memory per value", "Integers compare faster than floats do here", "Integer arithmetic is exact, so totals cannot drift", "Integers avoid the need to validate any inputs"]}
+  answerIndex={2}
+  correctFeedback="Exactness is the whole reason. Memory and speed are irrelevant at these sizes."
+  wrongFeedback="Performance is not the motivation. Binary floating point cannot represent most decimal fractions, so sums of floats drift."
+/>
+
+    <Quiz
+  question="Your discount code passes every test. What has that established?"
+  choices={["The arithmetic is exact for all valid inputs", "No percentage you tried exposed a rounding fault", "The rounding mode matches the business rules", "Floating point is not used anywhere in the path"]}
+  answerIndex={1}
+  correctFeedback="Exactly the Python trap: every percentage in that suite was binary-representable, so a real defect stayed invisible until 8.7% was tried."
+  wrongFeedback="A green suite bounds what you sampled. With floats, which values you picked decides whether you can see the bug at all."
+/>
+
+    <Quiz
+  question="Why divide only once, at the very end of the calculation?"
+  choices={["Each division can introduce a fresh rounding error", "Division is the slowest arithmetic operation there is", "Dividing early will always overflow the safe range", "The language forbids chaining divisions on integers"]}
+  answerIndex={0}
+  correctFeedback="Multiplication of integers stays exact; division is where you leave the integers. Do it once, as late as possible, and round there."
+  wrongFeedback="Speed is not the issue. Every division is an opportunity to leave exact arithmetic, so you want exactly one."
+/>
+
+## Read this next
+
+    <p><strong>Primary source:</strong>
+<a href="https://floating-point-gui.de/">The Floating-Point Guide</a> — read “Basic Answers”
+and “Error Propagation”. It is the clearest treatment of why this happens in every
+language, not just this one.</p>
+
+    <p>Then skim the <a href="https://github.com/tc39/proposal-decimal">TC39 decimal proposal</a>
+README, so you know what JavaScript may eventually offer and why it is hard.</p>
+
+## Where the limits are
+
+    <p>Integer cents are exact only inside `Number.MAX_SAFE_INTEGER`
+(9,007,199,254,740,991). Because `percentOf` multiplies by up to 10,000 before
+dividing, the intermediate product is the real ceiling: safe to roughly
+<strong>£9&nbsp;billion in a single line item</strong>. Past that you want
+`BigInt` — a later lesson, if the mission ever needs it.</p>
+
+    <p><strong>Ask me things.</strong> Especially here — numeric bugs are the ones people
+  nod along to and then reproduce six months later in production. If any step above felt
+  like it worked "by magic", say so and we will take it apart.</p>

@@ -1,0 +1,173 @@
+---
+title: "Bounding an Agent"
+description: "The roster, an agent's writes, and why the builder must not be able to edit its own grader — enforced by comparing change-sets, not by trust."
+sidebar:
+  order: 6
+---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>You can say exactly what each agent in a roster may change in the repo, and prove an
+  out-of-bounds edit gets caught. You will know why a `tools` list is not a permission, why
+  the builder is the only unrestricted agent and <em>still</em> cannot touch the machinery
+  that grades it, and how a breach differs from a gate violation.</p>
+</Callout>
+
+## The roster
+
+<p>A factory's agents are declared in one file, `adws/adw_sssf_config/sssf.config.yaml`. Each
+agent is named — `planner`, `builder`, `reviewer` — never identified by its model. The name
+is the identity; the model is a setting you can change under it. A roster entry sets the
+model, thinking level, prompts, the tools it may call, and — the subject of this lesson —
+what it may write.</p>
+
+## Two controls that look alike and are not
+
+<table>
+  <tr><th></th><th>`tools`</th><th>`writes`</th></tr>
+  <tr><td>Says</td><td>which tools the agent may call</td><td>which repo paths it may modify</td></tr>
+  <tr><td>Checked</td><td>at call time, by the harness</td><td>after the phase, in code</td></tr>
+  <tr><td>Can it protect a file?</td><td><strong>No</strong></td><td><strong>Yes</strong></td></tr>
+</table>
+
+<Callout kind="why" label="Why tools cannot protect a file">
+<p>`bash` runs <em>anything</em> — including `git checkout adws/` — and `write` reaches any
+  path. So an agent's tool list is a statement of <em>intent</em> that nothing enforces at the
+  filesystem. The only control that actually bounds what an agent changes is `writes`, and it
+  is enforced in `adw_modules/permissions.py` after every call.</p>
+</Callout>
+
+## What `writes` means
+
+<table>
+  <tr><th>`writes:` value</th><th>Means</th></tr>
+  <tr><td>absent / `None`</td><td>unrestricted — may modify anything <em>except</em> `protected_files`</td></tr>
+  <tr><td>`[]`</td><td>read-only with respect to the repo</td></tr>
+  <tr><td>`["specs/", "mod.ts"]`</td><td>only these — a trailing `/` is a directory prefix, `*` a glob, else an exact path</td></tr>
+</table>
+
+<p>"Read-only with respect to the repo" is the careful phrase. A `writes: []` agent is not
+mute: it still writes its own envelope, its plan, its findings into the session runtime under
+`data_dir`. The scout and reviewer change nothing in the repo yet always record their work.</p>
+
+## Protected files: the grader an agent cannot touch
+
+<p>Some paths are off-limits to every agent that does not explicitly name them — the factory's
+own machinery:</p>
+
+```yaml
+protected_files:
+  - adws/adw_modules/        # the runner, gates, permissions themselves
+  - adws/adw_sssf_config/    # the roster
+  - adws/adw_*.py            # the chains
+```
+
+<Callout kind="trap" label="The builder is unrestricted — and still cannot edit its own grader">
+<p>The `builder` has no `writes` key: it is the one agent allowed to change anything in the
+  repo, because building is its job. And it <em>still</em> cannot touch `protected_files`. An
+  agent that could edit `gates.py` or `quality.py` could make its own work pass by lowering
+  the bar — so the thing that decides whether the work passed is exactly the thing the worker
+  may not reach. "Naming a path in your own `writes` is what unlocks a protected one" — and no
+  sane roster gives the builder `writes: [adws/adw_modules/]`.</p>
+</Callout>
+
+## How a breach is caught: change-sets, not surveillance
+
+<p>Permissions are not enforced by watching each write as it happens. They are enforced by
+<strong>comparing the repo before and after</strong> the agent ran:</p>
+
+```python
+def permitted(path, agent, cfg) -> bool:
+    if is_session_runtime(path):                 # data_dir/ — always writable
+        return True
+    if any(_matches(path, p) for p in (agent.writes or [])):
+        return True                              # naming a path unlocks it
+    if any(_matches(path, p) for p in cfg.defaults.protected_files):
+        return False
+    return agent.writes is None                  # None = unrestricted, [] = read-only
+```
+
+<p>The change-set comes from `git diff HEAD --numstat` plus untracked files, snapshotted
+before and after. Any path whose fingerprint changed is checked against `permitted`.</p>
+
+<Callout kind="why" label="Why compare change-sets instead of intercepting writes">
+<p>An agent that runs `git checkout adws/` does not <em>write</em> those files — it
+  <em>discards</em> changes in them. A write-interceptor sees nothing; a change-set comparison
+  sees the files are different afterward and flags them. This is not hypothetical: an agent
+  once ran `git checkout adws/` and wiped work. Comparing states catches what watching writes
+  cannot.</p>
+</Callout>
+
+## A breach is not a gate violation
+
+<p>Keep the two failure classes separate. A <strong>gate violation</strong> is work an agent
+can be <em>asked to fix</em> — the file it claimed does not exist, so it is corrected and tries
+again (Lesson 5). A <strong>permissions breach</strong> is not a correction target: the agent
+did something it was never allowed to do. It fails the run as a breach, not a fixable finding.</p>
+
+## Your turn
+
+<p><em>Reps are tagged <strong>[read]</strong> (inspect a real file, no setup) or <strong>[run]</strong> (drive the <a href="/01-sssf-fundamentals/reference/0004-wiring-your-factory/">wired factory</a>).</em></p>
+
+
+<ol class="steps">
+  <li>
+    <p><strong>[read]</strong> <strong>Read the roster.</strong> In `~/Projects/training/sssf-play`, open
+    `adws/adw_sssf_config/sssf.config.yaml`. For each agent, write its `writes` value in the
+    three-way vocabulary above. Which agents are read-only? Which is unrestricted?</p>
+  </li>
+  <li>
+    <p><strong>[run]</strong> <strong>Watch a breach.</strong> Give an agent `writes: []`, then a task that makes it
+    edit a tracked repo file. Run it. Confirm the run fails as a <em>breach</em> — and confirm
+    the same agent still wrote its own envelope under `data_dir`.</p>
+  </li>
+  <li>
+    <p><strong>[run]</strong> <strong>Prove the grader is safe.</strong> Try to get the builder to modify
+    `adws/adw_modules/gates.py`. It must be blocked even though the builder is otherwise
+    unrestricted. Then say, in one sentence, what would break if it were not.</p>
+  </li>
+</ol>
+
+## Check yourself
+
+<Quiz
+  question="Why can a <code>tools</code> allowlist not protect <code>gates.py</code> from an agent?"
+  choices={["Tool lists are advisory hints to the model only", "The harness applies tools after the phase ends", "bash and write already reach any path anyway", "gates.py is generated fresh on every single run"]}
+  answerIndex={2}
+  correctFeedback="bash runs anything and write reaches anywhere, so the tool list is intent nothing enforces. Only `writes`, checked in code, actually bounds changes."
+  wrongFeedback="It is about reach, not timing. bash/write can touch any path, so the capability list cannot protect a file — writes does."
+/>
+
+<Quiz
+  question="An agent runs <code>git checkout adws/</code>, discarding changes. How is that caught?"
+  choices={["A write-interceptor blocks the checkout call", "The before/after change-set shows the diff", "The tools list forbids the git subcommand", "It is not caught — checkout is a read action"]}
+  answerIndex={1}
+  correctFeedback="Nothing was written, so interception sees nothing. Comparing the repo before and after shows those files changed, and the breach is flagged."
+  wrongFeedback="Discarding is not a write, so interception misses it. The change-set comparison sees the files differ afterward — that is the whole reason to compare states."
+/>
+
+<Quiz
+  question="How does a permissions breach differ from a gate violation?"
+  choices={["A breach is retried; a violation fails the run", "A breach is logged; a violation is silent", "A violation is fixable; a breach is not", "There is no difference — both are corrections"]}
+  answerIndex={2}
+  correctFeedback="A gate violation is work the agent can be asked to fix. A breach is an action it was never allowed to take — not a correction target."
+  wrongFeedback="They are different classes. A violation re-prompts for a fix; a breach is a forbidden action, not something to correct and retry."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> `adws/adw_modules/permissions.py` in `sssf-play` — its
+module docstring is the clearest statement of why change-sets beat surveillance, and the
+`permitted` function is the whole policy in ten lines. Then the `defaults` block of
+`sssf.config.yaml`, where `protected_files` lives.</p>
+
+## Where this goes next
+
+<p>You have now met every mechanism a run uses: phases, envelopes, gates, the fix loop, and
+the bounds on who may change what. One more control sits on top of `writes`, not instead of
+it: naming a workflow protocol — `tdd`, `codebase-design` — an agent carries into a headless
+run it otherwise cannot see.</p>
+
+<p><strong>Ask me things.</strong> Bring me a roster and I will tell you which agent could, in
+principle, weaken its own grader — and how the config stops it.</p>

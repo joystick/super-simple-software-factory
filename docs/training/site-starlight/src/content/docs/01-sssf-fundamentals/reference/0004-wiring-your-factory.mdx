@@ -1,0 +1,59 @@
+---
+title: "Wiring Your Factory"
+description: "One-time setup so the run-it-yourself reps work. Do this once; every lesson's `run` rep assumes it."
+sidebar:
+  order: 4
+---
+import Callout from '@components/Callout.astro'
+
+<Callout kind="win" label="What this page is for">
+<p>Every lesson ends with a hands-on rep. Some are <strong>read</strong> reps — open a real
+  file, no setup — and you can do them right now. Others are <strong>run</strong> reps: they
+  drive a live factory and, for a few, spend real money. This page is the one-time setup those
+  `run` reps depend on. Do it once and come back to it only if something breaks.</p>
+</Callout>
+
+## The two kinds of rep
+
+<table>
+  <tr><th>Badge</th><th>Means</th><th>Needs</th></tr>
+  <tr><td><strong>[read]</strong></td><td>inspect a real artifact already in the repo</td><td>nothing — do it now</td></tr>
+  <tr><td><strong>[run]</strong></td><td>execute a factory command and read the result</td><td>this page's setup; some cost money</td></tr>
+</table>
+
+<p>If you are only reading the course, the <strong>[read]</strong> reps alone carry the ideas.
+The <strong>[run]</strong> reps are where the ideas become something you have <em>done</em> —
+worth the setup when you are ready.</p>
+
+## What you need
+
+<ol class="steps">
+  <li><p><strong>The playground repo.</strong> The Python factory the lessons reference lives at
+  `~/Projects/training/sssf-play`. Every `[read]` rep points at a real file inside it; every
+  `[run]` rep runs from its root.</p></li>
+  <li><p><strong>`uv`.</strong> The chains run under `uv` (`uv run adws/adw_*.py …`). Install it
+  once; the `justfile` wraps the raw commands as `just plan`, `just sdlc`, and so on.</p></li>
+  <li><p><strong>A model key.</strong> The roster's `model:` values are `provider/model-id`; the
+  provider half decides which key is read. Set the key for whatever provider the roster names in
+  `adws/adw_sssf_config/sssf.config.yaml`.</p></li>
+  <li><p><strong>`sqlite3`.</strong> The trace reps (L8) read `adws/adw_data/sssf.db` with the
+  `just sessions` / `just phases` / `just tail` recipes, which shell out to `sqlite3`.</p></li>
+</ol>
+
+<Callout kind="trap" label="Run reps cost money — the capstone deliberately so">
+<p>A `[run]` rep that spawns agents spends real tokens. Most are cents. The L10 capstone
+  ("watch the factory certify a bug") is about <strong>$0.60–£1</strong> and is the most useful
+  spend in the course — but it is a spend. Do the free `[read]` reps first; reach for the paid
+  `[run]` reps when you want the idea in your hands, not just your head.</p>
+</Callout>
+
+## Sanity check
+
+<p>From `~/Projects/training/sssf-play`, the cheapest possible run confirms the wiring:</p>
+
+```bash
+just demo          # one read-only scout agent, one line back
+just sessions      # the run you just made should be the top row
+```
+
+<p>If `just sessions` shows your run, every `[run]` rep in the course will work.</p>

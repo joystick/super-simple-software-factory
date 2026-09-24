@@ -1,0 +1,213 @@
+---
+// The "whole machine" factory diagram (L10), as an animated, theme-aware SVG.
+// Replaces the ASCII swimlane. An envelope token flows planner -> builder, gate
+// badges pulse, a correction arc shows the fix loop, and events drop into the
+// trace DB. Animation can be paused; it starts paused when the visitor prefers
+// reduced motion.
+const uid = `fd-${Math.random().toString(36).slice(2, 8)}`;
+---
+
+<figure class="diagram" data-testid="factory-diagram" data-uid={uid}>
+  <div class="diagram-bar">
+    <span class="diagram-cap">one ADW run — a thin Python script</span>
+    <button type="button" class="diagram-toggle" data-testid="diagram-toggle" aria-pressed="false">
+      <span class="dt-play">▶ Play</span><span class="dt-pause">❚❚ Pause</span>
+    </button>
+  </div>
+
+  <svg viewBox="0 0 860 470" role="img"
+       aria-label="A single ADW run across five phases: an engineer request, a planner agent phase, a test code phase, a builder agent phase, and a commit code phase. The planner's envelope crosses to the builder as previous=plan. Gates artifacts_exist and diff_matches_claims verify each agent's claims; a failed gate sends a correction back into the same session (the fix loop). Every phase streams into the sssf.db trace, while permissions bound what each agent may write.">
+    <!-- lane legend -->
+    <g class="legend" font-size="12">
+      <rect x="20" y="18" width="12" height="12" rx="2" class="fill-engineer"/>
+      <text x="38" y="28">engineer (human)</text>
+      <rect x="168" y="18" width="12" height="12" rx="2" class="fill-agent"/>
+      <text x="186" y="28">agent (proposes)</text>
+      <rect x="316" y="18" width="12" height="12" rx="2" class="fill-code"/>
+      <text x="334" y="28">code (disposes)</text>
+    </g>
+
+    <!-- phase boxes -->
+    <g class="phase" font-size="13" text-anchor="middle">
+      <g class="p-engineer">
+        <rect x="24" y="60" width="120" height="52" rx="8" class="box stroke-engineer"/>
+        <text x="84" y="82" class="ph-title">engineer</text>
+        <text x="84" y="99" class="ph-sub">request</text>
+      </g>
+      <g class="p-agent">
+        <rect x="176" y="60" width="150" height="52" rx="8" class="box stroke-agent"/>
+        <text x="251" y="82" class="ph-title">planner</text>
+        <text x="251" y="99" class="ph-sub">agent phase</text>
+      </g>
+      <g class="p-code">
+        <rect x="358" y="60" width="96" height="52" rx="8" class="box stroke-code"/>
+        <text x="406" y="82" class="ph-title">test</text>
+        <text x="406" y="99" class="ph-sub">code</text>
+      </g>
+      <g class="p-agent">
+        <rect x="486" y="60" width="150" height="52" rx="8" class="box stroke-agent"/>
+        <text x="561" y="82" class="ph-title">builder</text>
+        <text x="561" y="99" class="ph-sub">agent phase</text>
+      </g>
+      <g class="p-code">
+        <rect x="668" y="60" width="150" height="52" rx="8" class="box stroke-code"/>
+        <text x="743" y="82" class="ph-title">commit</text>
+        <text x="743" y="99" class="ph-sub">code</text>
+      </g>
+    </g>
+
+    <!-- envelope crossing planner -> builder -->
+    <g class="seam">
+      <line x1="326" y1="140" x2="486" y2="140" class="flow-line" marker-end={`url(#${uid}-arrow)`}/>
+      <text x="406" y="132" text-anchor="middle" font-size="11" class="muted">previous = plan</text>
+      <g class="token">
+        <rect x="-13" y="-9" width="26" height="18" rx="3" class="env-box"/>
+        <text x="0" y="4" text-anchor="middle" font-size="9" class="env-text">✉</text>
+        <animateMotion dur="2.4s" repeatCount="indefinite" path="M 326 140 L 486 140"/>
+      </g>
+    </g>
+
+    <!-- gate badges -->
+    <g font-size="11" text-anchor="middle">
+      <g class="gate gate-a">
+        <rect x="181" y="150" width="140" height="26" rx="13" class="gate-box"/>
+        <text x="251" y="167" class="gate-text">artifacts_exist ✓</text>
+      </g>
+      <g class="gate gate-b">
+        <rect x="491" y="150" width="140" height="26" rx="13" class="gate-box"/>
+        <text x="561" y="167" class="gate-text">diff_matches_claims ✓</text>
+      </g>
+    </g>
+
+    <!-- fix loop: correction back into the same session -->
+    <path d="M 561 176 C 561 210, 470 210, 470 182" fill="none" class="correction" marker-end={`url(#${uid}-arrow-red)`}/>
+    <text x="470" y="224" text-anchor="middle" font-size="11" class="danger">✗ correction → same session (fix loop, bounded by retries)</text>
+
+    <!-- drop into the trace -->
+    <g class="drops" stroke-dasharray="3 4">
+      <line x1="84" y1="112" x2="84" y2="360" class="drop"/>
+      <line x1="251" y1="176" x2="251" y2="360" class="drop"/>
+      <line x1="406" y1="112" x2="406" y2="360" class="drop"/>
+      <line x1="561" y1="176" x2="561" y2="360" class="drop"/>
+      <line x1="743" y1="112" x2="743" y2="360" class="drop"/>
+    </g>
+    <g class="pulse-group">
+      <circle r="4" class="pulse"><animateMotion dur="1.6s" repeatCount="indefinite" path="M 251 176 L 251 360"/></circle>
+      <circle r="4" class="pulse"><animateMotion dur="1.6s" begin="0.8s" repeatCount="indefinite" path="M 561 176 L 561 360"/></circle>
+    </g>
+
+    <!-- trace db -->
+    <rect x="24" y="360" width="812" height="54" rx="8" class="db-box"/>
+    <text x="430" y="382" text-anchor="middle" font-size="13" class="db-title">sssf.db</text>
+    <text x="430" y="401" text-anchor="middle" font-size="11" class="muted">sessions · phases · events · envelopes · gate_results · agent_sessions · processes</text>
+
+    <text x="430" y="440" text-anchor="middle" font-size="11" class="muted">all the while: permissions bound what each agent may write</text>
+
+    <defs>
+      <marker id={`${uid}-arrow`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-head"/>
+      </marker>
+      <marker id={`${uid}-arrow-red`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-head-red"/>
+      </marker>
+    </defs>
+  </svg>
+</figure>
+
+<style>
+  .diagram {
+    margin: 1.5rem 0;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.6rem;
+    overflow: hidden;
+    background: var(--sl-color-gray-7, var(--sl-color-black));
+  }
+  .diagram-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; padding: 0.5rem 0.85rem;
+    border-bottom: 1px solid var(--sl-color-gray-5);
+    background: var(--sl-color-gray-6, var(--sl-color-gray-7));
+  }
+  .diagram-cap { font-size: 0.8rem; color: var(--sl-color-gray-2); font-weight: 600; }
+  .diagram-toggle {
+    font: inherit; font-size: 0.78rem; cursor: pointer;
+    padding: 0.2rem 0.7rem; border-radius: 999px;
+    border: 1px solid var(--sl-color-gray-4);
+    background: var(--sl-color-bg); color: var(--sl-color-text);
+  }
+  .diagram-toggle:hover { border-color: var(--sl-color-text-accent); }
+  /* the button shows the ACTION: "Pause" while playing, "Play" while paused */
+  .diagram-toggle .dt-play { display: none; }
+  .diagram.paused .diagram-toggle .dt-play { display: inline; }
+  .diagram.paused .diagram-toggle .dt-pause { display: none; }
+  .diagram svg { display: block; width: 100%; height: auto; padding: 0.5rem; }
+
+  /* text + strokes are theme-aware via Starlight tokens */
+  .diagram text { fill: var(--sl-color-text); }
+  .muted { fill: var(--sl-color-gray-3) !important; }
+  .ph-title { font-weight: 700; }
+  .ph-sub { fill: var(--sl-color-gray-3) !important; }
+  .box { fill: var(--sl-color-gray-6, transparent); stroke-width: 2; }
+  .stroke-engineer { stroke: var(--sl-color-gray-3); }
+  .stroke-agent { stroke: hsl(265, 60%, 62%); }
+  .stroke-code { stroke: hsl(150, 45%, 45%); }
+  .fill-engineer { fill: var(--sl-color-gray-3); }
+  .fill-agent { fill: hsl(265, 60%, 62%); }
+  .fill-code { fill: hsl(150, 45%, 45%); }
+
+  .flow-line { stroke: var(--sl-color-text-accent); stroke-width: 2; }
+  .arrow-head { fill: var(--sl-color-text-accent); }
+  .arrow-head-red { fill: hsl(3, 70%, 55%); }
+  .env-box { fill: hsl(198, 70%, 50%); }
+  .env-text { fill: #fff; }
+  .gate-box { fill: hsla(150, 45%, 45%, 0.14); stroke: hsl(150, 45%, 45%); stroke-width: 1.5; }
+  .gate-text { fill: var(--sl-color-text) !important; }
+  .correction { stroke: hsl(3, 70%, 55%); stroke-width: 2; stroke-dasharray: 5 4; }
+  .danger { fill: hsl(3, 70%, 55%) !important; }
+  .drop { stroke: var(--sl-color-gray-4); stroke-width: 1; }
+  .db-box { fill: hsla(215, 40%, 50%, 0.12); stroke: var(--sl-color-gray-4); stroke-width: 1.5; }
+  .db-title { font-weight: 700; }
+  .pulse { fill: hsl(198, 70%, 55%); }
+
+  /* animation: the flow line & correction dash, gate pulse */
+  .flow-line { stroke-dasharray: 6 5; animation: dash 1.2s linear infinite; }
+  .correction { animation: dash 0.9s linear infinite; }
+  @keyframes dash { to { stroke-dashoffset: -22; } }
+  .gate-box { animation: gpulse 2.4s ease-in-out infinite; }
+  @keyframes gpulse { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
+
+  /* PAUSE: freeze CSS animations and SMIL <animateMotion> */
+  .diagram.paused svg :is(.flow-line, .correction, .gate-box) { animation-play-state: paused; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .diagram:not(.motion-on) svg :is(.flow-line, .correction, .gate-box) { animation-play-state: paused; }
+  }
+</style>
+
+<script>
+  function initFactoryDiagrams() {
+    document.querySelectorAll<HTMLElement>('.diagram[data-testid="factory-diagram"]').forEach((fig) => {
+      if (fig.dataset.wired) return;
+      fig.dataset.wired = 'true';
+      const svg = fig.querySelector('svg')!;
+      const btn = fig.querySelector<HTMLButtonElement>('.diagram-toggle')!;
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      const setPlaying = (playing: boolean) => {
+        fig.classList.toggle('paused', !playing);
+        btn.setAttribute('aria-pressed', String(playing));
+        // pause/resume SMIL animateMotion
+        try { playing ? (svg as any).unpauseAnimations() : (svg as any).pauseAnimations(); } catch {}
+      };
+
+      // honour reduced-motion: start paused
+      setPlaying(!reduce);
+      if (reduce) fig.classList.add('motion-on'); // once user opts in, ignore the reduce guard
+
+      btn.addEventListener('click', () => setPlaying(fig.classList.contains('paused')));
+    });
+  }
+  initFactoryDiagrams();
+  document.addEventListener('DOMContentLoaded', initFactoryDiagrams);
+  document.addEventListener('astro:page-load', initFactoryDiagrams);
+</script>

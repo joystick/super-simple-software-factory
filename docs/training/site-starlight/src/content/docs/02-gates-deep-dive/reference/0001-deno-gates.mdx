@@ -1,0 +1,135 @@
+---
+title: "Deno Gates"
+description: "The commands, what each one catches, and the overlap that surprises people."
+sidebar:
+  order: 1
+---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+## The commands
+
+    <table>
+      <tr>
+        <th>Command</th>
+        <th>Answers</th>
+        <th>Speed</th>
+      </tr>
+      <tr>
+        <td>`deno test`</td>
+        <td>Does it do the right thing?</td>
+        <td>slowest</td>
+      </tr>
+      <tr>
+        <td>`deno lint`</td>
+        <td>Is there dead or suspicious code?</td>
+        <td>fast</td>
+      </tr>
+      <tr>
+        <td>`deno check <paths>`</td>
+        <td>Do the types hold?</td>
+        <td>fast</td>
+      </tr>
+      <tr>
+        <td>`deno fmt`</td>
+        <td>— <em>a fix, not a gate</em></td>
+        <td>fast</td>
+      </tr>
+    </table>
+
+## The overlap
+
+    <Callout kind="why" label="Measured, not assumed">
+<p>`deno test` <strong>type-checks before running</strong>. A type error
+  therefore fails both `test` and `check`.</p>
+      <p>`deno check` still earns its place: it is far faster, and it reaches files
+  that no test imports.</p>
+      <p>Unlike `pytest` + `mypy`, which are fully independent.</p>
+</Callout>
+
+    <table>
+      <tr>
+        <th>Defect</th>
+        <th>test</th>
+        <th>lint</th>
+        <th>check</th>
+      </tr>
+      <tr>
+        <td>Unused variable</td>
+        <td>green</td>
+        <td><strong>RED</strong></td>
+        <td>green</td>
+      </tr>
+      <tr>
+        <td>Type error</td>
+        <td><strong>RED</strong></td>
+        <td>green</td>
+        <td><strong>RED</strong></td>
+      </tr>
+      <tr>
+        <td>Wrong arithmetic</td>
+        <td><strong>RED</strong></td>
+        <td>green</td>
+        <td>green</td>
+      </tr>
+    </table>
+
+## Useful flags
+
+    
+```
+deno test --filter "sku"      # only tests whose name matches
+deno test --fail-fast         # stop at the first failure
+deno test --no-check          # skip type checking (isolates a real test failure)
+deno test --coverage=cov      # then: deno coverage cov
+deno lint --rules             # list every available rule
+deno fmt --check              # report formatting without rewriting (CI-safe)
+```
+
+
+## Tasks in `deno.json`
+
+    
+```
+"tasks": {
+  "test":  "deno test",
+  "lint":  "deno lint",
+  "check": "deno check src tests",
+  "gates": "deno test && deno lint && deno check src tests && echo 'ALL GREEN'"
+}
+```
+
+
+    <p>Run with `deno task gates`. Naming the sequence once means the gate a
+factory runs and the gate you run locally cannot drift apart.</p>
+
+## Writing a test
+
+    
+```
+import { assertEquals, assertThrows } from "@std/assert";
+
+Deno.test("a name that states the rule being protected", () => {
+  assertEquals(actual, expected);
+});
+
+Deno.test("invalid input is rejected", () => {
+  assertThrows(() => build(bad), PricingError, "substring of the message");
+});
+```
+
+
+    <p>Common assertions: `assertEquals`, `assertThrows`,
+`assertRejects` (async), `assert`, `assertStrictEquals`,
+`assertAlmostEquals`.</p>
+
+    <Callout kind="trap" label="Rule">
+<p>A gate you have not watched fail is not a gate. Break something on purpose, confirm
+  the expected gate goes red — and if it stays green, <strong>suspect the test before the
+  tool</strong>.</p>
+</Callout>
+
+    <p>Sources:
+    <a href="https://docs.deno.com/runtime/fundamentals/testing/">Deno — Testing</a> ·
+    <a href="https://jsr.io/@std/assert">@std/assert</a> ·
+    <a href="https://docs.deno.com/runtime/reference/cli/lint/">deno lint</a></p>

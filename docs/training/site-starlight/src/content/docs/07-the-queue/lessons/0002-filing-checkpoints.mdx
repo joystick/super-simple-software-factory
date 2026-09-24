@@ -1,0 +1,10 @@
+---
+title: "Filing Checkpoints"
+description: "A skill claiming to have written a ticket file is not the same as the ticket being visible to the queue — this lesson covers the mandatory checkpoints that catch a filing that silently didn't take."
+sidebar:
+  order: 2
+---
+
+<p>Filing a ticket is less manual than it looks — `/triage`'s own agent-brief-posting step is what creates `issues/NN-slug.md` on a local-markdown tracker — but every step in the chain has failed silently on a real repo: a file not where a skill's claim said, a status string that doesn't match what the frontier scan expects, an uncommitted change invisible to a fresh session. This lesson covers the mandatory checkpoints run after `/to-spec`, `/to-tickets`, or `/triage`: confirming the feature directory and expected files exist, that every `issues/` file's `Status:` line is parseable and one of the five canonical states, that nothing is left uncommitted, and that every `Blocked by:` reference actually resolves within the same feature.</p>
+
+{/* TODO: full lesson content, see plans/2026-09-24-docs-reference-and-training.md */}

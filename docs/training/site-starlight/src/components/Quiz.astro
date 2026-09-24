@@ -1,0 +1,131 @@
+---
+// Retrieval-practice quiz island. Mirrors assets/quiz.js from the old Docsify
+// site: click a choice, disable all buttons, mark correct/wrong, show feedback.
+//
+// Deliberate choices carried over unchanged:
+//   - Choices are NOT shuffled (authored equal-length on purpose; shuffling
+//     would make the authored parallelism harder to audit).
+//   - Every choice stays visible after answering, for contrast.
+interface Props {
+  question: string
+  choices: string[]
+  answerIndex: number
+  correctFeedback: string
+  wrongFeedback: string
+}
+
+const { question, choices, answerIndex, correctFeedback, wrongFeedback } = Astro.props
+const uid = `quiz-${Math.random().toString(36).slice(2, 9)}`
+---
+
+<div class="quiz" data-testid="quiz" data-answer={answerIndex} data-uid={uid}>
+  <p class="quiz-question" data-testid="quiz-question" set:html={question} />
+  <div class="quiz-choices" role="group">
+    {choices.map((choice, i) => <button type="button" data-testid="quiz-choice" data-index={i}>{choice}</button>)}
+  </div>
+  <div class="quiz-feedback" data-testid="quiz-feedback" data-correct={correctFeedback} data-wrong={wrongFeedback} hidden></div>
+</div>
+
+<style>
+  .quiz {
+    border: 2px solid var(--sl-color-gray-5);
+    border-radius: 0.5rem;
+    padding: 1.25rem;
+    margin: 1.5rem 0;
+  }
+  .quiz-question {
+    font-weight: 700;
+    margin-top: 0;
+  }
+  .quiz-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .quiz-choices button {
+    text-align: left;
+    padding: 0.6rem 0.9rem;
+    border: 2px solid var(--sl-color-gray-5);
+    border-radius: 0.35rem;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+  }
+  .quiz-choices button:hover:not(:disabled) {
+    border-color: var(--sl-color-text-accent);
+  }
+  .quiz-choices button:disabled {
+    cursor: default;
+  }
+  .quiz-choices button.correct {
+    border-color: hsl(150, 45%, 32%);
+    background: hsl(150, 45%, 94%);
+    color: hsl(150, 45%, 18%);
+  }
+  .quiz-choices button.wrong {
+    border-color: hsl(3, 70%, 45%);
+    background: hsl(3, 70%, 96%);
+    color: hsl(3, 70%, 24%);
+  }
+  /* Key dark styles off Starlight's [data-theme] (always set on <html>) so a
+     manual toggle that disagrees with the OS still gets the right colors. */
+  :global(:root[data-theme='dark']) .quiz-choices button.correct {
+    background: hsl(150, 45%, 16%);
+    color: hsl(150, 45%, 88%);
+  }
+  :global(:root[data-theme='dark']) .quiz-choices button.wrong {
+    background: hsl(3, 50%, 20%);
+    color: hsl(3, 70%, 90%);
+  }
+  .quiz-feedback {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px dashed var(--sl-color-hairline);
+  }
+</style>
+
+<script>
+  function wireQuiz(quiz: HTMLElement) {
+    const answer = Number(quiz.dataset.answer)
+    const buttons = Array.from(quiz.querySelectorAll('button')) as HTMLButtonElement[]
+    const feedback = quiz.querySelector('.quiz-feedback') as HTMLElement | null
+
+    buttons.forEach((button, index) => {
+      button.addEventListener('click', () => {
+        if (quiz.dataset.done === 'true') return
+        quiz.dataset.done = 'true'
+
+        buttons.forEach((b) => {
+          b.disabled = true
+        })
+        buttons[answer].classList.add('correct')
+        if (index !== answer) button.classList.add('wrong')
+
+        if (feedback) {
+          const right = index === answer
+          feedback.hidden = false
+          feedback.textContent =
+            (right ? 'Correct. ' : 'Not quite. ') +
+            (right ? feedback.dataset.correct || '' : feedback.dataset.wrong || '')
+        }
+      })
+    })
+  }
+
+  function wireAll() {
+    document.querySelectorAll<HTMLElement>('.quiz').forEach((q) => {
+      if (!q.dataset.wired) {
+        q.dataset.wired = 'true'
+        wireQuiz(q)
+      }
+    })
+  }
+
+  // This module script runs after the DOM is parsed, so wire immediately.
+  // Also re-wire after Starlight view-transition navigations (if enabled),
+  // and as a belt-and-suspenders guard on DOMContentLoaded.
+  wireAll()
+  document.addEventListener('DOMContentLoaded', wireAll)
+  document.addEventListener('astro:page-load', wireAll)
+</script>

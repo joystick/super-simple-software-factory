@@ -1,0 +1,10 @@
+---
+title: "Recon Before Spending"
+description: "Before wiring a single gate, spend a short recon pass finding out what a codebase already has — its test runner, its lint config, its build command — so the factory is wired to real tools, not guesses."
+sidebar:
+  order: 0
+---
+
+<p>Adopting SSSF into an existing codebase starts with recon, not installation: before <code>/sssf install</code> touches anything, spend a short pass reading the repo's actual test runner, linter, typechecker, and build command, because <code>quality.py</code> can only be wired to commands that genuinely exist and genuinely fail on a real defect. Skipping recon is how a gate ends up pointed at a placeholder — the exact failure mode Chapter 1 spent a whole lesson teaching you to distrust. This lesson walks the recon checklist: what to look for, where the answers usually live (<code>package.json</code> scripts, a <code>Makefile</code>, CI config), and why this is cheap insurance against the single most common way a new install goes wrong on day one.</p>
+
+{/* TODO: full lesson content, see plans/2026-09-24-docs-reference-and-training.md */}

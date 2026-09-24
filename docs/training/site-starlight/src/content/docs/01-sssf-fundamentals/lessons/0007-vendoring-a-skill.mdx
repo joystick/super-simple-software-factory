@@ -1,0 +1,192 @@
+---
+title: "Vendoring a Skill"
+description: "skill_engineering lets you carry a workflow protocol — tdd, codebase-design — into a headless run. It changes how an agent works, never what a gate checks."
+sidebar:
+  order: 7
+---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>You can explain why an SSSF agent cannot see the skills installed on your machine, carry
+  one in on purpose with `skill_engineering`, and say — precisely — what that does and does not
+  change about the run. You will know why it is a list of paths, not a single named skill, why
+  composition order is not alphabetical, and why the gates still do all the checking.</p>
+</Callout>
+
+## The gap this closes
+
+<p>Every lesson so far has been about a run's own machinery: phases, gates, the fix loop,
+`writes`. None of it touches a different fact — the interactive skills you use every day
+(`/tdd`, `/codebase-design`, whatever is installed on your machine) are invisible to a headless
+SSSF agent. It runs with `--setting-sources ''`, so it starts with none of your skill
+directory. Grep the agent launch args in `adws/adw_modules/` to confirm on your version. That
+gap does not close by installing more skills locally — it closes only for a skill you name,
+on purpose, per agent.</p>
+
+## A list of paths, not a switch
+
+<p>`skill_engineering` is a roster field, set per agent (or in `defaults`, inherited by every
+agent that does not override it):</p>
+
+```yaml
+agents:
+  builder:
+    coding_agent: claude_code
+    skill_engineering:
+      - adws/adw_data/skill_engineering/tdd/SKILL.md
+      - adws/adw_data/skill_engineering/codebase-design/SKILL.md
+```
+
+<p>It is a **list**, because an agent's protocol needs are not one-size. A builder might carry
+`tdd`; a refactor-only agent might carry `codebase-design` alone, or both. Each entry is a file
+path — there is no registry lookup, no name resolution. If the path is wrong, `agents.validate()`
+raises before any agent spawns; a typo in the roster is a config error, not a wasted turn.</p>
+
+<Callout kind="trap" label="claude_code only">
+<p>`skill_engineering_applies(agent)` is `agent.coding_agent == "claude_code"` — nothing else.
+Set the field on a `pi` or `agy` agent and it is silently ignored at compose time, though
+`agents.validate()` does warn: "skill_engineering is set but coding_agent is ... and will be
+ignored." Read that warning; it is the whole difference between a config that does something
+and one that only looks like it does.</p>
+</Callout>
+
+## Vendor, then attach
+
+<p>Two separate, deliberate acts — never one auto-updating link:</p>
+
+```bash
+uv run <sssf>/scripts/vendor_skill.py ~/.claude/skills/tdd/SKILL.md
+# writes adws/adw_data/skill_engineering/tdd/SKILL.md, stamped with provenance
+```
+
+<p>The vendored copy opens with an HTML-comment header — `source`, `date`, a `sha256` of the
+original — invisible in a rendered Markdown viewer and stripped before the text ever reaches a
+model. It exists so drift from the source skill is detectable later: `vendor_skill.py --check`
+re-hashes and tells you if your copy has fallen behind. Vendoring produces a diff you commit,
+not a symlink that changes under you.</p>
+
+<p>Attach it by adding the path to an agent's `skill_engineering` list, as above. Nothing else
+is required — no separate "enable" flag.</p>
+
+## What actually happens to the prompt
+
+<p>At call time, `skill_engineering.compose()` builds the final system prompt:</p>
+
+```python
+def compose(system_text: str, skill_paths: list[str]) -> str:
+    parts = [system_text]
+    for raw_path in skill_paths:
+        name, body = _read(raw_path)          # provenance header stripped here
+        parts.append(DELIMITER.format(name=name) + body)
+    return "".join(parts)
+```
+
+<p>The agent's own system prompt always comes first — its identity and output contract outrank
+any borrowed protocol — then each skill's text, **in the order you listed them**, never sorted.
+Composition order is the engineer's, not alphabetical: a stable order matters for prompt
+caching, and sorting would silently change which instruction a model reads first.</p>
+
+## Cost is visible, and it is only a warning
+
+<p>Vendored text is real tokens on every call that agent makes. `estimate_tokens()` gives a
+rough, model-agnostic count — never presented as a billed figure — and `just sessions` reports
+it per run. An agent can carry a soft `skill_token_budget`; going over it produces a console
+warning, not a blocked run. This is a **soft ceiling you watch**, the same posture as
+everything else in this course: nothing stops the agent from running over-budget, the same way
+nothing stops a placeholder gate from reporting green. You are the one who reads the number.</p>
+
+## The gates still decide, not the skill
+
+<Callout kind="why" label="Why this doesn't need a new kind of gate">
+<p>`skill_engineering.py`'s own module docstring says it plainly: this changes how the agent
+works, never what is checked afterward. Attaching `tdd` puts red-green-refactor language in the
+builder's prompt. Nothing verifies the agent actually wrote a failing test first — the outcome
+gates (Lesson 1) still judge the diff and the test run, exactly as before. A skill is an
+instruction you handed the agent, not a promise it kept. If you want evidence it worked
+test-first, that evidence has to come from the same place all your other evidence comes from: a
+gate that watched something fail, then pass.</p>
+</Callout>
+
+## Your turn
+
+<p><em>Reps are tagged <strong>[read]</strong> (inspect a real file, no setup) or <strong>[run]</strong> (drive the <a href="/01-sssf-fundamentals/reference/0004-wiring-your-factory/">wired factory</a>).</em></p>
+
+<ol class="steps">
+  <li>
+    <p><strong>[read]</strong> <strong>Find the gap.</strong> In `~/Projects/training/sssf-play`,
+    grep `adw_modules/` for `setting-sources`. Confirm for yourself that a headless agent starts
+    with no view of your installed skills — this is the fact `skill_engineering` exists to work
+    around, on purpose, one skill at a time.</p>
+  </li>
+  <li>
+    <p><strong>[run]</strong> <strong>Vendor one skill.</strong> Pick a short skill file you have
+    locally (or write a five-line stand-in), vendor it, and read the provenance header that
+    lands in `adws/adw_data/skill_engineering/`. Run `vendor_skill.py --check` against it and
+    confirm it reports clean.</p>
+  </li>
+  <li>
+    <p><strong>[run]</strong> <strong>Watch composition order.</strong> Attach two skills to one
+    agent in a deliberate order, then in the reverse order. Diff the composed prompt (or the
+    envelope that records it) and confirm the order in the file is the order in the prompt —
+    not alphabetical.</p>
+  </li>
+  <li>
+    <p><strong>[run]</strong> <strong>Watch the mismatch warning fire.</strong> Set
+    `skill_engineering` on an agent whose `coding_agent` is `pi` or `agy`, and run
+    `agents.validate()` (or just start a run). Read the exact warning text yourself instead of
+    trusting the quote above, then confirm the skill did not compose onto that agent's prompt.</p>
+  </li>
+</ol>
+
+## Check yourself
+
+<Quiz
+  question="An agent has `skill_engineering: [tdd/SKILL.md]` but `coding_agent: pi`. What happens?"
+  choices={["The skill composes onto the prompt as usual", "agents.validate() blocks the run entirely", "It is ignored at compose time; validate() only warns", "pi translates it into its own skill format"]}
+  answerIndex={2}
+  correctFeedback="skill_engineering_applies() checks coding_agent == 'claude_code' only. Under pi it's silently ignored at compose time — validate() warns, but does not block the run."
+  wrongFeedback="Check skill_engineering_applies(): it is exactly coding_agent == 'claude_code'. Under any other coding_agent the field is set but has no effect — validate() only warns about it."
+/>
+
+<Quiz
+  question="Why does compose() preserve list order instead of sorting skill names?"
+  choices={["Alphabetical order is reserved for tools, not skills", "A stable order keeps caching and precedence intact", "YAML lists cannot be sorted at load time", "Sorting would break the provenance header check"]}
+  answerIndex={1}
+  correctFeedback="Composition order is the engineer's, not alphabetical — an unstable order would break prompt caching, and sorting could silently reorder which protocol dominates."
+  wrongFeedback="It's about caching stability and deliberate precedence — the engineer's listed order, never re-sorted, so it can't silently change which instruction the model reads first."
+/>
+
+<Quiz
+  question="A builder carrying the tdd skill produces code without an initial failing test. What does the run report?"
+  choices={["A skill_engineering breach, same class as a permissions breach", "Nothing special — the outcome gates judge the diff and test run exactly as always", "The run refuses to start until a failing test exists", "skill_token_budget blocks the commit"]}
+  answerIndex={1}
+  correctFeedback="skill_engineering changes the prompt, never the checking. Vendoring tdd is an instruction, not a verified promise — the same outcome gates from Lesson 1 are still the only judge."
+  wrongFeedback="No new gate exists for this. Skill text only shapes how the agent is asked to work; whether it actually did is exactly what the ordinary outcome gates were already checking."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> `adw_modules/skill_engineering.py` — the whole mechanism is
+under 150 lines, and its module docstring states the composition-order rule directly. Then
+`scripts/vendor_skill.py` for the provenance header, and `skill_engineering_applies()` in
+`adw_modules/agents.py` for the `claude_code`-only rule.</p>
+
+<Callout kind="trap" label="Check which repo you're standing in">
+<p>Every other lesson's primary source lives in `~/Projects/training/sssf-play`. This one does
+not — `skill_engineering` shipped in `joystick/super-simple-software-factory` (the skill
+source fork), and had not yet been ported into `sssf-play`'s stamped copy as of this writing.
+If `adw_modules/skill_engineering.py` is missing from your `sssf-play`, that is why: read the
+source in the fork, at `.claude/skills/sssf/templates/adws/adw_modules/`, and check whether it
+has landed in your stamped repo before running any `[run]` rep above against it.</p>
+</Callout>
+
+## Where this goes next
+
+<p>You now have every control over what an agent may do and how it is asked to work: bounded
+by `writes`, and — where you choose — carrying a named protocol on top. All of it still streams
+into one place while it happens. Next: learning to read that record — `sssf.db` — for the
+questions it can answer, and to notice the ones it cannot.</p>
+
+<p><strong>Ask me things.</strong> Bring me a roster with a `skill_engineering` list and I will
+tell you which agents it actually affects, and what order their prompt assembles in.</p>

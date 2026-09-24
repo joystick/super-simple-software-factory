@@ -1,0 +1,10 @@
+---
+title: "Tuning the Roster"
+description: "The default roster a fresh install ships with is a starting point, not a fit — this lesson covers reading its defaults, overriding per-agent fields, and validating the result before it runs unattended."
+sidebar:
+  order: 4
+---
+
+<p>A freshly stamped roster's defaults are a reasonable starting point, not a fit for your project — some agents need a different `model`, a tighter `writes` boundary, or a `coding_agent` swap, and getting this wrong shows up as either an agent that can't do its job or one that can do far more than it should. This lesson covers tuning the roster deliberately: reading what `defaults` merging actually does, which fields are worth overriding per-agent early, and running `agents.validate()` after every change so a typo in the roster is caught as a config error before it becomes a wasted, or worse an unbounded, run.</p>
+
+{/* TODO: full lesson content, see plans/2026-09-24-docs-reference-and-training.md */}

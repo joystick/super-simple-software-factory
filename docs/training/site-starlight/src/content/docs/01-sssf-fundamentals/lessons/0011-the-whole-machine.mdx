@@ -1,0 +1,95 @@
+---
+title: "The Whole Machine"
+description: "One diagram for everything you have learned, and one real run traced through all of it — the moment the parts become a machine you can see."
+sidebar:
+  order: 11
+---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+import FactoryDiagram from '@components/FactoryDiagram.astro'
+
+<Callout kind="win" label="The win">
+<p>You have met every part separately. This page puts them on one picture and walks a single
+  real run through it, so the twelve lessons stop being a list and become a machine you can see at
+  a glance. No new mechanism — just the whole, assembled.</p>
+</Callout>
+
+## The machine, on one diagram
+
+<p>A run flows left to right through phases. Agents propose inside <code>agent</code> phases;
+deterministic code disposes at every seam and in every <code>code</code> phase. Everything
+streams downward into the trace as it happens.</p>
+
+<FactoryDiagram />
+
+## Each part, and the lesson it came from
+
+<table>
+  <tr><th>Part</th><th>In one line</th><th>Lesson</th></tr>
+  <tr><td><strong>Agent proposes, code disposes</strong></td><td>code owns the loop; the agent owns one phase</td><td>L0</td></tr>
+  <tr><td><strong>Gate</strong></td><td>the definition of done — and green means nothing until watched failing</td><td>L1–L2</td></tr>
+  <tr><td><strong>Envelope</strong></td><td>the one typed object that crosses a seam</td><td>L3</td></tr>
+  <tr><td><strong>Phase / run</strong></td><td>three lanes; the spine the rest hangs on</td><td>L4</td></tr>
+  <tr><td><strong>Fix loop</strong></td><td>a red gate is a correction into the same session, not a restart</td><td>L5</td></tr>
+  <tr><td><strong>Bounding</strong></td><td>what an agent may write; the builder can't edit its grader</td><td>L6</td></tr>
+  <tr><td><strong>Vendoring a skill</strong></td><td>carrying a workflow protocol into a run that otherwise can't see it</td><td>L7</td></tr>
+  <tr><td><strong>Trace</strong></td><td>what ran and what it cost — never whether it meant anything</td><td>L8</td></tr>
+  <tr><td><strong>Chain</strong></td><td>a thin script that names the phases and their gates</td><td>L9</td></tr>
+  <tr><td><strong>Stamp &amp; run</strong></td><td>put it on a real repo and trust it only because you verified it</td><td>L10</td></tr>
+</table>
+
+## One run, traced through all of it
+
+<p>Walk the real `b16c5c29` run (the CouponDiscount feature from L3) through the whole picture:</p>
+
+<ol class="steps">
+  <li><p><strong>engineer</strong> logs the request — "add a coupon discount." One row in
+  `sessions`, one `engineer` phase.</p></li>
+  <li><p><strong>planner</strong> (agent phase) proposes a spec. Its <em>envelope</em> declares
+  `artifacts: [specs/…coupon-discount.md]`. Gates <code>artifacts_exist</code> and
+  <code>files_non_empty</code> read those claims and pass — the seam is verified, not trusted.</p></li>
+  <li><p><strong>builder</strong> (agent phase) gets `previous=plan` — the planner's envelope,
+  not its chat. It reports `changed_files: [app/pricing.py, tests/test_pricing.py]`.
+  <code>diff_matches_claims</code> checks each against the diff.</p></li>
+  <li><p><strong>test</strong> (code phase) runs the suite. Had it failed, its result would come
+  back to the builder <em>as an envelope</em> and the fix loop would correct the same session,
+  up to <code>MAX_FIX_LOOPS</code> times.</p></li>
+  <li><p><strong>commit</strong> (code phase) lands the work. Throughout, <em>permissions</em>
+  ensured the builder touched only the repo — never <code>adws/adw_modules/</code>, its own
+  grader. And every step above wrote a row into <em>sssf.db</em> while it happened.</p></li>
+</ol>
+
+<Callout kind="why" label="What you can now do that you could not at L0">
+<p>Point at any factory — yours or a colleague's — open one run's trace, and narrate it seam by
+  seam: which phase proposed, which gate disposed, where a correction fired, what the run was
+  allowed to touch, and the one question the whole green banner still cannot answer. That
+  narration <em>is</em> operating the factory.</p>
+</Callout>
+
+## Check yourself
+
+<Quiz
+  question="A colleague shows you a green 5/5 run. Using the whole machine, what do you check first?"
+  choices={["The total token cost of the run in sessions", "That every phase reached success status", "Whether each gate was ever watched failing", "How many fix-loop corrections were needed"]}
+  answerIndex={2}
+  correctFeedback="The trace proves what ran, never whether a gate could fail. The green is only worth something if the gates were verified — everything else is secondary to that."
+  wrongFeedback="Cost, phase status, and attempts are all readable in the trace — and all beside the point. The one thing it cannot show is whether a gate could fail."
+/>
+
+<Quiz
+  question="Where in the machine does a planner's decision reach the builder?"
+  choices={["Through a shared conversation both agents see", "As the planner's envelope, passed in as previous", "The trace database, which the builder queries", "It does not — the builder re-plans from the request"]}
+  answerIndex={1}
+  correctFeedback="Context crosses as a typed envelope handed in as `previous=plan`. The chat never travels; the seam is owned by code."
+  wrongFeedback="No shared chat and no DB read — the planner's envelope is passed to the builder as `previous`. That is the only thing that crosses the seam."
+/>
+
+## Where this goes next
+
+<p>That is the fundamentals, whole. <strong>Chapter 2</strong> takes the cornerstone — gates —
+deep, rebuilding the pricing engine in TypeScript to prove the discipline survives a change of
+language and toolchain. You are no longer learning the parts; you are hardening the one that
+matters most.</p>
+
+<p><strong>Ask me things.</strong> Bring me any run's trace and we will narrate the whole
+machine over it — and find the question its green banner cannot answer.</p>

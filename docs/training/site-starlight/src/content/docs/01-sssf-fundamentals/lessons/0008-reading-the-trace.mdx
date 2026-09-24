@@ -1,0 +1,168 @@
+---
+title: "Reading the Trace"
+description: "sssf.db records what ran, what it cost, and what each gate examined — faithfully. And it cannot record whether any of it meant anything."
+sidebar:
+  order: 8
+---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>You can open `sssf.db` after any run and answer, precisely: which phases ran, in which
+  lanes, at what cost, with how many correction attempts, and what each gate actually checked.
+  And you can name — out loud — the one question the trace is structurally unable to answer.</p>
+</Callout>
+
+## One data path
+
+<p>Everything a run does streams into a single SQLite database as it happens. There is no
+second channel and no end-of-run batch:</p>
+
+<Callout kind="why" label="Agents write to SQLite; readers poll SQLite">
+<p>The tracer tails the coding agent's JSONL output line by line and inserts each event
+  <em>while the agent is still working</em>, so a tool call is visible mid-run, not after.
+  The database is WAL, so a reader never blocks a running workflow. "What is happening right
+  now" and "what happened last week" are the same query against the same tables.</p>
+</Callout>
+
+## Seven tables
+
+<table>
+  <tr><th>Table</th><th>One row per…</th></tr>
+  <tr><td>`sessions`</td><td>a run — its request, status, total tokens and cost</td></tr>
+  <tr><td>`phases`</td><td>a phase — name, kind, owner, status, attempt</td></tr>
+  <tr><td>`events`</td><td>anything that happened — phase_start, tool_call, gate_pass/fail, error</td></tr>
+  <tr><td>`envelopes`</td><td>a hand-off — the typed payload, whether it was valid, which attempt</td></tr>
+  <tr><td>`gate_results`</td><td>a gate run — passed, violations, and the checks behind them</td></tr>
+  <tr><td>`agent_sessions`</td><td>an agent in a run — its session id and context-window occupancy</td></tr>
+  <tr><td>`processes`</td><td>a live pid — so a stuck run can be found and stopped</td></tr>
+</table>
+
+## The four recipes you will actually use
+
+<p>A stamped repo ships these `just` recipes; each is one line of SQL:</p>
+
+```sql
+-- just sessions        the last runs, newest first
+select adw_id, status, substr(request,1,50), total_tokens, round(total_cost,4)
+  from sessions order by started_at desc limit 10;
+
+-- just phases <adw_id>   the spine of one run
+select seq, name, kind, owner, status, attempt
+  from phases where adw_id = ? order by seq;
+
+-- just tail <adw_id>     the most recent events (live during a run)
+select rowid, type, name, started_at
+  from events where adw_id = ? order by rowid desc limit 25;
+
+-- just procs <adw_id>    what is still alive
+select kind, name, pid, command from processes
+  where adw_id = ? and ended_at is null;
+```
+
+<p>`phases` is the one you will read most: it is Lesson 4's spine, made queryable. The
+`attempt` column is Lesson 5's fix loop, counted.</p>
+
+## A green gate says what it checked
+
+<p>The `gate_results` table has a `checks_json` column — `[{item, ok, note}]`, the
+individual checks behind the verdict, not just pass/fail. This is Lesson 1 and 2 written into
+the schema. A gate that passed tells you <em>what</em> it verified:</p>
+
+```
+gate: artifacts_exist   passed: 1
+checks: [
+  {item: "specs/b16c5c29_coupon-discount.md", ok: true, note: "exists, 2.1KB"},
+  {item: ".../context_handoff/plan.md",        ok: true, note: "exists, 4.4KB"}
+]
+```
+
+## What the trace cannot tell you
+
+<Callout kind="trap" label="A faithful trace of a dead gate is indistinguishable from a faithful trace of a live one">
+<p>The database records, perfectly, that a gate ran, that it passed, and which items it
+  examined. It cannot record whether that gate was <em>able to fail</em>. Run the factory with
+  a real, verified test gate and it writes `status: success, 5/5`. Run it with an `echo` gate
+  on broken code and it writes the <em>same</em> `status: success, 5/5` — both entries true,
+  both faithful, one meaningless.</p>
+<p>The trace answers "what ran and what did it cost." It cannot answer "did any of it mean
+  anything." That question was settled earlier or not at all — by watching the gate fail
+  (Lesson 1). Coverage of the record is not coverage of reality.</p>
+</Callout>
+
+## Your turn
+
+<p><em>Reps are tagged <strong>[read]</strong> (inspect a real file, no setup) or <strong>[run]</strong> (drive the <a href="/01-sssf-fundamentals/reference/0004-wiring-your-factory/">wired factory</a>).</em></p>
+
+
+<ol class="steps">
+  <li>
+    <p><strong>[run]</strong> <strong>Run the smallest thing and read it.</strong> In `sssf-play`, run `just scout`
+    (or `just demo`), then `just phases &lt;adw_id&gt;`. Name every phase's lane. Where is the
+    single `engineer` phase, and what does the `attempt` column say?</p>
+  </li>
+  <li>
+    <p><strong>[read]</strong> <strong>Read a gate.</strong> Pull one `gate_results` row and its `checks_json`. State
+    what the gate verified — not that it passed, but what it looked at.</p>
+  </li>
+  <li>
+    <p><strong>[read]</strong> <strong>Find the blind spot.</strong> Write down one question the trace answers exactly
+    (e.g. "what did this run cost?") and one it cannot answer at all ("was the test gate
+    capable of catching a bug?"). The second is the whole point of the lesson.</p>
+  </li>
+</ol>
+
+## Check yourself
+
+<Quiz
+  question="The trace schema has an <code>attempt</code> column on a phase. Given Lesson 5's fix loop, what does it count?"
+  choices={["The tokens the phase consumed", "How many fix-loop corrections it took", "The number of tools the agent called", "How many phases ran before it"]}
+  answerIndex={1}
+  correctFeedback="Each correction bumps the attempt. So a phase with attempt=2 was corrected once — the fix loop, made countable in the trace."
+  wrongFeedback="attempt counts corrections, not tokens or tools. It is Lesson 5's fix loop, recorded as a number you can read."
+/>
+
+<Quiz
+  question="When are a run's tool calls written to the database?"
+  choices={["Batched and flushed once the run completes", "Mid-run, as the agent's output streams", "Only if the run fails and needs debugging", "When a reader first queries the events table"]}
+  answerIndex={1}
+  correctFeedback="The tracer tails the agent's JSONL and inserts each event as it happens. WAL means readers never block the running workflow."
+  wrongFeedback="Nothing is batched to the end. Events are inserted mid-run, so the trace shows work while it is still happening."
+/>
+
+<Quiz
+  question="What does the <code>checks_json</code> column on a gate result hold?"
+  choices={["The raw stdout of the command that ran", "A copy of the agent's full envelope", "Each item the gate examined and its note", "The next phase's prompt after correction"]}
+  answerIndex={2}
+  correctFeedback="It is [{item, ok, note}] — the checks behind the verdict. A green gate can therefore say what it verified, not merely that it passed."
+  wrongFeedback="It is the per-item checks, not stdout or the envelope. That is how a passing gate records what it actually looked at."
+/>
+
+<Quiz
+  question="Which question can <code>sssf.db</code> NOT answer?"
+  choices={["How many tokens did this run consume", "Which phase failed and on what attempt", "Whether a passing gate could have failed", "What each gate examined and reported"]}
+  answerIndex={2}
+  correctFeedback="The trace records that a gate passed and what it examined — never whether it was capable of failing. That is settled by watching it fail, not by the database."
+  wrongFeedback="Cost, failed phases, and per-gate checks are all in the trace. What it cannot record is whether a passing gate was ever able to fail."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> the `CREATE TABLE` block at the top of
+`adws/adw_modules/tracer.py` in `sssf-play` — the whole schema in one screen. Then the
+`sessions`, `phases`, `tail`, and `procs` recipes in the `justfile`, which are just SQL you
+can read and edit.</p>
+
+<p>For the wider idea, revisit <a href="https://martinfowler.com/bliki/TestCoverage.html">Fowler
+on test coverage</a>: a coverage report says which lines ran, never whether the assertions
+around them meant anything. The trace has exactly that shape, one level up.</p>
+
+## Where this goes next
+
+<p>You can now read what a run did. Next: <strong>composing</strong> a run. The chains you have
+been reading — `adw_plan_build_test`, `adw_simple_sdlc` — are short Python scripts you can copy
+and edit. Building your own is the difference between operating the factory and being operated
+by it.</p>
+
+<p><strong>Ask me things.</strong> Bring me an `adw_id` and we will read its trace together —
+the phases, the attempts, and the one thing the numbers cannot tell us.</p>

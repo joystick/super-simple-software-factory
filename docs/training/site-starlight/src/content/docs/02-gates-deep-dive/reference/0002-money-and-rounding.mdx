@@ -1,0 +1,142 @@
+---
+title: "Money and Rounding"
+description: "The rules, the units, and the numbers that prove them."
+sidebar:
+  order: 2
+---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+## The rules
+
+    <ol>
+      <li><strong>Store money as integer cents.</strong> £10.00 is `1_000`.</li>
+      <li><strong>Store percentages as integer basis points.</strong> 8.7&nbsp;% is `870`; 1&nbsp;bp = 0.01&nbsp;%.</li>
+      <li><strong>Multiply first, divide once, round last.</strong></li>
+      <li><strong>Round half-up</strong> — the customer gets the half cent.</li>
+      <li><strong>Guard your inputs</strong> with `Number.isInteger`.</li>
+    </ol>
+
+## Units
+
+    <table>
+      <tr>
+        <th>Human</th>
+        <th>Stored</th>
+        <th>Note</th>
+      </tr>
+      <tr>
+        <td>£10.00</td>
+        <td>`1_000`</td>
+        <td>cents</td>
+      </tr>
+      <tr>
+        <td>8.7&nbsp;%</td>
+        <td>`870`</td>
+        <td>basis points</td>
+      </tr>
+      <tr>
+        <td>100&nbsp;%</td>
+        <td>`10_000`</td>
+        <td>bp</td>
+      </tr>
+      <tr>
+        <td>0.01&nbsp;%</td>
+        <td>`1`</td>
+        <td>the precision floor</td>
+      </tr>
+    </table>
+
+## The shape
+
+    
+```
+Math.round((amountCents * points) / 10_000)
+//          └── integer ─────────┘
+//                                └── one division, at the end
+//         └── half-up, applied once ──────────────────────┘
+```
+
+
+## Numbers that justify the rules
+
+    <table>
+      <tr>
+        <th>Expression</th>
+        <th>Result</th>
+      </tr>
+      <tr>
+        <td>`0.1 + 0.2`</td>
+        <td>`0.30000000000000004`</td>
+      </tr>
+      <tr>
+        <td>`1500 * 8.7`</td>
+        <td>`13049.999999999998`</td>
+      </tr>
+      <tr>
+        <td>`Math.round(1500 * 8.7 / 100)`</td>
+        <td>`130` — wrong</td>
+      </tr>
+      <tr>
+        <td>`Math.round(1500 * 870 / 10000)`</td>
+        <td>`131` — right</td>
+      </tr>
+      <tr>
+        <td>`500 * 8.7 / 100`</td>
+        <td>`43.5` — the error cancels here, which is why this bug hides</td>
+      </tr>
+      <tr>
+        <td>`8.7 * 100`</td>
+        <td>`869.9999999999999`</td>
+      </tr>
+      <tr>
+        <td>`Math.round(2.5)` / `Math.round(-2.5)`</td>
+        <td>`3` / `-2`</td>
+      </tr>
+    </table>
+
+    <p>Across 8 fractional percentages × 2,000 amounts (16,000 combinations), the float route
+and the basis-point route disagreed <strong>105 times</strong>, always by one cent, always
+against the customer.</p>
+
+## Converting a percentage safely
+
+    
+```
+// works for every value from 0.00 to 100.00 — checked against
+// exact decimal shifting across all 10,001, zero mismatches
+Math.round(Number((percent * 100).toPrecision(15)))
+```
+
+
+## Limits
+
+    <table>
+      <tr>
+        <th>Bound</th>
+        <th>Value</th>
+      </tr>
+      <tr>
+        <td>`Number.MAX_SAFE_INTEGER`</td>
+        <td>9,007,199,254,740,991</td>
+      </tr>
+      <tr>
+        <td>Safe single line item</td>
+        <td>≈ £9 billion (the ×10,000 intermediate is the ceiling)</td>
+      </tr>
+      <tr>
+        <td>Beyond that</td>
+        <td>`BigInt`</td>
+      </tr>
+    </table>
+
+    <Callout kind="trap" label="The meta-rule">
+<p>When testing numeric code, deliberately choose values that are <em>not</em> exactly
+  representable in binary — 8.7, 2.675, 0.7, 3.3. Round numbers and halves like 12.5 or
+  7.25 are representable, agree under both routes, and will pass a suite that is blind
+  to the bug.</p>
+</Callout>
+
+    <p>Sources: <a href="https://floating-point-gui.de/">The Floating-Point Guide</a> ·
+     <a href="https://github.com/tc39/proposal-decimal">TC39 decimal proposal</a> ·
+     <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/round">MDN — Math.round</a></p>

@@ -1,0 +1,175 @@
+---
+title: "Bootstrap Vocabulary"
+description: "wayfinder's headless interview has no one to answer it. Relocate the interview instead of deleting it — bootstrap it once, interactively, before the dark loop starts."
+sidebar:
+  order: 1
+---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>You can name exactly why a vendored planning skill's "ask the user how to proceed" fallback
+  breaks headless, explain the bootstrap/AFK split that fixes it without deleting the interview,
+  and say precisely what has to be committed — and why — before a dark-factory loop is allowed to
+  start.</p>
+</Callout>
+
+## The interview that has no one on the other end
+
+<p>`wayfinder` — the planning skill that decides whether a request lands in familiar territory
+("no fog") or somewhere your project hasn't named terms for yet ("fog") — has a fallback for the
+fog case: ask the user how to proceed. That fallback is written for an interactive session, a
+human who answers back. Vendor it under `skill_engineering:` on a headless `claude_code` agent
+and there is no one there. Best case, the model role-plays both sides of a conversation and you
+get a low-fidelity spec with none of the interview's real value. Worst case, it actually tries to
+prompt, and the run hangs waiting on input that will never come.</p>
+
+<Callout kind="why" label="Why not just delete the interview">
+<p>The interview is not overhead — it is genuinely how a project converges on shared vocabulary:
+  does "cancellation" mean the subscription ends now or at period-end, is "account" the Customer
+  record or the User record. Skipping it does not make that ambiguity go away; it just means the
+  ambiguity gets guessed at, silently, inside a run nobody is watching. The fix is not to remove
+  the interview. It is to move <em>when</em> it happens.</p>
+</Callout>
+
+## The bootstrap / AFK split
+
+<p>The adoption playbook splits the interview into two phases that run in two different modes,
+never blended:</p>
+
+<table>
+  <tr><th>Phase</th><th>Mode</th><th>Runs when</th></tr>
+  <tr><td><strong>Bootstrap</strong></td><td>human-supervised, outside the headless loop</td>
+      <td>a feature introduces domain concepts your project hasn't named yet</td></tr>
+  <tr><td><strong>AFK</strong></td><td>headless, the common case</td>
+      <td>the request only composes concepts already named</td></tr>
+</table>
+
+<p>The decision, as a chain rather than a diagram (this site has no mermaid renderer wired in —
+see the reference glossary's Dark-factory entry for the fuller picture):</p>
+
+<ol class="steps">
+  <li>New feature request lands. <strong>Does `CONTEXT.md` already name these terms?</strong></li>
+  <li>If yes: skip straight to scout — no human step at all.</li>
+  <li>If no, or unsure: run `/grill-with-docs` yourself, interactively, in your own harness. It
+  writes `CONTEXT.md`/`docs/adr/`.</li>
+  <li>Commit `CONTEXT.md`/`docs/adr/` before starting the headless loop.</li>
+  <li>Scout: glossary → OKF → ast-grep, in that order. Planner: scope to the delta only.</li>
+  <li>Build → gates → review → document, same as every other run.</li>
+</ol>
+
+## Bootstrap: run it yourself, then commit before the loop starts
+
+<p>When a request introduces vocabulary your project has not settled yet, run `/grill-with-docs`
+yourself, interactively, in whichever harness you're in. It composes two skills into one: `grilling`
+(the relentless interview) with `domain-modeling` (which writes the resolved vocabulary into
+`CONTEXT.md`/`docs/adr/` — durable and citable, not prose trapped inside one spec file that no
+later run will ever read). Approve what it produces, then:</p>
+
+<Callout kind="trap" label="Commit before just sdlc, not after">
+<p>`CONTEXT.md`/`docs/adr/` must be committed <strong>before</strong> starting `just sdlc`. Scout
+  and the planner read them from the working tree — not from any live session, not from your
+  conversation history. Skipping the commit makes the entire bootstrap step invisible to the
+  pipeline: the interview happened, the vocabulary was settled, and the headless run proceeds as
+  if none of it existed.</p>
+</Callout>
+
+## AFK: what runs unmodified, and what gets overridden
+
+<p>If the request only composes concepts `CONTEXT.md` already names, skip bootstrap entirely —
+there is nothing left to interview about. `to-spec` already does not interview by design: "no
+interview, just synthesis," per its own frontmatter. It runs **unmodified** — you do not edit the
+vendored copy of `to-spec` itself. What changes is the agent's own `system.md` (the layer this
+belongs to — see this chapter's "Two Layers" lesson), which needs to tell the agent what to do
+when the skill text underneath it says "ask the user":</p>
+
+<ul>
+  <li>`wayfinder` finds no fog → continue directly into `to-spec`. Do not stop and ask how to
+  proceed.</li>
+  <li>`to-spec` never prompts. If it hits a genuine ambiguity `CONTEXT.md` cannot resolve, it says
+  so in the plan and in `notes_for_next_agent`, proposes a best-guess term explicitly labeled
+  provisional, and flags that a human should run the bootstrap interview before the plan is final.
+  It does not guess silently, and it does not attempt to prompt.</li>
+  <li>`to-tickets`'s "quiz the user" step never applies in-loop — the spec is always already in
+  context from the prior step in the same composed prompt.</li>
+</ul>
+
+<p>Two more overrides belong in that same `system.md`, on top of the interview question. Both
+`to-spec` and `to-tickets` self-apply the `ready-for-agent` triage label by default — which
+bypasses this pipeline's own `/triage` gate entirely (Chapter 7 covers why `/triage` must stay the
+sole promoter):</p>
+
+<ul>
+  <li>`to-spec` files at `Status: needs-triage`, not the `ready-for-agent` its own instructions
+  say to apply. Skipping triage here would let a spec bypass feasibility, compliance, and
+  redundancy judgment altogether.</li>
+  <li>`to-tickets` files every ticket at `Status: needs-triage` too. Its own local-ticket-template
+  uses bold `**Status:**`/`**Blocked by:**` — either form is fine, `adw_watch.py`'s frontier scan
+  tolerates both (Chapter 7 covers the regex). `Blocked by:` values still must be bare, comma-
+  separated ticket numbers — no explanatory parenthetical, never prose like "none": omit the line
+  entirely when a ticket has no real blocker.</li>
+</ul>
+
+<Callout kind="trap" label="grill-with-docs stays out of skill_engineering">
+<p>`grill-with-docs`'s `disable-model-invocation: true` is load-bearing, not an oversight.
+  Vendoring it into an agent's `skill_engineering` list risks it landing in a composed prompt and
+  firing headless despite that flag — exactly the failure this whole split exists to prevent.
+  Bootstrap stays something <em>you</em> run, on purpose, never something a chain reaches for on
+  its own.</p>
+</Callout>
+
+## Why this is a vocabulary problem, not a planning problem
+
+<Callout kind="why" label="The interview and the plan are answering different questions">
+<p>It is tempting to fold the fog-resolving interview into the planner's own judgment — let the
+  planner guess at ambiguous terms the way it already scopes work. Don't: a planner deciding what
+  "cancellation" means on the fly is making a domain decision it has no standing to make alone,
+  and no one downstream will know it happened. Bootstrap keeps that decision where it belongs —
+  made once, by a human, written down in a place every later run can read — so the planner's only
+  job stays what it already was: turning agreed vocabulary into a scoped plan, never inventing the
+  vocabulary itself.</p>
+</Callout>
+
+## Check yourself
+
+<Quiz
+  question="A headless claude_code agent has wayfinder vendored under skill_engineering and hits a fog case. What actually happens if the AFK overrides above are not in place?"
+  choices={["The run pauses and waits for a human to answer in the terminal", "The model role-plays both sides, or the run hangs waiting on input that never comes", "wayfinder automatically falls back to a safe default term", "The gate on that phase fails immediately with a clear error"]}
+  answerIndex={1}
+  correctFeedback="Nothing built into the fallback knows it is headless. Best case you get a low-fidelity role-played answer; worst case the run genuinely hangs on input that will never arrive."
+  wrongFeedback="wayfinder's fallback is written assuming a human answers back. Headless and unmodified, it either gets role-played by the model or stalls waiting on input — nothing catches this automatically."
+/>
+
+<Quiz
+  question="Why must CONTEXT.md/docs/adr/ be committed before just sdlc runs, not just approved in conversation?"
+  choices={["Committing triggers a webhook that notifies the planner", "Scout and the planner read from the working tree, not your conversation", "Uncommitted files fail Rule Zero's permissions check", "Git hooks re-validate CONTEXT.md's YAML frontmatter on commit"]}
+  answerIndex={1}
+  correctFeedback="Scout and the planner have no access to your conversation history — only the working tree. An approved-but-uncommitted update is invisible to the very run it was meant to inform."
+  wrongFeedback="It's not a hook or a validation step — it's simpler and stricter: the headless run only ever sees the working tree, so anything not committed there does not exist as far as scout or the planner are concerned."
+/>
+
+<Quiz
+  question="Why does to-spec's AFK override file at Status: needs-triage instead of the ready-for-agent its own instructions specify?"
+  choices={["needs-triage is required by adw_watch.py's frontier regex", "Filing ready-for-agent directly would skip the /triage feasibility and compliance judgment", "to-spec cannot write Status: ready-for-agent under skill_engineering", "needs-triage is the default before any Status: line is set"]}
+  answerIndex={1}
+  correctFeedback="to-spec's own default is ready-for-agent — self-promoting past /triage. The override exists specifically so a spec produced in the headless loop still passes through the one interactive judgment gate before work can be claimed."
+  wrongFeedback="Nothing technical blocks to-spec from writing ready-for-agent — it does so by default when run interactively. The override is a deliberate policy choice: don't let AFK-produced work skip /triage's judgment."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> the adoption playbook's Part C, "going dark: bootstrap
+vocabulary once, then let the loop run headless" — read Problem 1 in full, then Problem 2 for the
+related re-implementation gap this lesson does not cover. For the mechanism the bootstrap
+interview itself runs on, read the `grilling` and `domain-modeling` skills directly.</p>
+
+## Where this goes next
+
+<p>You now know why one problem — an interview with no one to answer it — gets fixed by
+relocating it rather than deleting it. The next lesson covers the second headless problem this
+chapter names: nothing stopping a plan from quietly re-implementing what already exists, and the
+scout/planner overrides that close it.</p>
+
+<p><strong>Ask me things.</strong> Bring me a feature request that touches vocabulary your project
+hasn't settled yet, and we'll work out together whether it needs bootstrap or can go straight to
+AFK.</p>

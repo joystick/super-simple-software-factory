@@ -1,0 +1,212 @@
+---
+title: "The Clamp and the Test That Never Ran"
+description: "You are about to write the function everything else exists to serve — and to meet a bug that lived in the Python original for its entire life, protected by a test that asserted the right thing and never once exercised it."
+sidebar:
+  order: 4
+---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>`priceCart`: subtotal, discounts, clamp, tax, total. Plus the single most
+  useful habit in testing, learned the only way it sticks — by watching a suite stay green
+  over a real defect.</p>
+</Callout>
+
+## The pipeline
+
+    
+```
+subtotal  ->  discounts  ->  tax  ->  total
+```
+
+
+    <p>Four stages, each total, no branches. Two invariants make it predictable:</p>
+
+    <ul>
+      <li><strong>Discounts apply to the subtotal, never to each other.</strong> Two 10&nbsp;%
+  discounts take 20&nbsp;% off, not 19&nbsp;%. Stacking multiplicatively is defensible, but
+  it makes the <em>order of the rule list observable</em> — and a pricing engine whose
+  answer depends on list order is a support-ticket generator.</li>
+      <li><strong>Tax is charged after discounts</strong>, on what is actually owed.</li>
+    </ul>
+
+## The clamp
+
+    <p>Rules do not know about each other, so nothing stops them summing past the cart's value.
+Three 50&nbsp;% discounts on a £10 cart want £15. A cart must never pay the customer, so
+the total is clamped to the subtotal.</p>
+
+    <p>Clamping raises a question with a real answer: <em>which</em> discount gets trimmed?</p>
+
+    <Callout kind="why" label="Trim the last, keep the earlier ones whole">
+<p>Because a receipt has to be explainable. "Member 60&nbsp;% — £6.00, bulk 60&nbsp;% —
+  £4.00 (capped)" is a sentence you can say to a customer. Spreading the shortfall
+  proportionally across both gives two numbers that match neither rule, and nobody can
+  explain either.</p>
+</Callout>
+
+## Now the part worth the whole lesson
+
+    <p>Here is the obvious test for that clamp. It is the one the Python original had:</p>
+
+    
+```
+// two 100% discounts on a 1000c cart
+assertEquals(receipt.discountCents, 1_000);
+assertEquals(receipt.totalCents, 0);
+```
+
+
+    <p>It asserts exactly the right thing. It passed for the lifetime of the codebase. And
+<strong>the clamp could be deleted without it noticing.</strong></p>
+
+    <p>Trace it. The clamp walks the discounts, keeping a running total, stopping once the
+ceiling is reached:</p>
+
+    
+```
+for (const discount of discounts) {
+  if (running >= ceiling) break;                                   // ①
+  const amountCents = Math.min(discount.amountCents, ceiling - running);  // ②
+  kept.push({ label: discount.label, amountCents });
+  running += amountCents;
+}
+```
+
+
+    <p>With <strong>two 100&nbsp;% discounts</strong>: the first is 1000c, which already equals
+the ceiling. `running` becomes 1000. The second iteration hits line ① and
+breaks. <strong>Line ② never does any work.</strong> Delete `Math.min`
+entirely and the answer is identical.</p>
+
+    <Callout kind="trap" label="Measured, on this codebase">
+<p>With `Math.min` replaced by `discount.amountCents`:</p>
+      <table>
+        <tr>
+          <th>Test</th>
+          <th>Result</th>
+        </tr>
+        <tr>
+          <td>100&nbsp;% + 100&nbsp;% — “discounts never exceed the subtotal”</td>
+          <td><strong>1 passed</strong> — sails through</td>
+        </tr>
+        <tr>
+          <td>60&nbsp;% + 60&nbsp;% — “a partially overflowing discount is clipped”</td>
+          <td><strong>1 failed</strong> — catches it</td>
+        </tr>
+        <tr>
+          <td>whole suite</td>
+          <td>48 passed, 2 failed</td>
+        </tr>
+      </table>
+      <p>The assertion was never the problem. The <em>inputs</em> were. 100&nbsp;% + 100&nbsp;%
+  never produces a partial overflow, so it never reaches the line it claims to protect.</p>
+</Callout>
+
+### The case that does the work
+
+    <p>60&nbsp;% + 60&nbsp;% of 1000c is 1200c. The second discount overflows <em>only
+partly</em>, so it must be trimmed to the 400c that remains — not taken whole (total −200)
+and not dropped (total 400):</p>
+
+    
+```
+assertEquals(receipt.discounts.map((d) => d.amountCents), [600, 400]);
+```
+
+
+    <Callout kind="trap" label="The habit to take away">
+<p><strong>A test that asserts a boundary must use inputs that actually reach it.</strong>
+  Ask of every guard: what input makes this line the one that decides the answer? If your
+  test does not contain that input, you have written documentation, not a test.</p>
+      <p>You have now seen this failure mode three times in four lessons — the clamp here, the
+  binary-representable percentages in lesson 2, and the type error that tripped two gates
+  in lesson 1. Same root: <strong>a claim that was never executed.</strong></p>
+</Callout>
+
+## Build it
+
+    <ol class="steps">
+      <li>
+        <p>Confirm the starting state — 32 green from lessons 1–3, 18 red:</p>
+        
+```
+deno task test
+```
+
+      </li>
+      <li>
+        <p>Implement `BulkDiscount` first; it is the smaller job and the second rule
+    you need in order to make anything stack. It discounts one SKU's lines once enough
+    units are present — counted <strong>across</strong> lines, which is what
+    `Cart.quantityOf` is for.</p>
+      </li>
+      <li>
+        <p>Implement `priceCart`. Collect discounts, drop the ones worth zero, clamp
+    if they exceed the subtotal, then tax what remains.</p>
+        <p>Keep the clamp in its own small function. It is the piece with the interesting
+    behaviour and the one you will want to read again in six months.</p>
+      </li>
+      <li>
+        <p>Green at 50? Now do the experiment yourself. Replace `Math.min(...)` with
+    `discount.amountCents` and run the two tests separately:</p>
+        
+```
+deno test --filter "discounts never exceed the subtotal"   # still passes
+deno test --filter "PARTIALLY overflowing"                 # fails
+```
+
+        <p>Seeing the first one pass over a real bug is the point. Restore afterwards.</p>
+      </li>
+    </ol>
+
+## Check yourself
+
+    <Quiz
+  question="A test asserts a clamp. Deleting the clamp keeps it green. Why?"
+  choices={["The assertion is checking the wrong property here", "The clamp was genuinely unnecessary in that path", "Its inputs never drive execution to the clamped line", "The runner silently cached a previous passing result"]}
+  answerIndex={2}
+  correctFeedback="The assertion was right. The inputs never produced a partial overflow, so the clamped line never decided the answer."
+  wrongFeedback="The assertion was correct all along. What was missing were inputs that reach the line being protected."
+/>
+
+    <Quiz
+  question="Why apply discounts to the subtotal rather than to each other?"
+  choices={["So the order of the rule list cannot change the total", "So that discounts can never exceed the cart's value", "Because compounding percentages is far slower to run", "Because the tax stage requires a single flat discount"]}
+  answerIndex={0}
+  correctFeedback="Compounding makes list order observable, and an engine whose answer depends on rule order is one nobody can reason about."
+  wrongFeedback="The clamp handles the ceiling separately. This invariant is about order-independence."
+/>
+
+    <Quiz
+  question="When discounts overflow, why trim the last rather than share it out?"
+  choices={["Trimming the last is measurably cheaper to compute", "The earlier rules were validated before the later ones", "Proportional sharing would reintroduce float arithmetic", "Every line on the receipt should stay explainable"]}
+  answerIndex={3}
+  correctFeedback="Spreading the shortfall gives numbers matching no rule. Keeping earlier discounts whole means each line can be justified to a customer."
+  wrongFeedback="It is about explainability. A receipt line nobody can account for is a support call."
+/>
+
+## Read this next
+
+    <p><strong>Primary source:</strong>
+<a href="https://martinfowler.com/bliki/TestCoverage.html">Martin Fowler — Test Coverage</a>.
+Short, and directly on this lesson's nerve: coverage tells you which lines <em>ran</em>,
+never whether the assertions around them meant anything. A line can be 100&nbsp;% covered
+by a test that would pass with it deleted.</p>
+
+    <p>If you want the technique that catches this systematically, read about
+<a href="https://en.wikipedia.org/wiki/Mutation_testing">mutation testing</a> — it
+automates exactly the experiment in step 4: change the code, and see whether any test
+notices.</p>
+
+## Where this is going
+
+    <p>The engine is nearly complete. What remains is the coupon rule — the one that broke the
+Python contract and motivated the context object back in lesson 3 — written test-first, with
+the discipline itself as the subject rather than a side effect: red, green, refactor, with a
+known-good target to check yourself against.</p>
+
+    <p><strong>Ask me things.</strong> If you want to argue that the clamp should share the
+  shortfall proportionally, do — it is a defensible position, and working out what it does
+  to a receipt is a better use of ten minutes than taking my word for it.</p>

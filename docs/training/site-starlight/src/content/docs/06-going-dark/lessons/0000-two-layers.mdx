@@ -1,0 +1,10 @@
+---
+title: "Two Layers"
+description: "prompt_engineering and skill_engineering are two distinct layers an agent's behavior is shaped by — one baked into the roster's system prompts, one vendored in per agent — and going dark depends on knowing which layer to edit."
+sidebar:
+  order: 0
+---
+
+<p>The adoption playbook frames a factory's behavior as sitting in two distinct layers: `prompt_engineering` — the system prompts baked into each agent's own role, edited directly in your repo — and `skill_engineering` — named protocols vendored in per agent, covered in Chapter 1's "Vendoring a Skill" lesson. Going dark depends on knowing exactly which layer to edit for a given problem: the headless-interview fix in this chapter's bootstrap-vocabulary lesson, for instance, lives in an agent's own `system.md` (layer one), never in a vendored skill file (layer two) — editing the wrong layer either does nothing or silently breaks the next `vendor_skill.py --check`.</p>
+
+{/* TODO: full lesson content, see plans/2026-09-24-docs-reference-and-training.md */}

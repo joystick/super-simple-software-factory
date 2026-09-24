@@ -1,0 +1,133 @@
+---
+// The adw_simple_sdlc cycle (L9) as an animated vertical flow. A runner pulse
+// travels top -> bottom through the phases; three commit stages are marked
+// (three work products, three authors). Play/pause; starts paused under
+// prefers-reduced-motion.
+const uid = `sdlc-${Math.random().toString(36).slice(2, 8)}`;
+const stages = [
+  { t: 'engineer · request', s: 'the run begins', kind: 'engineer', commit: false },
+  { t: 'planner → commit_plan', s: 'the spec, in the planner’s words', kind: 'agent', commit: true },
+  { t: 'builder → test / fix loop', s: 'the code, only after the suite is green', kind: 'agent', commit: false },
+  { t: 'reviewer → revise loop', s: '“is this what was asked for?”', kind: 'agent', commit: false },
+  { t: 'commit_build', s: 'the verified tree', kind: 'code', commit: true },
+  { t: 'documenter → commit_docs', s: 'the write-up, from the run’s baseline', kind: 'agent', commit: true },
+];
+const top = 52, gap = 62, h = 44, w = 400, x = 60, cx = x + w / 2;
+---
+
+<figure class="diagram" data-testid="sdlc-cycle" data-uid={uid}>
+  <div class="diagram-bar">
+    <span class="diagram-cap">adw_simple_sdlc — plan · build · test · review · document</span>
+    <button type="button" class="diagram-toggle" data-testid="diagram-toggle" aria-pressed="false">
+      <span class="dt-play">▶ Play</span><span class="dt-pause">❚❚ Pause</span>
+    </button>
+  </div>
+
+  <svg viewBox={`0 0 520 ${top + stages.length * gap + 8}`} role="img"
+       aria-label="The adw_simple_sdlc cycle as a vertical flow: engineer request; planner then commit the plan; builder then a bounded test/fix loop; reviewer then a bounded revise loop; commit the build; documenter then commit the docs. Three stages commit — three work products by three authors.">
+    <!-- spine -->
+    <line x1={cx} y1={top + h} x2={cx} y2={top + (stages.length - 1) * gap} class="spine"/>
+
+    {stages.map((st, i) => {
+      const y = top + i * gap;
+      return (
+        <g class={`stage kind-${st.kind}`} data-i={i}>
+          {i < stages.length - 1 && (
+            <line x1={cx} y1={y + h} x2={cx} y2={y + gap} class="link" marker-end={`url(#${uid}-arr)`}/>
+          )}
+          <rect x={x} y={y} width={w} height={h} rx="9" class="s-box"/>
+          <text x={x + 16} y={y + 20} class="s-title">{st.t}</text>
+          <text x={x + 16} y={y + 36} class="s-sub">{st.s}</text>
+          {st.commit && (
+            <g>
+              <rect x={x + w - 78} y={y + 11} width="66" height="22" rx="11" class="commit-tag"/>
+              <text x={x + w - 45} y={y + 26} text-anchor="middle" class="commit-text">commit</text>
+            </g>
+          )}
+        </g>
+      );
+    })}
+
+    <!-- runner pulse travelling the spine -->
+    <circle r="6" class="runner">
+      <animateMotion dur="4.8s" repeatCount="indefinite" path={`M ${cx} ${top + h} L ${cx} ${top + (stages.length - 1) * gap}`}/>
+    </circle>
+
+    <defs>
+      <marker id={`${uid}-arr`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" class="arr-head"/>
+      </marker>
+    </defs>
+  </svg>
+</figure>
+
+<style>
+  .diagram {
+    margin: 1.5rem 0;
+    border: 1px solid var(--sl-color-gray-5);
+    border-radius: 0.6rem; overflow: hidden;
+    background: var(--sl-color-gray-7, var(--sl-color-black));
+  }
+  .diagram-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; padding: 0.5rem 0.85rem;
+    border-bottom: 1px solid var(--sl-color-gray-5);
+    background: var(--sl-color-gray-6, var(--sl-color-gray-7));
+  }
+  .diagram-cap { font-size: 0.8rem; color: var(--sl-color-gray-2); font-weight: 600; }
+  .diagram-toggle {
+    font: inherit; font-size: 0.78rem; cursor: pointer;
+    padding: 0.2rem 0.7rem; border-radius: 999px;
+    border: 1px solid var(--sl-color-gray-4);
+    background: var(--sl-color-bg); color: var(--sl-color-text);
+  }
+  .diagram-toggle:hover { border-color: var(--sl-color-text-accent); }
+  .diagram-toggle .dt-play { display: none; }
+  .diagram.paused .diagram-toggle .dt-play { display: inline; }
+  .diagram.paused .diagram-toggle .dt-pause { display: none; }
+  .diagram svg { display: block; width: 100%; height: auto; max-width: 560px; margin: 0 auto; padding: 0.5rem; }
+
+  .diagram text { fill: var(--sl-color-text); }
+  .s-title { font-size: 13px; font-weight: 700; }
+  .s-sub { font-size: 11px; fill: var(--sl-color-gray-3); }
+  .s-box { fill: var(--sl-color-gray-6, transparent); stroke-width: 2; }
+  .kind-engineer .s-box { stroke: var(--sl-color-gray-3); }
+  .kind-agent .s-box { stroke: hsl(265, 60%, 62%); }
+  .kind-code .s-box { stroke: hsl(150, 45%, 45%); }
+  .spine { stroke: var(--sl-color-gray-5); stroke-width: 2; }
+  .link { stroke: var(--sl-color-text-accent); stroke-width: 2; stroke-dasharray: 6 5; animation: dash 1s linear infinite; }
+  .arr-head { fill: var(--sl-color-text-accent); }
+  .commit-tag { fill: hsla(150, 45%, 45%, 0.16); stroke: hsl(150, 45%, 45%); stroke-width: 1.5; }
+  .commit-text { font-size: 11px; fill: var(--sl-color-text); }
+  .runner { fill: hsl(198, 70%, 55%); }
+
+  @keyframes dash { to { stroke-dashoffset: -22; } }
+
+  .diagram.paused svg .link { animation-play-state: paused; }
+  @media (prefers-reduced-motion: reduce) {
+    .diagram:not(.motion-on) svg .link { animation-play-state: paused; }
+  }
+</style>
+
+<script>
+  function initSdlcCycles() {
+    document.querySelectorAll<HTMLElement>('.diagram[data-testid="sdlc-cycle"]').forEach((fig) => {
+      if (fig.dataset.wired) return;
+      fig.dataset.wired = 'true';
+      const svg = fig.querySelector('svg')!;
+      const btn = fig.querySelector<HTMLButtonElement>('.diagram-toggle')!;
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const setPlaying = (playing: boolean) => {
+        fig.classList.toggle('paused', !playing);
+        btn.setAttribute('aria-pressed', String(playing));
+        try { playing ? (svg as any).unpauseAnimations() : (svg as any).pauseAnimations(); } catch {}
+      };
+      setPlaying(!reduce);
+      if (reduce) fig.classList.add('motion-on');
+      btn.addEventListener('click', () => setPlaying(fig.classList.contains('paused')));
+    });
+  }
+  initSdlcCycles();
+  document.addEventListener('DOMContentLoaded', initSdlcCycles);
+  document.addEventListener('astro:page-load', initSdlcCycles);
+</script>

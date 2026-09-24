@@ -1,0 +1,211 @@
+---
+title: "The Shape of a Rule"
+description: "Python declared a <code>Protocol</code>. TypeScript checks shapes structurally and erases the whole thing at runtime. This lesson designs the contract every pricing rule will obey — and the design decision it turns on is one a production codebase got wrong first."
+sidebar:
+  order: 3
+---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>A `Cart`, a `PricingRule` contract, and the first rule that
+  implements it — designed so that adding a <em>fourth</em> input two months from now does
+  not touch a single existing rule.</p>
+</Callout>
+
+## The decision, stated up front
+
+    <p>A rule needs the cart. It also needs to know whether the customer is a member. Later it
+will need a coupon code, and after that probably a date and a region.</p>
+
+    <p>There are two ways to hand it those, and they age very differently.</p>
+
+### Option A — a parameter list
+
+    
+```
+apply(cart: Cart, isMember: boolean): Discount | null
+```
+
+
+    <p>Now add coupons. Every rule's signature changes. Every rule that does not care about
+coupons still has to accept the parameter, because the caller passes it positionally.</p>
+
+### Option B — a context object
+
+    
+```
+apply(context: PricingContext): Discount | null
+```
+
+
+    <p>Adding coupons means adding one field to `PricingContext`.
+<strong>Every existing rule keeps compiling, untouched.</strong> A rule reads the fields it
+cares about and ignores the rest.</p>
+
+    <Callout kind="why" label="This is not hypothetical">
+<p>The Python original took option A, and when a coupon rule arrived it had to widen
+  every rule's signature. The first attempt absorbed the new argument with
+  `**kwargs`:</p>
+      
+```
+def apply(self, cart, *, is_member, **_kwargs): ...
+```
+
+      <p>That compiles, and it silently swallows misspellings forever. Call it with
+  `cupon_code=` and nothing complains — you get a rule that quietly never fires,
+  and a discount that simply does not appear on a receipt.</p>
+      <p>The second attempt named the parameter explicitly on every rule, so a typo became an
+  error. Better — but it still meant editing every rule to add a field none of them asked
+  for. <strong>The context object is the shape that removes the dilemma.</strong></p>
+</Callout>
+
+## Structural typing: the part that surprises Python developers
+
+    <p>TypeScript does not care what a class says it is. It cares what shape it has. A class
+with the right method <em>is</em> a `PricingRule`, with or without an
+`implements` clause.</p>
+
+    <p>Which raises a fair question: if it is optional, why write it? Because of
+<strong>where the error appears.</strong> Here is a class with a misspelled method,
+checked both ways — these are the real compiler messages:</p>
+
+### Without `implements`
+
+    
+```
+class Typo {
+  aply(_c: PricingContext): Discount | null { return null; }
+}
+const rules: PricingRule[] = [new Typo()];   // <-- error lands HERE, line 5
+
+TS2741: Property 'apply' is missing in type 'Typo'
+        but required in type 'PricingRule'.
+```
+
+
+### With `implements`
+
+    
+```
+class Typo implements PricingRule {          // <-- error lands HERE, line 2
+  aply(_c: PricingContext): Discount | null { return null; }
+}
+
+TS2420: Class 'Typo' incorrectly implements interface 'PricingRule'.
+        Property 'apply' is missing in type 'Typo'.
+```
+
+
+    <Callout kind="why" label="Why that difference matters">
+<p>Both catch the bug — TypeScript is not letting it through either way. But without
+  `implements`, the complaint arrives wherever the class is <em>used</em>, which
+  may be a different file, in a diff you are not reading, weeks later.</p>
+      <p>`implements` is a <strong>claim checked at the definition</strong>. It
+  costs one word and moves the error to the line that is actually wrong.</p>
+      <p>It adds no runtime behaviour whatsoever. Like every type in TypeScript, it is gone
+  after compilation — which is why `Object.freeze` is still doing the real work
+  for immutability, exactly as in lesson 1.</p>
+</Callout>
+
+## `null` or a zero discount?
+
+    <p>A rule that does not apply returns `null`. It does not return a
+`Discount` worth zero cents.</p>
+
+    <p>They are different claims. `null` says "this rule is not relevant to this
+cart". A zero discount says "this rule applied, and it was worth nothing" — and that is a
+line on a receipt a customer will ask about.</p>
+
+## Build it
+
+    <ol class="steps">
+      <li>
+        <p>Read `tests/rules.test.ts`. Note the `ctx()` helper at the
+    top: it builds a context with defaults so each test states only what it cares about.
+    That helper only reads well <em>because</em> the contract is a single object.</p>
+      </li>
+      <li>
+        <p>Confirm the starting state — 20 green from lessons 1 and 2, 12 red:</p>
+        
+```
+deno task test
+```
+
+      </li>
+      <li>
+        <p>Implement `Cart`. It holds lines, sums a subtotal, and counts a SKU
+    across split lines. One test pushes onto `cart.items` and expects a throw:
+    `readonly` on an array is compile-time only, so you need the runtime half
+    again — and note that freezing the array you were <em>handed</em> is not the same as
+    freezing a copy of it.</p>
+      </li>
+      <li>
+        <p>Implement `MemberDiscount`. Two things to get right:</p>
+        <ul>
+          <li>Validate the percentage in the <strong>constructor</strong>, not in
+      `apply`. A misconfigured rule should fail when the roster is built, before
+      it ever meets a cart.</li>
+          <li>Keep the human percentage for the label and the basis points for the arithmetic.
+      The label reads `member 8.7%`; the maths uses `870`.</li>
+        </ul>
+      </li>
+      <li>
+        <p>Green? Run the gates, then break the contract on purpose: rename
+    `apply` to `aply` and watch `deno check` tell you at
+    the class definition. Restore.</p>
+        
+```
+deno task gates
+```
+
+      </li>
+    </ol>
+
+## Check yourself
+
+    <Quiz
+  question="Why does a rule take one context object instead of separate parameters?"
+  choices={["Objects are cheaper to pass than several arguments", "Adding an input later leaves existing rules untouched", "TypeScript cannot type more than two parameters well", "It allows the rule to mutate the values it receives"]}
+  answerIndex={1}
+  correctFeedback="Widening the contract becomes adding a field, not editing every implementation. That is the whole reason."
+  wrongFeedback="It is about how the contract ages. With a parameter list, every new input edits every rule — including the ones that ignore it."
+/>
+
+    <Quiz
+  question="What does an <code>implements</code> clause actually change?"
+  choices={["It makes the class checked at runtime by the engine", "It is required before the class can satisfy the type", "It causes the interface to exist in the compiled code", "It moves the type error to the class definition site"]}
+  answerIndex={3}
+  correctFeedback="Structural typing means the class conforms either way. `implements` only decides WHERE you are told about a mismatch — and the definition is the useful place."
+  wrongFeedback="Types are erased at compile time, and structural typing means the clause is optional. What it changes is where the error is reported."
+/>
+
+    <Quiz
+  question="Why return <code>null</code> rather than a zero-valued discount?"
+  choices={["They are different claims about what happened", "Returning objects allocates memory on every call", "A zero amount would break the rounding function", "The type system forbids returning empty structures"]}
+  answerIndex={0}
+  correctFeedback="`null` means not applicable. Zero means applied and worth nothing — a line a customer can see and query."
+  wrongFeedback="Nothing technical stops a zero discount. The problem is that it asserts something different, and the receipt shows it."
+/>
+
+## Read this next
+
+    <p><strong>Primary source:</strong>
+<a href="https://www.typescriptlang.org/docs/handbook/type-compatibility.html">TypeScript Handbook — Type Compatibility</a>.
+This is the authoritative explanation of structural typing and why a class never needs to
+announce what it is.</p>
+
+    <p>If you want the contrast, Python's
+<a href="https://peps.python.org/pep-0544/">PEP 544</a> introduced `Protocol`
+to give Python the same structural checking that TypeScript has by default.</p>
+
+## Where this is going
+
+    <p>You now have one rule. Next comes several, plus the question of what happens when their
+discounts add up to more than the cart is worth. That is where the Python original hid a
+bug for its entire life — a clamp with a test that never exercised it — and you will meet
+it as a spec before you meet it as a story.</p>
+
+    <p><strong>Ask me things.</strong> The context-object decision in particular is worth
+  arguing with — if you think a parameter list is fine here, say so and let us test the
+  claim against what happens when the coupon rule lands.</p>

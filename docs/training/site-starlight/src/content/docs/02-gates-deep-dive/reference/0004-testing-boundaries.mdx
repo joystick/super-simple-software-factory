@@ -1,0 +1,105 @@
+---
+title: "Testing Boundaries"
+description: "How to write a test that reaches the line it claims to protect."
+sidebar:
+  order: 4
+---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+## The rule
+
+    <Callout kind="trap" label="Ask this of every guard you test">
+<p><strong>What input makes THIS line the one that decides the answer?</strong></p>
+      <p>If your test does not contain that input, you have written documentation, not a test.
+  It will pass whether the line is there or not.</p>
+</Callout>
+
+## The three misses, all from this project
+
+    <table>
+      <tr>
+        <th>Guard</th>
+        <th>Test that missed it</th>
+        <th>Why it missed</th>
+        <th>Input that catches it</th>
+      </tr>
+      <tr>
+        <td>clamp on overflowing discounts</td>
+        <td>100% + 100%</td>
+        <td>the first discount alone hits the ceiling; the loop breaks before the clamp is consulted</td>
+        <td><strong>60% + 60%</strong> — a <em>partial</em> overflow</td>
+      </tr>
+      <tr>
+        <td>exact decimal arithmetic</td>
+        <td>5%, 12.5%, 7.25%</td>
+        <td>every one is exactly representable in binary, so float and exact agree</td>
+        <td><strong>8.7% of 1500c</strong> — 130 vs 131</td>
+      </tr>
+      <tr>
+        <td>type checking as a separate gate</td>
+        <td>“break a type, expect check to fail”</td>
+        <td>`deno test` type-checks too, so two gates go red, not one</td>
+        <td>a type error in a file <strong>no test imports</strong></td>
+      </tr>
+    </table>
+
+## Boundary checklist
+
+    <table>
+      <tr>
+        <th>Guard shape</th>
+        <th>Inputs that reach it</th>
+      </tr>
+      <tr>
+        <td>`Math.min(x, limit)`</td>
+        <td>x below, x <strong>equal</strong>, x above — and reach it with a <em>partial</em> overflow</td>
+      </tr>
+      <tr>
+        <td>`if (running >= ceiling) break`</td>
+        <td>stop exactly at, and stop past</td>
+      </tr>
+      <tr>
+        <td>`if (n < 1) throw`</td>
+        <td>0, 1, −1</td>
+      </tr>
+      <tr>
+        <td>rounding half-up</td>
+        <td>a value landing exactly on `.5`</td>
+      </tr>
+      <tr>
+        <td>float vs exact</td>
+        <td>values NOT representable in binary: 8.7, 2.675, 0.7, 3.3</td>
+      </tr>
+      <tr>
+        <td>empty collection</td>
+        <td>zero, one, many</td>
+      </tr>
+    </table>
+
+## Verify by mutation
+
+    <p>The only way to know a test works is to watch it fail. Break the line, run the tests
+individually, restore:</p>
+
+    
+```
+deno test --filter "the name of the test that should catch it"
+```
+
+
+    <p>If it still passes, the test does not reach the line. Fix the <strong>test</strong>.</p>
+
+## What coverage does not tell you
+
+    <p>Coverage reports which lines <em>ran</em>. It says nothing about whether the assertions
+around them meant anything. A line can be 100&nbsp;% covered by a test that would pass
+with it deleted — which is exactly what the clamp was.</p>
+
+    <p><a href="https://en.wikipedia.org/wiki/Mutation_testing">Mutation testing</a> automates
+the experiment: change the code, and see whether any test notices.</p>
+
+    <p>Sources:
+    <a href="https://martinfowler.com/bliki/TestCoverage.html">Fowler — Test Coverage</a> ·
+    <a href="https://en.wikipedia.org/wiki/Mutation_testing">Mutation testing</a> ·
+    <a href="https://docs.deno.com/runtime/fundamentals/testing/">Deno — Testing</a></p>

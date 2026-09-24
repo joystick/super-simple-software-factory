@@ -1,0 +1,198 @@
+---
+title: "The Fix Loop"
+description: "What happens when a gate goes red: not a restart, a correction into the same live session — and why a dead gate disables the whole machine."
+sidebar:
+  order: 5
+---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>You can trace exactly what happens between a red gate and a green one: which session gets
+  re-prompted, with what message, how many times, and where the run finally gives up. And you
+  will see why a failed test suite reaches the builder through the <em>same door</em> an
+  agent's envelope did.</p>
+</Callout>
+
+## The choice: restart or correct
+
+<p>A gate fails. The agent's work is unacceptable. There are two ways to respond, and SSSF is
+built entirely around choosing the second:</p>
+
+<table>
+  <tr><th></th><th>Restart</th><th>Correct</th></tr>
+  <tr><td>What happens</td><td>throw the session away, start cold</td><td>re-prompt the <strong>same</strong> session</td></tr>
+  <tr><td>The agent keeps</td><td>nothing — every lesson learned is gone</td><td>its full context window, intact</td></tr>
+  <tr><td>Cost</td><td>the whole phase again</td><td>one message</td></tr>
+  <tr><td>The prompt says</td><td>the original task, from scratch</td><td>exactly what was wrong, by name</td></tr>
+</table>
+
+<Callout kind="why" label="A correction costs one message; a restart costs everything">
+<p>The coding agent treats its session id as create-or-continue, so "run an agent" and
+  "continue an agent" are the same call. When JSON does not parse or a gate returns
+  violations, <strong>nothing restarts</strong>. The harness sends one more message into the
+  live session, naming the violations, and the context window stays intact. This is why the
+  factory can be uncompromising about "done" without being ruinous about it.</p>
+</Callout>
+
+## The inner loop: gate corrections
+
+<p>Inside a single agent phase, after the envelope parses, every attached gate runs. A
+violation does not fail the phase — it re-prompts. Simplified from `agents.execute`:</p>
+
+```python
+for gate_attempt in range(1, phase.params.retries + 2):
+    violations = [v for gate in call.gates
+                    for v in gate(envelope, run).violations]
+    if not violations:
+        break                                   # green: done
+    if gate_attempt > phase.params.retries:
+        raise GateFailure(...)                   # budget spent: the phase fails
+    correction = "Your previous response failed validation:\n- " + "\n- ".join(violations)
+    result = send(correction)                    # SAME session, one more message
+    envelope, _ = _parse_with_retries(run, phase, call, result, send)
+```
+
+<p>The number of corrections is `phase.params.retries` — the field you met on `PhaseParams`
+in Lesson 4. `retries=0` means one shot, no corrections. `retries=1` means one correction
+allowed. The loop is <strong>bounded by construction</strong>; it cannot run forever.</p>
+
+### The note is the correction
+
+<p>Recall from Lesson 2 that each gate check carries a `note`. On a failed check that note
+becomes the violation text, and the violation text is what the agent is told. "Write notes
+for the agent that must act on them" was not style advice — the note <em>is</em> the fix
+instruction.</p>
+
+## The outer loop: test, then fix
+
+<p>The suite is a `code` phase (Lesson 4), so it cannot correct an agent by itself. The ADW
+script wires the repair explicitly, bounded by a constant. From `adw_build_test.py`:</p>
+
+```python
+MAX_FIX_LOOPS = 3
+
+for i in range(1, MAX_FIX_LOOPS + 1):
+    with run.phase(PhaseParams(name=f"test_{i}", kind="code", owner="quality",
+                               description="Run the suite and record pass/fail.")) as ph:
+        test = quality.run_tests(run)
+        record(ph, test)
+    if test.passed:
+        break
+    with run.phase(PhaseParams(name=f"fix_{i}", kind="agent", owner="builder", retries=1,
+                               description="Repair the code so the failing suite passes.")) as ph:
+        ph.call(AgentCall(output_type=BuildOutput, prompt=fix_prompt,
+                          previous=quality.as_envelope(test, "tests"),
+                          gates=[gates.diff_matches_claims]))
+
+return run.finish(accepted=test.passed,
+                  reason=f"the suite still failed after {MAX_FIX_LOOPS} fix attempt(s)")
+```
+
+<Callout kind="why" label="The failing suite arrives as an envelope">
+<p>Look at `previous=quality.as_envelope(test, "tests")`. The test result is wrapped into an
+  <strong>envelope</strong> — the same typed object an agent produces — and handed to the
+  builder as its `previous`. "Testing is code" and "context crosses as an envelope" are not
+  two systems bolted together: the suite's failure comes through the <em>same door</em> an
+  agent's report does, so the repair loop needs no special case. Lessons 2, 3, and 5 are one
+  mechanism seen three times.</p>
+</Callout>
+
+## Two surfaces, one machine
+
+<p>Both kinds of failure feed the same correction machinery:</p>
+
+<table>
+  <tr><th>Failure</th><th>Detected by</th><th>Bounded by</th><th>Correction carries</th></tr>
+  <tr><td>claim gate violation</td><td>`agents.execute`, inner loop</td><td>`retries`</td><td>the gate's `note`</td></tr>
+  <tr><td>suite failed</td><td>a `code` test phase</td><td>`MAX_FIX_LOOPS`</td><td>the failing output, as an envelope</td></tr>
+</table>
+
+<Callout kind="trap" label="A dead gate disables the whole machine">
+<p>The fix loop only fires on a <strong>failure</strong>. So when the test gate is an
+  `echo` that exits 0 (Lesson 1), there is no failure to feed it. The builder writes broken
+  code, the gate says PASSED, the loop never runs, the correction is never sent, and the
+  commit phase lands the bug — while the trace reads 5/5 success.</p>
+<p><strong>A dead gate does not merely fail to catch bugs. It disables the repair machinery
+  and then certifies the result.</strong> This is why Lesson 1 insisted a gate be
+  <em>watched failing</em>: an unverified gate is not a weak safety net, it is a switched-off
+  one wired to a green light.</p>
+</Callout>
+
+## Your turn
+
+<p><em>Reps are tagged <strong>[read]</strong> (inspect a real file, no setup) or <strong>[run]</strong> (drive the <a href="/01-sssf-fundamentals/reference/0004-wiring-your-factory/">wired factory</a>).</em></p>
+
+
+<ol class="steps">
+  <li>
+    <p><strong>[read]</strong> <strong>Find both loops.</strong> In `adw_plan_build_test.py`, point to the inner loop
+    (the `retries` on an agent phase) and the outer loop (`MAX_FIX_LOOPS`). What is the
+    maximum number of builder invocations a single run can make?</p>
+  </li>
+  <li>
+    <p><strong>[run]</strong> <strong>Watch a correction fire.</strong> Give the builder a task, then wire a claim
+    gate you know it will trip (e.g. require an artifact it will not produce). In the trace,
+    find the `gate_fail` event, the correction message, and the `gate_pass` that follows in
+    the <em>same</em> phase — one phase_id, two attempts.</p>
+  </li>
+  <li>
+    <p><strong>[run]</strong> <strong>Watch it NOT fire.</strong> Replace the test command with `echo ok` and run
+    the same broken task. Confirm the fix loop never runs and the run is certified green —
+    then say, in one sentence, what the trace would have to record for you to trust that
+    green.</p>
+  </li>
+</ol>
+
+## Check yourself
+
+<Quiz
+  question="Recall from Lesson 3: when the builder is corrected, what does it still hold?"
+  choices={["A fresh prompt with the task restated", "Its intact session and full context", "Only the single correction message", "The planner's original chat transcript"]}
+  answerIndex={1}
+  correctFeedback="That is the whole point of correcting instead of restarting — the live session keeps its context window, so nothing learned is thrown away."
+  wrongFeedback="A correction re-enters the same session, so the agent keeps its full context. Nothing is restated from scratch and no chat is re-sent."
+/>
+
+<Quiz
+  question="When a gate returns violations, what does the harness do?"
+  choices={["Starts a fresh session with the original task", "Re-prompts the same session naming the fault", "Marks the phase failed and moves to the next", "Lowers the model temperature and tries again"]}
+  answerIndex={1}
+  correctFeedback="Same session, one more message, the violations by name — the context window stays intact. A restart would throw away what the agent learned."
+  wrongFeedback="Nothing is thrown away. The live session is corrected in place with the exact violations, for one message's cost."
+/>
+
+<Quiz
+  question="How does a failing test suite reach the builder to be repaired?"
+  choices={["As a raw stderr string appended to the prompt", "Through a special test-only repair channel", "Wrapped as an envelope, like an agent's report", "The reviewer summarises it for the builder"]}
+  answerIndex={2}
+  correctFeedback="quality.as_envelope wraps the result as the builder's `previous`. Testing is code, but its outcome crosses the seam as an envelope — the same door."
+  wrongFeedback="It is not a raw string or a side channel. The result is wrapped as an envelope, so the repair loop needs no special case."
+/>
+
+<Quiz
+  question="Why does a dead (echo) test gate do more damage than having no gate at all?"
+  choices={["It slows every run down with a useless call", "It hides the real command from the reviewer", "It passes falsely, so the fix loop never fires", "It overwrites the previous run's trace rows"]}
+  answerIndex={2}
+  correctFeedback="No failure means no correction. The bug is committed and the trace certifies 5/5 — a switched-off net wired to a green light."
+  wrongFeedback="The cost is not speed. A false pass means the repair machinery never runs, and the green result then certifies the bug."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> `adws/adw_modules/agents.py` in `sssf-play` — the
+`execute` function is the inner loop end to end, and its module docstring states the whole
+principle in three lines. Then any `adw_*_test.py` script for the outer loop and its
+`MAX_FIX_LOOPS`.</p>
+
+## Where this goes next
+
+<p>You now know what a run is, what crosses its seams, and what happens when a seam goes red.
+Before reading the record all of this leaves behind, one more control: <strong>bounding an
+agent</strong>. The fix loop assumes the builder can only change what it is supposed to. Next
+is what makes that true — the roster, an agent's `writes`, and why the builder must not be
+able to edit its own grader.</p>
+
+<p><strong>Ask me things.</strong> Bring me a run that failed after its fix loop and we will
+read the corrections in order — what the agent was told each time, and whether the notes were
+good enough to act on.</p>

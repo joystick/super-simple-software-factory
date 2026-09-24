@@ -1,0 +1,10 @@
+---
+title: "Sessions, Resume, and Hermetic Flags"
+description: "A session can be continued with --resume or run hermetically with none of your local skill directory visible — this lesson covers the flags that decide which, and why the difference matters for a headless run."
+sidebar:
+  order: 1
+---
+
+<p>Every agent call happens inside a session, and two knobs decide what that session can see and carry forward: `--resume`, which continues a prior session's context rather than starting cold, and the hermetic flags (like `--setting-sources ''`) that strip away your local skill directory so a headless run's environment is reproducible rather than accidentally dependent on whatever happens to be installed on the machine that launched it. This lesson covers both mechanics directly, and why a dark-factory run in particular needs to be run hermetically on purpose, not by accident.</p>
+
+{/* TODO: full lesson content, see plans/2026-09-24-docs-reference-and-training.md */}

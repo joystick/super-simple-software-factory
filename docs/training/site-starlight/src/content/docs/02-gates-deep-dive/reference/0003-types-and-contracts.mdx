@@ -1,0 +1,152 @@
+---
+title: "Types and Contracts"
+description: "Structural typing, where errors land, and what survives to runtime."
+sidebar:
+  order: 3
+---
+
+## What is erased, what survives
+
+    <table>
+      <tr>
+        <th>Construct</th>
+        <th>At runtime</th>
+      </tr>
+      <tr>
+        <td>`interface`, `type`</td>
+        <td>gone</td>
+      </tr>
+      <tr>
+        <td>`readonly`</td>
+        <td>gone</td>
+      </tr>
+      <tr>
+        <td>`implements`</td>
+        <td>gone</td>
+      </tr>
+      <tr>
+        <td>`private` (TS keyword)</td>
+        <td>gone</td>
+      </tr>
+      <tr>
+        <td>`#field` (JS private)</td>
+        <td><strong>enforced</strong></td>
+      </tr>
+      <tr>
+        <td>`Object.freeze`</td>
+        <td><strong>enforced</strong></td>
+      </tr>
+      <tr>
+        <td>`class`</td>
+        <td><strong>a real value</strong></td>
+      </tr>
+    </table>
+
+    <p><strong>Rule:</strong> if you need a guarantee while the program is running, a type
+will not give it to you. Pair `readonly` with `Object.freeze`.</p>
+
+## Where a mismatch is reported
+
+    <p>Structural typing means a class conforms if its shape fits. `implements` is
+optional and changes only the location of the complaint:</p>
+
+    <table>
+      <tr>
+        <th>Written as</th>
+        <th>Error</th>
+        <th>Reported at</th>
+      </tr>
+      <tr>
+        <td>no clause</td>
+        <td>`TS2741` property missing</td>
+        <td>the <strong>use</strong> site</td>
+      </tr>
+      <tr>
+        <td>`implements X`</td>
+        <td>`TS2420` incorrectly implements</td>
+        <td>the <strong>class</strong></td>
+      </tr>
+    </table>
+
+    <p>Use `implements`. One word, and the error points at the line that is wrong.</p>
+
+## Contract shape
+
+    
+```
+// Good — widening later touches only this interface
+interface PricingContext {
+  readonly cart: Cart;
+  readonly isMember: boolean;
+  readonly couponCode: string;
+}
+interface PricingRule {
+  apply(context: PricingContext): Discount | null;
+}
+
+// Ages badly — every new input edits every implementation
+apply(cart: Cart, isMember: boolean, couponCode: string): Discount | null
+```
+
+
+## Absence
+
+    <table>
+      <tr>
+        <th>Return</th>
+        <th>Means</th>
+      </tr>
+      <tr>
+        <td>`null`</td>
+        <td>deliberately not applicable</td>
+      </tr>
+      <tr>
+        <td>`undefined`</td>
+        <td>absent, often accidentally</td>
+      </tr>
+      <tr>
+        <td>`{ amountCents: 0 }`</td>
+        <td>applied, worth nothing — visible on a receipt</td>
+      </tr>
+    </table>
+
+    <p>Pick one and be consistent. This codebase uses `null` for "no discount",
+because it is an explicit decision rather than a missing value.</p>
+
+## Immutability recipes
+
+    
+```
+// object
+this.x = x;
+Object.freeze(this);
+
+// array field — freeze a COPY, or the caller keeps a mutable handle
+this.items = Object.freeze([...items]);
+
+// type-level only (erased)
+readonly items: readonly LineItem[];
+```
+
+
+## Interface vs type alias
+
+    <table>
+      <tr>
+        <th>Use</th>
+        <th>When</th>
+      </tr>
+      <tr>
+        <td>`interface`</td>
+        <td>an object or class contract; better errors, can be implemented</td>
+      </tr>
+      <tr>
+        <td>`type`</td>
+        <td>unions, intersections, mapped and conditional types</td>
+      </tr>
+    </table>
+
+    <p>Sources:
+    <a href="https://www.typescriptlang.org/docs/handbook/type-compatibility.html">Type Compatibility</a> ·
+    <a href="https://www.typescriptlang.org/docs/handbook/2/objects.html">Object Types</a> ·
+    <a href="https://peps.python.org/pep-0544/">PEP 544 — Protocols</a></p>

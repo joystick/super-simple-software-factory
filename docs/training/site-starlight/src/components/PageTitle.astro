@@ -1,0 +1,41 @@
+---
+// Override of Starlight's default PageTitle. Renders the page title, then
+// re-surfaces the page `description` as a visible subtitle under the heading —
+// this is the original lesson subtitle (e.g. "Why a green result carries
+// almost no information…"), valuable training material that must stay visible,
+// not just live in metadata.
+// Starlight's page-title anchor id (from its internal constants, which are
+// not a public export — the value is stable).
+import AudioLecture from './AudioLecture.astro';
+const PAGE_TITLE_ID = '_top';
+
+const { entry } = Astro.locals.starlightRoute;
+const { title, description } = entry.data;
+// Only lessons have generated audio; rendering the player elsewhere would fire
+// a 404 manifest fetch on every non-lesson page.
+const isLesson = /(^|\/)lessons\//.test(entry.id ?? entry.slug ?? '');
+---
+
+<h1 id={PAGE_TITLE_ID} data-testid="page-title">{title}</h1>
+{description && <p class="page-subtitle" data-testid="page-subtitle">{description}</p>}
+{isLesson && <AudioLecture />}
+
+<style>
+	@layer starlight.core {
+		h1 {
+			margin-top: 1rem;
+			font-size: var(--sl-text-h1);
+			line-height: var(--sl-line-height-headings);
+			font-weight: 600;
+			color: var(--sl-color-white);
+		}
+		.page-subtitle {
+			margin-top: 0.5rem;
+			font-size: var(--sl-text-lg);
+			line-height: var(--sl-line-height-headings);
+			color: var(--sl-color-gray-2);
+			font-weight: 400;
+			text-wrap: balance;
+		}
+	}
+</style>

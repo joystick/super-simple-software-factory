@@ -1,0 +1,75 @@
+---
+// Renders the "win" / "why" / "trap" callout blocks that appeared as
+// <div class="win|why|trap"><span class="label">...</span><p>...</p></div>
+// in the original Docsify lesson HTML.
+interface Props {
+  kind: 'win' | 'why' | 'trap'
+  label: string
+}
+const { kind, label } = Astro.props
+
+const kindClass: Record<Props['kind'], string> = {
+  win: 'callout callout-win',
+  why: 'callout callout-why',
+  trap: 'callout callout-trap',
+}
+---
+
+<div class={kindClass[kind]} data-testid="callout" data-callout-kind={kind}>
+  <span class="callout-label">{label}</span>
+  <div class="callout-body">
+    <slot />
+  </div>
+</div>
+
+<style>
+  .callout {
+    border-radius: 0.5rem;
+    border: 2px solid var(--border-color, #444);
+    border-left-width: 6px;
+    padding: 1rem 1.25rem;
+    margin: 1.5rem 0;
+  }
+  .callout-label {
+    display: block;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.5rem;
+  }
+  .callout-body :global(p:last-child) {
+    margin-bottom: 0;
+  }
+  .callout-win {
+    border-color: hsl(150, 45%, 32%);
+    background: hsl(150, 45%, 96%);
+    color: hsl(150, 45%, 18%);
+  }
+  .callout-why {
+    border-color: hsl(198, 39%, 45%);
+    background: hsl(198, 39%, 96%);
+    color: hsl(198, 39%, 22%);
+  }
+  .callout-trap {
+    border-color: hsl(3, 70%, 45%);
+    background: hsl(3, 70%, 96%);
+    color: hsl(3, 70%, 24%);
+  }
+  /* Starlight sets [data-theme] on <html> for both light and dark (including
+     when the setting is "auto"), so key the dark palette off that attribute
+     rather than prefers-color-scheme — otherwise a manual toggle that disagrees
+     with the OS shows the wrong background. */
+  :global(:root[data-theme='dark']) .callout-win {
+    background: hsl(150, 45%, 14%);
+    color: hsl(150, 45%, 88%);
+  }
+  :global(:root[data-theme='dark']) .callout-why {
+    background: hsl(198, 39%, 16%);
+    color: hsl(198, 39%, 90%);
+  }
+  :global(:root[data-theme='dark']) .callout-trap {
+    background: hsl(3, 50%, 16%);
+    color: hsl(3, 70%, 90%);
+  }
+</style>

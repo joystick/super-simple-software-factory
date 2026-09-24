@@ -1,0 +1,10 @@
+---
+title: "The Driver Contract"
+description: "agent_cc and agent_pi are two different drivers behind the same coding_agent seam — this lesson covers what contract every driver must honor so a chain can swap one for another without changing its phases."
+sidebar:
+  order: 0
+---
+
+<p>SSSF's `coding_agent` field selects between drivers — `agent_cc`, `agent_pi`, and others — that all sit behind one contract, so a chain's phases never need to know or care which one is actually running. This lesson covers what that contract requires of a driver (structured output, a usage/cost report, tool-call tracking) and why keeping drivers interchangeable behind it is what lets you swap `claude_code` for `pi` on one agent without touching the rest of the roster or a single phase definition.</p>
+
+{/* TODO: full lesson content, see plans/2026-09-24-docs-reference-and-training.md */}

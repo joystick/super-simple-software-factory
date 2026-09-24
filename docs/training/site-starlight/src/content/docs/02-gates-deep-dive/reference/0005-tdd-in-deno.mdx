@@ -1,0 +1,145 @@
+---
+title: "TDD in Deno"
+description: "Red, green, refactor — and what each looks like in a typed runtime."
+sidebar:
+  order: 5
+---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+## The cycle
+
+    <table>
+      <tr>
+        <th>Step</th>
+        <th>Do</th>
+        <th>Rule</th>
+      </tr>
+      <tr>
+        <td><strong>Red</strong></td>
+        <td>write ONE failing test</td>
+        <td>watch it fail before writing any code</td>
+      </tr>
+      <tr>
+        <td><strong>Green</strong></td>
+        <td>the smallest thing that passes</td>
+        <td>hard-coding is allowed here</td>
+      </tr>
+      <tr>
+        <td><strong>Refactor</strong></td>
+        <td>improve with the suite green</td>
+        <td>no behaviour change; run after every edit</td>
+      </tr>
+    </table>
+
+## Two flavours of red
+
+    <table>
+      <tr>
+        <th>Flavour</th>
+        <th>Looks like</th>
+        <th>Tells you</th>
+      </tr>
+      <tr>
+        <td>does not compile</td>
+        <td>type error; <strong>no tests run at all</strong></td>
+        <td>the thing does not exist yet — nothing about behaviour</td>
+      </tr>
+      <tr>
+        <td>compiles and fails</td>
+        <td>N passed, 1 failed</td>
+        <td>the behaviour is genuinely absent or wrong</td>
+      </tr>
+    </table>
+
+    <p>Add a throwing stub to move from the first to the second. Do not skip straight to an
+implementation — the stub is what lets you see the test fail for the right reason.</p>
+
+## Commands
+
+    
+```
+deno task test                        # everything
+deno test --filter "coupon"           # just the cycle you are on
+deno test --fail-fast                 # stop at the first failure
+deno test --no-check                  # skip type checking to isolate a runtime failure
+deno task gates                       # test + lint + check, before you commit
+```
+
+
+    <p>During a cycle, run `--filter`. Before a commit, run the lot: a new slice
+must never break an old one.</p>
+
+## Writing the test
+
+    
+```
+Deno.test("a name that states the RULE, not the mechanics", () => {
+  // arrange — the smallest input that reaches the behaviour
+  const cart = new Cart([new LineItem("widget", 1_000, 1)]);
+
+  // act — one call
+  const receipt = priceCart(cart, rules, options);
+
+  // assert — the behaviour, not the implementation
+  assertEquals(receipt.discountCents, 200);
+});
+```
+
+
+    <p>Good name: <em>“a coupon does not apply when the supplied code differs”</em>.<br />
+Bad name: <em>“test apply returns null”</em> — that describes the code, and will be a lie
+after any refactor.</p>
+
+## Smells
+
+    <table>
+      <tr>
+        <th>Smell</th>
+        <th>Why it matters</th>
+      </tr>
+      <tr>
+        <td>Several tests written before running any</td>
+        <td>none of them has been observed to fail</td>
+      </tr>
+      <tr>
+        <td>A test that passed the moment it was written</td>
+        <td>it may assert nothing; delete a line of the code and check</td>
+      </tr>
+      <tr>
+        <td>Asserting on private internals</td>
+        <td>refactoring breaks the test though behaviour is intact</td>
+      </tr>
+      <tr>
+        <td>Only representable / round values in numeric tests</td>
+        <td>see reference 04 — the bug hides in the values you skipped</td>
+      </tr>
+      <tr>
+        <td>A test needing a comment to explain what it checks</td>
+        <td>rename it; the name is the documentation</td>
+      </tr>
+    </table>
+
+    <Callout kind="trap" label="The one property that matters">
+<p><strong>Would this test still pass if the implementation were wrong?</strong></p>
+      <p>If yes, it is not protecting anything. TDD makes the answer "no" by construction —
+  you were standing in the failure a moment ago.</p>
+</Callout>
+
+## Deciding what to test
+
+    <ol>
+      <li>The behaviour a caller depends on — one test per rule.</li>
+      <li>Each boundary, with inputs that <em>reach</em> it (reference 04).</li>
+      <li>Each way it can be invalid — one per error message.</li>
+      <li>Empty, one, many.</li>
+      <li>Any decision you made that could reasonably have gone the other way.</li>
+    </ol>
+
+    <p>Not tested: private helpers, formatting, or anything you would happily change without
+telling a caller.</p>
+
+    <p>Sources:
+    <a href="https://martinfowler.com/bliki/TestDrivenDevelopment.html">Fowler — TDD</a> ·
+    <a href="https://martinfowler.com/bliki/SelfTestingCode.html">Self Testing Code</a> ·
+    <a href="https://docs.deno.com/runtime/fundamentals/testing/">Deno — Testing</a></p>

@@ -1,0 +1,48 @@
+# docs/training recipes -- these are the bare, unprefixed names, for working
+# on the course directly from this directory (`cd docs/training && just serve`).
+# The fork's own root justfile also has `training-*`-prefixed equivalents
+# (`just training-serve`) runnable from anywhere in the repo -- same
+# underlying commands, just namespaced for cross-repo consistency.
+# The book itself is an Astro Starlight site living in site-starlight/.
+# Originally built as the standalone "sssf-learn" repo (github.com/joystick/
+# sssf-learn); moved here 2026-09-24, see plans/2026-09-24-docs-reference-and-training.md
+# in the fork root.
+
+# list every recipe
+default:
+    @just --list
+
+# install site deps (run once)
+install:
+    cd site-starlight && npm install
+
+# serve the book locally with hot reload (http://localhost:4321)
+serve PORT="4321":
+    cd site-starlight && npm run dev -- --port {{PORT}}
+
+# alias for the everyday loop
+dev PORT="4321": (serve PORT)
+
+# production build into site-starlight/dist
+build:
+    cd site-starlight && npm run build
+
+# preview the production build
+preview:
+    cd site-starlight && npm run preview
+
+# run the audio-module unit tests
+test:
+    cd site-starlight && node --test scripts/audio/extract-sections.test.mjs scripts/audio/cue-map.test.mjs
+
+# build the Piper TTS docker image once (bakes in the amy + ryan voices)
+audio-image:
+    cd site-starlight && docker build -t piper-tts:local -f scripts/audio/piper.Dockerfile scripts/audio
+
+# (re)generate narrated-lecture audio for all lessons — Piper neural TTS via Docker.
+# needs `just audio-image` (once) + a fresh `just build`. Renders every lesson in
+# both voices (amy, ryan). Limit with a route, e.g.
+#   just audio /01-sssf-fundamentals/lessons/0001-a-gate-you-have-not-watched-fail/
+# or one voice: `node scripts/audio/build-audio.mjs --voices amy`
+audio ROUTE="":
+    cd site-starlight && node scripts/audio/build-audio.mjs {{ if ROUTE != "" { "--only " + ROUTE } else { "" } }}

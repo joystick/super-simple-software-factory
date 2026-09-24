@@ -1,0 +1,196 @@
+---
+title: "Writing the Spec Yourself"
+description: "Four lessons handed you a failing test file and asked you to satisfy it. This one does not. You get a list of behaviours and an empty file, because writing the test is the skill — satisfying one is the easy half."
+sidebar:
+  order: 5
+---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>A coupon rule you specified, built one failing test at a time. And a working answer to
+  the question every previous lesson raised: <em>how do I know a test can fail?</em></p>
+</Callout>
+
+## Why test-first, given everything so far
+
+    <p>Look at what has actually gone wrong in this course:</p>
+
+    <table>
+      <tr>
+        <th>Lesson</th>
+        <th>The miss</th>
+      </tr>
+      <tr>
+        <td>1</td>
+        <td>I claimed a type error trips one gate. It trips two.</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>The float example carried over from Python did not reproduce.</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>The clamp test passed with the clamp deleted.</td>
+      </tr>
+    </table>
+
+    <p>Three misses, one root: <strong>a claim nobody executed.</strong> Each was caught by the
+same crude act — run it and look.</p>
+
+    <Callout kind="why" label="This is the argument for TDD, and it is not the usual one">
+<p>The common pitch is about design, or coverage, or confidence. Those are real but
+  arguable.</p>
+      <p>The unarguable one is narrower: <strong>a test written after the code has never been
+  observed to fail.</strong> You have seen it pass. You have no evidence it <em>can</em>
+  do anything else. Every trap in this course was that exact gap.</p>
+      <p>Writing the test first makes "watch it fail" structural instead of a discipline you
+  have to remember. Red is not a step you perform; it is the state you are already in.</p>
+</Callout>
+
+## Red has two flavours in a typed language
+
+    <p>Worth knowing before you start, because the first one surprises people:</p>
+
+    <ol>
+      <li><strong>It does not compile.</strong> You import `CouponDiscount` and it
+  does not exist. `deno test` reports a type error and runs <em>nothing</em> —
+  your 50 passing tests vanish from the output. This is red, and it is correct.</li>
+      <li><strong>It compiles and fails.</strong> You add a stub that throws. Now the runner
+  runs, your 50 are back, and one test fails for the reason you intended.</li>
+    </ol>
+
+    <p>Both are red. Only the second tells you anything about behaviour, which is why the stub
+step exists rather than jumping straight to an implementation.</p>
+
+## Build it
+
+    <ol class="steps">
+      <li>
+        <p>Open `tests/coupon.test.ts`. It is inert — the suite is still 50 green.
+    Read the behaviour list and the decisions at the top.</p>
+      </li>
+      <li>
+        <p>Uncomment the import. Run `deno task test` and watch flavour-one red.</p>
+      </li>
+      <li>
+        <p>Uncomment the worked example. Add the smallest stub to
+    `src/pricing.ts` that makes the file compile — a class whose
+    `apply` throws. Run again: flavour-two red, 50 passing, 1 failing.</p>
+      </li>
+      <li>
+        <p>Make it green. <strong>The smallest thing that works.</strong> Returning a
+    hard-coded discount is legitimate at this stage — the next test is what forces you to
+    generalise. Resisting that feels wasteful and is the entire discipline.</p>
+      </li>
+      <li>
+        <p>Now the loop. For each remaining behaviour: <strong>write the failing test first</strong>,
+    watch it fail, then change the code. Nine behaviours, nine small cycles.</p>
+      </li>
+      <li>
+        <p>Settle the three open decisions — case sensitivity, whitespace, duplicate coupons —
+    by writing a test that states your answer, with a comment saying why.</p>
+      </li>
+    </ol>
+
+    <Callout kind="trap" label="The failure mode to watch for in yourself">
+<p>You will be tempted to write four tests, then the implementation, then run everything.
+  It feels more efficient. It is the old habit wearing a new hat: those four tests have
+  still never been observed to fail individually.</p>
+      <p>One test. Watch it fail. Make it pass. The cycle is the product.</p>
+</Callout>
+
+## Your decisions have consequences — think before you assert
+
+    <p>The three open questions are not filler. Each has a defensible answer both ways:</p>
+
+    <table>
+      <tr>
+        <th>Question</th>
+        <th>One way</th>
+        <th>The other</th>
+      </tr>
+      <tr>
+        <td>Case sensitive?</td>
+        <td>Exact match is predictable and trivially explained</td>
+        <td>Customers type `save20` and expect it to work</td>
+      </tr>
+      <tr>
+        <td>Trim whitespace?</td>
+        <td>Copy-paste adds spaces; trimming is kind</td>
+        <td>Silent normalisation hides input problems</td>
+      </tr>
+      <tr>
+        <td>Two matching coupons?</td>
+        <td>Both apply — rules do not know about each other</td>
+        <td>One applies — "a coupon" is singular to a customer</td>
+      </tr>
+    </table>
+
+    <p>Pick, test, and write the reason down. <strong>The wrong outcome is leaving it
+undecided</strong>, so the behaviour is whatever your implementation happened to do —
+discovered later by a customer.</p>
+
+## Done when
+
+    <ul>
+      <li>All nine behaviours have a test, each of which you watched fail first.</li>
+      <li>The three decisions are settled by a test with a stated reason.</li>
+      <li>`deno task gates` is green — 50 plus yours.</li>
+      <li>You have run one mutation: break your coupon's code comparison and confirm a test
+  you wrote catches it.</li>
+    </ul>
+
+    <p>Then, and only then, open `~/Projects/training/sssf-play/app/pricing.py` and
+compare. You may well have made different choices; the interesting question is whether
+yours are <em>defensible</em>, not whether they match.</p>
+
+## Check yourself
+
+    <Quiz
+  question="What does a test written after the code definitely lack?"
+  choices={["Coverage of the error paths through that code", "A meaningful name describing what it protects", "Independence from the implementation details", "Any evidence that it is able to fail at all"]}
+  answerIndex={3}
+  correctFeedback="You have only ever seen it pass. That is the gap every trap in this course fell into."
+  wrongFeedback="It may have all of those. What it cannot have is an observation of it failing — you were never in that state."
+/>
+
+    <Quiz
+  question="Why is a hard-coded return acceptable to pass your first test?"
+  choices={["Because early tests are not meant to be precise", "Because the next test is what forces generalisation", "Because refactoring later removes all shortcuts", "Because the compiler will reject it soon anyway"]}
+  answerIndex={1}
+  correctFeedback="Each test adds exactly the pressure needed for the next increment. Generalising early is guessing at requirements you have not written down."
+  wrongFeedback="It is not sloppiness. The next failing test is what makes the general solution necessary, and until then you would be guessing."
+/>
+
+    <Quiz
+  question="Your import fails to compile and the runner shows no tests. What is that?"
+  choices={["A misconfiguration that must be fixed before starting", "A warning that can be safely ignored while iterating", "A valid red — the first of two flavours in typed code", "An indication the test file is in the wrong directory"]}
+  answerIndex={2}
+  correctFeedback="It is red. It just says nothing about behaviour yet, which is exactly why the next step is a stub rather than an implementation."
+  wrongFeedback="Nothing is broken. A missing export is a legitimate failing state — it simply cannot tell you anything about behaviour."
+/>
+
+## Read this next
+
+    <p><strong>Primary source:</strong>
+<a href="https://martinfowler.com/bliki/TestDrivenDevelopment.html">Martin Fowler — Test Driven Development</a>,
+then <a href="https://martinfowler.com/bliki/SelfTestingCode.html">Self Testing Code</a>.
+Short, and they separate the design argument from the regression argument — which most
+introductions blur together.</p>
+
+    <p>For the discipline itself, Kent Beck's <em>Test-Driven Development: By Example</em>
+remains the primary text. The first section builds a money class, which will feel
+pointed.</p>
+
+## Where this is going
+
+    <p>The engine is finished. `pricing-ts` already has its own stamped factory, `quality.py`
+wired to `deno test` / `deno lint` / `deno check`, each watched failing before being trusted —
+the same discipline as Chapter 1, proven to survive the change of language. If you want to see
+that wiring for yourself rather than take it on trust, read `adws/adw_modules/quality.py` in
+`pricing-ts` directly and run `just quality` there.</p>
+
+    <p><strong>Bring me your tests, not just your bugs.</strong> Paste what you wrote for any
+  of the nine behaviours and I will tell you whether it would survive the implementation
+  being wrong — which is the only property that matters.</p>

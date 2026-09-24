@@ -1,0 +1,179 @@
+---
+title: "Phases and the Run"
+description: "The spine every factory hangs on: three lanes, one context manager, and the reason code owns the phase list instead of the model."
+sidebar:
+  order: 4
+---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>You can read any ADW script top to bottom and name every phase, its lane, and its owner —
+  and say why the phase list lives in Python instead of inside a prompt. You will know what
+  `ph.call()` is allowed to do, and why a phase you forgot to describe will not even open.</p>
+</Callout>
+
+## What a phase is
+
+<p>A run is not one long agent session. It is a <strong>sequence of phases</strong>, and the
+sequence is ordinary Python — a script you can read. Each phase is one bounded unit of work
+with a name, an owner, and a lane. That is the spine the whole factory hangs on: gates
+(Lesson 1–2) and envelopes (Lesson 3) are what happen <em>at the seams between phases</em>.</p>
+
+<Callout kind="why" label="Why code owns the phase list">
+<p>Hand a model your whole SDLC and you get a machine with no seams: no phase boundary, so
+  you cannot say which step failed; no nameable acceptance, so "done" means "the agent
+  stopped talking." Move the sequence into code and everything falls out of one line —
+  <strong>phases become the unit of the trace</strong>, envelopes become the only way context
+  crosses a seam, gates become the definition of done.</p>
+</Callout>
+
+## Three lanes
+
+<p>Every phase is exactly one of three <strong>kinds</strong>, and each renders as its own
+swim lane in the trace:</p>
+
+<table>
+  <tr><th>Kind</th><th>Who acts</th><th>What it is</th></tr>
+  <tr><td>`engineer`</td><td>the human</td><td>the request that starts a run — your prompt, logged as the first phase</td></tr>
+  <tr><td>`agent`</td><td>a model</td><td>`ph.call()`: prompt in, typed envelope out, gates verified</td></tr>
+  <tr><td>`code`</td><td>deterministic Python</td><td>a step that stands on its own — a commit, a migration, running the suite</td></tr>
+</table>
+
+<Callout kind="trap" label="A code step is never buried inside an agent phase">
+<p>Running the test suite is a <code>code</code> phase, not something an agent "does" and
+  reports. Committing is a <code>code</code> phase. Because these stand alone in the trace,
+  it shows <em>exactly</em> when code ran and when an agent was working — and a green suite
+  is a fact the code observed, never a claim the agent made. This is Lesson 1's whole point,
+  wired into the shape of a run.</p>
+</Callout>
+
+## The one primitive: `run.phase(...)`
+
+<p>A phase is opened with a context manager. An ADW script is little more than a stack of
+these, which is why the scripts are 40–180 lines: the logic lives in `adw_modules/`, the
+script just names the sequence.</p>
+
+```python
+with run.phase(PhaseParams(
+        name="build",
+        kind="agent",
+        owner="builder",
+        description="Implement the plan; report every changed file.",
+        retries=1)) as ph:
+    build = ph.call(AgentCall(output_type=BuildOutput, prompt=prompt,
+                              previous=plan,
+                              gates=[gates.diff_matches_claims]))
+```
+
+<p>Read it as a sentence: open a phase named `build`, in the `agent` lane, owned by the
+`builder`, and inside it make one call whose output must parse to `BuildOutput` and pass
+`diff_matches_claims`. `previous=plan` is the prior phase's envelope — the seam from
+Lesson 3, made explicit.</p>
+
+### `ph.call()` belongs to the agent lane only
+
+<p>The handle enforces its own lane. Calling an agent from a `code` or `engineer` phase is
+a construction error, not a subtle bug:</p>
+
+```python
+def call(self, call: AgentCall) -> EnvelopeBase:
+    if self.phase.params.kind != "agent":
+        raise RuntimeError("ph.call() is only valid inside an agent phase")
+    return agents.execute(self.run, self.phase, call)
+```
+
+### Status defaults to fail
+
+<p>A `Phase` is born with `status="fail"` — success must be <em>earned</em> by getting to the
+end of the block without an exception. If a gate raises or the JSON never parses, the phase
+is already failed; nothing has to remember to mark it so.</p>
+
+## The description is not decoration
+
+<p>`description` is required, and it is <strong>validated at construction time</strong> — the
+error fires before the phase ever opens, so it can never reach the trace half-formed:</p>
+
+```python
+# rejected — only restates the name:
+PhaseParams(name="commit_plan", kind="code", owner="git",
+            description="Commit the plan")
+
+# accepted — says what it does and why:
+PhaseParams(name="commit_plan", kind="code", owner="git",
+            description="Commit the spec file so the plan is a reviewable artifact on its own.")
+```
+
+<Callout kind="why" label="Why the factory is this strict about one sentence">
+<p>The description is the <em>only</em> sentence the trace, the console, and the phase block
+  in the UI ever show about intent — everything else is ids, statuses, and timings. A
+  description that echoes the name (`commit_plan: "Commit the plan"`) tells a reader nothing
+  they could not already see, so it is rejected exactly like a blank one. The trace is only
+  as legible as the sentences you were made to write.</p>
+</Callout>
+
+## Your turn
+
+<p><em>Reps are tagged <strong>[read]</strong> (inspect a real file, no setup) or <strong>[run]</strong> (drive the <a href="/01-sssf-fundamentals/reference/0004-wiring-your-factory/">wired factory</a>).</em></p>
+
+
+<ol class="steps">
+  <li>
+    <p><strong>[read]</strong> <strong>Read a real spine.</strong> Open `adws/adw_plan_build_test.py` in
+    `~/Projects/training/sssf-play`. List its phases in order and tag each with its lane —
+    which are `agent`, which are `code`, where is the single `engineer` phase?</p>
+  </li>
+  <li>
+    <p><strong>[read]</strong> <strong>Find the seam.</strong> For one `agent` phase, find its `previous=` argument.
+    Which earlier phase's envelope is being handed in, and what does that phase's gates
+    check about it?</p>
+  </li>
+  <li>
+    <p><strong>[run]</strong> <strong>Break a description.</strong> Change one phase's `description` to echo its
+    name and run the script. It must fail at construction — before any agent is spawned,
+    before anything lands in `sssf.db`. That "fail early, fail loud" edge is the lesson.</p>
+  </li>
+</ol>
+
+## Check yourself
+
+<Quiz
+  question="Running the test suite in a run is which kind of phase?"
+  choices={["An agent phase the builder runs and reports", "A code phase that stands on its own", "An engineer phase, since a human wrote it", "Not a phase — it happens between phases"]}
+  answerIndex={1}
+  correctFeedback="The suite is a known command, so it is code. A green result is a fact the code observed, never a claim an agent made."
+  wrongFeedback="A known command is code, never an agent's job. Keeping it a code phase is why the trace can show when code actually ran."
+/>
+
+<Quiz
+  question="What happens if you call <code>ph.call()</code> inside a code phase?"
+  choices={["It runs the agent with reduced permissions", "It silently no-ops and returns an empty envelope", "It raises immediately — the wrong lane", "It promotes the phase to the agent lane"]}
+  answerIndex={2}
+  correctFeedback="The handle checks its own kind and raises. Agent work belongs to the agent lane, and the boundary is enforced, not assumed."
+  wrongFeedback="It does not adapt or degrade — it raises. ph.call() is valid only inside an agent phase, by construction."
+/>
+
+<Quiz
+  question="Why does the factory reject a phase description that restates its name?"
+  choices={["The database column has a strict length limit", "To keep phase names short enough to index", "Duplicate strings break the console renderer", "It is the only intent the trace ever shows"]}
+  answerIndex={3}
+  correctFeedback="Everything else in the trace is ids and timings. If the one sentence of intent is an echo, the trace is illegible — so it is a construction-time error."
+  wrongFeedback="It is about legibility, not storage. The description is the only sentence of intent the trace shows, so it has to earn its place."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> `adws/adw_modules/runner.py` in `sssf-play` — the `Run`
+class and its `phase()` context manager are the whole spine in one file. Then any
+`adw_*.py` script, which is just that primitive used in sequence. They are short on
+purpose.</p>
+
+## Where this goes next
+
+<p>You have the phases and the seams between them. Next: what happens when a gate at a seam
+goes red — the <strong>fix loop</strong>. Nothing restarts; the same agent session is
+corrected in place. It is the reason a factory can be strict about "done" without being
+expensive about it.</p>
+
+<p><strong>Ask me things.</strong> Bring me an `adw_*.py` you do not fully follow and we will
+walk its phase list together — lane by lane, seam by seam.</p>

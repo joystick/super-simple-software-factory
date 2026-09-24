@@ -1,0 +1,144 @@
+---
+title: "Stamp and Run for Real"
+description: "The capstone: stamp the factory into a real repo, wire its gates to real commands, run a full SDLC — and trust the result because you watched every gate fail first."
+sidebar:
+  order: 10
+---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+import SdlcCycle from '@components/SdlcCycle.astro'
+
+<Callout kind="win" label="The win">
+<p>You can take an empty repo to a working factory, run a real feature through a full
+  plan → build → test → review → document cycle, and review the result like an operator:
+  diff read, cost checked, gates trusted <em>because they were verified</em>. This is where all
+  ten prior lessons meet in a single run.</p>
+</Callout>
+
+## Two steps to a factory
+
+<p>The whole system is a <strong>skill</strong> you stamp into any repo. The skill is the
+product; everything else — the `adws/`, the `justfile`, the demo app — is stamped output.</p>
+
+```bash
+# 1. get the skill into your repo (it lives under .claude/skills/sssf/)
+# 2. stamp the factory
+uv run .claude/skills/sssf/scripts/install.py
+```
+
+<p>Stamping writes a starter `adws/` tree, a `sssf.config.yaml` roster, the twelve chains, and
+a `justfile` wrapping them — so a fresh repo gets `just sessions`, `just phases`, `just plan`,
+`just sdlc` out of the box.</p>
+
+## What you must change before you trust it
+
+<Callout kind="trap" label="A freshly stamped factory certifies everything">
+<p>The shipped quality blocks are <strong>placeholders that exit 0</strong>. Straight after
+  stamping, your test phase is theatre: it passes on any code, and — because a passing gate
+  never fires the fix loop (Lesson 5) — it will commit a bug and certify the run 5/5. Stamping
+  gives you the <em>shape</em> of a factory, never its substance. The substance is the wiring
+  you do next, each piece <em>watched failing</em>.</p>
+</Callout>
+
+<table>
+  <tr><th>Change</th><th>File</th><th>Why</th></tr>
+  <tr><td>Your real commands</td><td>`adw_modules/quality.py`</td><td>until wired, the test phase is theatre</td></tr>
+  <tr><td>Your definition of done</td><td>`adw_modules/gates.py`</td><td>a gate is one function; write what "done" means here</td></tr>
+  <tr><td>Your roster</td><td>`adw_sssf_config/sssf.config.yaml`</td><td>models, thinking, tools, and each agent's `writes`</td></tr>
+  <tr><td>Your prompts</td><td>`adw_data/prompt_engineering/{agent}/`</td><td>what a good plan looks like, what a review must catch</td></tr>
+  <tr><td>Your chains</td><td>`adw_*.py`</td><td>copy the closest and edit the phase list</td></tr>
+</table>
+
+## The full cycle
+
+<p>`adw_simple_sdlc` is the whole SDLC in one chain — and it commits as it goes, three work
+products by three authors:</p>
+
+<SdlcCycle />
+
+<p>Each commit message is the words of the agent that produced it. The plan, the code, and the
+documentation each land in their own commit — so a reader can see three authors, not one
+undifferentiated blob.</p>
+
+## The capstone rep: certify a bug, then catch it
+
+<p>This is the single most convincing exercise in the course. Do it once and the whole
+philosophy is no longer something you were told.</p>
+
+<p><em>All three reps are <strong>[run]</strong> — they drive the
+<a href="/01-sssf-fundamentals/reference/0004-wiring-your-factory/">wired factory</a>, and the
+first one costs about a dollar. It is worth it.</em></p>
+
+<ol class="steps">
+  <li>
+    <p><strong>[run]</strong> <strong>Watch it certify a bug.</strong> In a throwaway copy of a real repo (e.g.
+    `pricing-ts`), leave the test block as the shipped placeholder. Run `just sdlc` on a task
+    that introduces a real bug. Watch the factory build it, "test" it green, review it, commit
+    it, and write `status: success · phases 5/5`. Read the trace: every row is true, and the
+    result is wrong. (Costs roughly $0.60–£1 — the most useful dollar in this course.)</p>
+  </li>
+  <li>
+    <p><strong>[run]</strong> <strong>Wire the gate — and watch it fail.</strong> Point the test block at the real
+    suite. Introduce the bug's class deliberately and confirm the gate goes red and the others
+    stay green (Lesson 1's procedure). Only now is it a gate.</p>
+  </li>
+  <li>
+    <p><strong>[run]</strong> <strong>Re-run and watch it catch.</strong> Run `just sdlc` again on the same task. This
+    time the failing suite fires the fix loop, the builder is corrected in place, and the run
+    either recovers or fails honestly with a named reason. Same factory, same prompt — the only
+    difference is a gate you watched fail.</p>
+  </li>
+</ol>
+
+## Reviewing like an operator
+
+<p>A finished run is not a finished job. Read the diff — the code, not the summary. Check the
+cost against what the work was worth. And trust the gates <em>only</em> because you verified
+them, never because the banner is green. "A factory is exactly as trustworthy as its weakest
+gate, and a gate's trustworthiness cannot be read, only demonstrated" — the first sentence of
+the course, now something you have done rather than read.</p>
+
+## Check yourself
+
+<Quiz
+  question="Immediately after stamping, what does the test gate do to broken code?"
+  choices={["Blocks the commit until the code is fixed", "Passes it — the shipped block is a placeholder", "Refuses to run until you wire a real command", "Warns but lets the run continue to review"]}
+  answerIndex={1}
+  correctFeedback="Shipped blocks exit 0. A passing gate never fires the fix loop, so the factory commits the bug and certifies 5/5 until you wire the command."
+  wrongFeedback="It passes — the block is a placeholder that exits 0. That is exactly why stamping gives you the shape, not the substance."
+/>
+
+<Quiz
+  question="Why does adw_simple_sdlc land three separate commits?"
+  choices={["Git performs better with smaller commits", "One per author: plan, code, and docs", "To leave rollback points between phases", "The reviewer requires a commit to inspect"]}
+  answerIndex={1}
+  correctFeedback="Plan, code, and write-up are three work products by three agents, each committed in its own author's words — so a reader sees three authors, not one blob."
+  wrongFeedback="It is about authorship, not git tuning. Each commit is one agent's work product in that agent's own words."
+/>
+
+<Quiz
+  question="What single change turns the capstone's certified bug into a caught one?"
+  choices={["Raising the model's thinking level to high", "Adding a second reviewer to the chain", "Wiring the test gate and watching it fail", "Increasing MAX_FIX_LOOPS past three"]}
+  answerIndex={2}
+  correctFeedback="Same factory, same prompt. The only difference is a real, verified gate — which fires the fix loop the placeholder never could."
+  wrongFeedback="It is not the model or the loop count. A gate you wired and watched fail is what makes the difference — everything else is unchanged."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> `.claude/skills/sssf/SKILL.md` in `sssf-play` — the hard
+rules and the request-routing table, the actual product you stamp. Then `scripts/install.py`,
+which is exactly what stamping runs. The repo README's "Why this exists" section is the whole
+philosophy in one page.</p>
+
+## Where this goes next
+
+<p>That is the fundamentals arc end to end: gates, envelopes, phases, the fix loop, bounds, the
+trace, chains, and a real run. <strong>Chapter 2</strong> takes the cornerstone — gates —
+deep, in a second language, proving the discipline survives a change of toolchain. And a
+parked <strong>Chapter 3</strong> runs this same factory against a real Next.js + Expo
+monorepo, where "where do the gate commands point" stops being obvious.</p>
+
+<p><strong>Ask me things.</strong> When you run the capstone, bring me the trace of the run
+that certified the bug. Reading it together — every true row adding up to a wrong answer — is
+the lesson landing.</p>

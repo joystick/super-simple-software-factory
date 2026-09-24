@@ -1,0 +1,192 @@
+---
+title: "Composing a Chain"
+description: "An ADW is a short, readable Python script — a sequence of phases and the gates on them. Copy the closest one, edit the phase list, own your own workflow."
+sidebar:
+  order: 9
+---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>You can read any `adw_*.py` end to end, say why it is 40–180 lines and not 1,000, and
+  compose your own chain by copying the closest one and editing its phase list. You will know
+  where gates attach, how a loop is bounded, and why a run can fail even when every phase in it
+  went green.</p>
+</Callout>
+
+## An ADW is thin on purpose
+
+<p>A chain is an ordinary Python script. All the machinery — the runner, agents, gates,
+permissions, tracer — lives in `adw_modules/`. The chain itself only names the sequence, which
+is why you can read one in a minute. Here is `adw_plan_build.py`, complete but for imports:</p>
+
+```python
+def main(prompt, config="adws/adw_sssf_config/sssf.config.yaml", adw_id=None) -> int:
+    cfg = agents.load_config(config)
+    run = session.ensure(cfg, adw_id)                    # new run, or continue one
+
+    with run.phase(PhaseParams(name="request", kind="engineer", owner=run.engineer,
+                               description="Capture the human's request that starts the run.")) as ph:
+        ph.log(input=prompt)
+
+    with run.phase(PhaseParams(name="plan", kind="agent", owner="planner",
+                               description="Turn the request into a spec the builder can follow.")) as ph:
+        plan = ph.call(AgentCall(output_type=PlanOutput, prompt=prompt,
+                                 gates=[gates.artifacts_exist, gates.files_non_empty]))
+
+    with run.phase(PhaseParams(name="build", kind="agent", owner="builder",
+                               description="Implement the plan; report every changed file.")) as ph:
+        build = ph.call(AgentCall(output_type=BuildOutput, prompt=prompt, previous=plan,
+                                  gates=[gates.diff_matches_claims]))
+
+    with run.phase(PhaseParams(name="commit", kind="code", owner="git",
+                               description="Commit the build once its claims are verified.")) as ph:
+        ph.log(sha=git_helper.commit_all(build.commit_message))
+
+    return run.finish()
+```
+
+<p>Every idea from Lessons 3–5 is visible here: the `engineer` lane opens it, agent phases
+carry an `output_type` and `gates`, `previous=plan` is the envelope crossing the seam, and the
+commit is a `code` phase that stands alone.</p>
+
+## The starter chains
+
+<p>You rarely start blank. Twelve chains ship; you copy the nearest and adjust:</p>
+
+<table>
+  <tr><th>Chain</th><th>Reach for it when</th></tr>
+  <tr><td>`adw_prompt`</td><td>one agent, one prompt</td></tr>
+  <tr><td>`adw_scout`</td><td>read-only recon, nothing changes</td></tr>
+  <tr><td>`adw_plan` / `adw_build`</td><td>you want only the spec, or only the code</td></tr>
+  <tr><td>`adw_quality`</td><td>lint/typecheck/build, no agents at all</td></tr>
+  <tr><td>`adw_build_test`</td><td>there is a suite to satisfy (bounded fix loop)</td></tr>
+  <tr><td>`adw_plan_build_test`</td><td>the standard chain</td></tr>
+  <tr><td>`adw_simple_sdlc`</td><td>plan → build → test → review → document</td></tr>
+</table>
+
+<p>That is the shortlist you will actually reach for. The rest of the twelve —
+`adw_build_review`, `adw_document`, `adw_plan_build`, `adw_plan_build_test_quality` — are
+narrower variants of the same names above with one phase added or removed;
+`ls adws/adw_*.py` in `sssf-play` lists all twelve if you want the full set.</p>
+
+## Bounded loops are just Python
+
+<p>The fix loop from Lesson 5 is not a framework feature — it is a `for` loop in the chain,
+capped by a constant you can see:</p>
+
+```python
+for i in range(1, MAX_FIX_LOOPS + 1):
+    with run.phase(PhaseParams(name=f"test_{i}", kind="code", owner="quality", ...)) as ph:
+        test = quality.run_tests(run)
+    if test.passed:
+        break
+    with run.phase(PhaseParams(name=f"fix_{i}", kind="agent", owner="builder", retries=1, ...)) as ph:
+        ph.call(AgentCall(output_type=BuildOutput, prompt=fix_prompt,
+                          previous=quality.as_envelope(test, "tests"), gates=[gates.diff_matches_claims]))
+```
+
+## Two questions, two phases
+
+<p>The fuller chains separate two things a beginner conflates. `adw_simple_sdlc` runs both a
+test phase and a reviewer phase, because they ask different questions:</p>
+
+<table>
+  <tr><th>Phase</th><th>Asks</th><th>Against</th></tr>
+  <tr><td>`code(test)`</td><td>"does it run?"</td><td>the suite</td></tr>
+  <tr><td>`agent(reviewer)`</td><td>"is this what was asked for?"</td><td>the plan</td></tr>
+</table>
+
+<p>Neither can answer the other's question. A suite that passes says nothing about whether the
+feature is the one requested; an approving review says nothing about whether the code runs.</p>
+
+## A green phase does not make a green run
+
+<Callout kind="why" label="Acceptance is a run-level fact, decided at finish">
+<p>`run.finish(accepted=..., reason=...)` is where a run's verdict is set — and it is separate
+  from whether the phases passed. A fix loop can exhaust its three attempts with the last
+  builder phase itself "green," yet `test.passed` is still false, so the run must fail. The
+  chain calls `run.finish(accepted=test.passed, reason="the suite still failed after 3
+  attempts")`. Phases succeeding is necessary; it is not sufficient.</p>
+</Callout>
+
+<Callout kind="trap" label="A phase without a gate is unchecked work, faster">
+<p>The moment you add an agent phase, ask what verifies its envelope. An agent phase with an
+  empty `gates=[]` produces a report nobody checked — the Lesson 1 problem, re-introduced by
+  omission. Composing a chain is as much about attaching the right gates as ordering the
+  phases.</p>
+</Callout>
+
+## Your turn
+
+<p><em>Reps are tagged <strong>[read]</strong> (inspect a real file, no setup) or <strong>[run]</strong> (drive the <a href="/01-sssf-fundamentals/reference/0004-wiring-your-factory/">wired factory</a>).</em></p>
+
+
+<ol class="steps">
+  <li>
+    <p><strong>[read]</strong> <strong>Diff two chains.</strong> In `sssf-play`, read `adw_build.py` and
+    `adw_build_test.py` side by side. Name exactly what the second adds — which phases, which
+    loop, which gate.</p>
+  </li>
+  <li>
+    <p><strong>[run]</strong> <strong>Compose one.</strong> Copy `adw_build.py` to `adw_build_review.py` (if it does
+    not already exist) and insert a reviewer phase after the build, with `previous=build` and a
+    consistency gate. Run it on a small task.</p>
+  </li>
+  <li>
+    <p><strong>[run]</strong> <strong>Make the run fail correctly.</strong> Point a chain at a task its gates will
+    reject and confirm `run.finish` reports a failed run with a <em>named</em> reason — not a
+    green run with a buried problem.</p>
+  </li>
+</ol>
+
+## Check yourself
+
+<Quiz
+  question="Recall from Lesson 1: an agent phase with an empty <code>gates=[]</code> reintroduces what?"
+  choices={["A permissions breach on the repo", "Unchecked work that looks verified", "A parse error in the envelope", "A slower but safer run"]}
+  answerIndex={1}
+  correctFeedback="No gate means the envelope is a report nobody checked — Lesson 1's green-carries-no-information problem, re-introduced by omission."
+  wrongFeedback="It is not a breach or a parse error. An ungated phase produces unchecked work that still reads as done — exactly Lesson 1's trap."
+/>
+
+<Quiz
+  question="Why are the ADW chain scripts only 40–180 lines each?"
+  choices={["They are stubs the framework expands at runtime", "All the logic lives in adw_modules; chains only sequence", "Longer scripts are rejected by the linter gate", "They call one giant function that does everything"]}
+  answerIndex={1}
+  correctFeedback="The runner, gates, permissions and tracer live in adw_modules. A chain just names the phases in order, so it stays readable."
+  wrongFeedback="They are complete, not stubs. They are short because the machinery is in adw_modules and the chain only sequences phases."
+/>
+
+<Quiz
+  question="A fix loop exhausts its 3 attempts and the suite still fails. What is the run's verdict?"
+  choices={["Success — the last builder phase went green", "Failure — run.finish sees the suite failed", "It retries a fourth time with more budget", "Undefined — the chain has to decide manually"]}
+  answerIndex={1}
+  correctFeedback="run.finish(accepted=test.passed, ...) sets the verdict. Phases going green is necessary but not sufficient; the suite must actually pass."
+  wrongFeedback="A green final phase is not a green run. run.finish checks test.passed and fails the run with a named reason."
+/>
+
+<Quiz
+  question="Why does adw_simple_sdlc run both a test phase and a reviewer phase?"
+  choices={["Redundancy, in case one of them crashes", "They ask different questions neither can answer alone", "The reviewer re-runs the suite more strictly", "To produce two commits instead of just one"]}
+  answerIndex={1}
+  correctFeedback="The suite asks 'does it run?'; the reviewer asks 'is this what was asked for?'. Passing tests say nothing about whether it is the right feature."
+  wrongFeedback="It is not redundancy. Tests judge 'does it run', the review judges 'is it what was asked' — two different questions."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> read `adw_plan_build.py`, then `adw_plan_build_test.py`,
+then `adw_simple_sdlc.py` in `sssf-play` in that order — each adds one idea to the last, and
+the diffs between them are the lesson. The header comment on `adw_simple_sdlc.py` is a small
+essay on why the commits land where they do.</p>
+
+## Where this goes next
+
+<p>You can read, run, and compose chains. The last step is putting it to work on a repo that is
+not a teaching toy: <strong>stamping</strong> the factory into a real project, wiring its gates
+to real commands, and running a full SDLC on real work — trusting the result because you
+watched every gate fail first. That is the capstone.</p>
+
+<p><strong>Ask me things.</strong> Bring me the workflow you wish existed and we will build its
+phase list together.</p>
