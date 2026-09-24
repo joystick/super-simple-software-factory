@@ -100,6 +100,21 @@ def test_read_blocked_by_treats_none_with_explanatory_parenthetical_as_no_blocke
     assert adw_watch.read_blocked_by(text) == []
 
 
+def test_read_blocked_by_treats_none_with_a_comma_inside_the_parenthetical_as_no_blockers():
+    # Found while writing the docs/training queue lesson, 2026-09-24: a comma
+    # INSIDE the parenthetical ("(none -- API exists, see spec.md)") used to
+    # get comma-split before the parenthetical was stripped, producing two
+    # broken tokens ("none -- API exists" and "see spec.md)") instead of
+    # recognizing the whole value as "no blocker".
+    text = "Blocked by: none (API exists, see spec.md)\n"
+    assert adw_watch.read_blocked_by(text) == []
+
+
+def test_read_blocked_by_strips_a_parenthetical_containing_a_comma_before_a_real_ticket():
+    text = "Blocked by: 09 (needs review, see spec.md)\n"
+    assert adw_watch.read_blocked_by(text) == ["09"]
+
+
 def test_read_blocked_by_warns_on_a_value_that_is_not_a_bare_ticket_number(tmp_path, capsys):
     path = tmp_path / "ticket.md"
     text = "Blocked by: the migration ticket\n"

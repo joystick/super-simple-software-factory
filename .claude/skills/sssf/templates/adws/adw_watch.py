@@ -120,17 +120,19 @@ def read_blocked_by(text: str, path: Path | None = None) -> list[str]:
     m = BLOCKED_BY_RE.search(text)
     if not m:
         return []
-    tokens = (b.strip() for b in m.group(1).split(","))
+    # Strip parenthetical annotations BEFORE splitting on commas -- a comma
+    # inside a parenthetical ("(none -- API exists, see spec.md)") used to
+    # get comma-split first, producing two broken tokens ("none -- API
+    # exists" and "see spec.md)") instead of one. Parens don't nest here, so
+    # a single non-greedy sub over the whole value is safe and simpler than
+    # re-deriving this per split token.
+    value = re.sub(r"\s*\([^)]*\)", "", m.group(1))
+    tokens = (b.strip() for b in value.split(","))
     result = []
     for raw in tokens:
         if not raw:
             continue
-        # Strip a "(Ticket name)" annotation anywhere in the token, not just
-        # at the very end -- "09 (Directory fallback...)." has trailing
-        # punctuation AFTER the closing paren, so a $-anchored strip (the
-        # first version of this fix) never fires on it at all.
-        cleaned = re.sub(r"\s*\([^)]*\)", "", raw).strip()
-        cleaned = cleaned.rstrip(".;:,").strip()
+        cleaned = raw.rstrip(".;:,").strip()
         if not cleaned or _NONE_RE.match(cleaned):
             # "None" (with or without an explanatory parenthetical) means no
             # blocker, same as omitting the line -- found live: "None
