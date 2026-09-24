@@ -322,20 +322,16 @@ docs-training-test/
       scripts — done so far via manual/agent spot-checks during the review
       pass, not a standing script. Still open.
 
-### Follow-up discovered during this pass, not yet fixed
-- [ ] **Real bug in `adw_watch.py`'s `read_blocked_by()`**: a `Blocked by:`
-      value shaped like `(none — reason, with an internal comma)` still fails
-      to resolve to "no blocker" — the value gets split on commas BEFORE the
-      parenthetical-stripping regex runs, so a comma inside the explanation
-      breaks the parenthetical into two unmatched fragments before either can
-      be recognized as `none`. Confirmed live via direct execution against the
-      real `weather-report`/fork code, both fail the same way; a
-      comma-free or semicolon-punctuated explanation (the actual fix applied
-      to the real ticket 09 earlier this session) works correctly. This is a
-      new finding from writing the sample lesson accurately, not something
-      the earlier `read_blocked_by()` hardening pass caught — worth a
-      dedicated follow-up fix + test, same pattern as this session's other
-      `adw_watch.py` hardening.
+### Follow-up discovered during this pass — fixed 2026-09-24 (commit `aae7aa8`)
+- [x] **Real bug in `adw_watch.py`'s `read_blocked_by()`**: a `Blocked by:`
+      value shaped like `(none — reason, with an internal comma)` failed
+      to resolve to "no blocker" — the value got split on commas BEFORE the
+      parenthetical-stripping regex ran, so a comma inside the explanation
+      broke the parenthetical into two unmatched fragments before either could
+      be recognized as `none`. Fix: strip the parenthetical from the whole
+      matched value first, then split on commas. Two regression tests added
+      (`test_watch.py`); full suite (49 tests) passes via
+      `uv run --with pytest pytest .claude/skills/sssf/templates/adws/tests/test_watch.py`.
 
 ### Step 7 — real-fork application (done, 2026-09-24)
 - [x] Test scripts written for real: `scripts/docs-check/{check_reference_manifest,
@@ -361,8 +357,6 @@ docs-training-test/
       honest stubs remain)
 - [ ] Full authoring of all 44 own-page reference rows (10 of 44 done as the
       sample, 34 remain)
-- [ ] The `read_blocked_by()` comma-inside-parenthetical bug found while writing
-      the sample queue lesson (see above) -- real, confirmed, not yet fixed
 - [ ] `training/`'s screencast scripts -> `03-screencasts` conversion (Phase 2 of
       the site-move mechanics, Open Question 2 -- deliberately deferred, `training/`
       is untouched)
@@ -375,6 +369,7 @@ docs-training-test/
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.1 | 2026-09-24 | Fixed the `read_blocked_by()` comma-inside-parenthetical bug tracked as an open follow-up in v1.0 (commit `aae7aa8`): stripped the parenthetical from the whole matched value before splitting on commas, added 2 regression tests, full 49-test suite passes. |
 | 1.0 | 2026-09-24 | Step 7 (real-fork application) done: wrote and ran the standing test scripts for real (`scripts/docs-check/`, wired to `just docs-check`), found and fixed a fresh batch of real bugs running them (a regex over-match, a genuine citation-shape error, 4 anchor typos); applied `docs/reference/` and `docs/training/` to the real fork in two coherent commits, added the root `justfile` (`training-*` recipes) and `.gitignore` rules, removed `learn/`; `npm install`/`npm run build` run for real from the fork (58 pages, 0 errors); pushed to `origin/main`; removed `sssf-learn`'s local clone only after re-confirming GitHub still has the full history; removed the now-done isolated test workspace. Marked `in-progress` rather than `done` -- the explicit follow-ups (remaining lesson/reference authoring, the `read_blocked_by()` bug, the screencast conversion) are real, tracked, and none of them were silently claimed complete. |
 | 0.3 | 2026-09-24 | Isolated test implementation built (3 builder passes: site move + baseline build, reference glossary, chapters 3-7 scaffold) and reviewed by a fable pass (`a6173d4265a575410`), which found several real issues — most notably a stale claim in the bootstrap lesson directly contradicting this session's own earlier `adw_watch.py` fix, and a genuinely new follow-up bug in `read_blocked_by()` discovered while verifying one of the review's findings (a comma inside a "none (explanation)" parenthetical still breaks resolution). All findings fixed except the new bug, which is tracked as an explicit follow-up. `npm run build` clean (58 pages) after fixes. Not yet: automated test scripts (link-checker, concept-completeness check) as standing scripts, and step 7 (real-fork application + `sssf-learn` deletion) — both still open, pending go-ahead. |
 | 0.2 | 2026-09-24 | Revised per fable critique (`a9afe766faa44234c`): fixed 2 citation errors (sssf.config.yaml's real path; Visualizer is an app, not a module class) and a category-count label error (7, not 6); marked categories 5 (gates/permissions) and 7 (the queue) as NET-NEW rather than "reorganize existing" (confirmed near-zero coverage in references/*.md); resolved the references/*.md fate as LINK-not-move (moving breaks SKILL.md's citations, copying creates divergence — the exact problem this project exists to fix); added an explicit fork-glossary-vs-course-reference rule to prevent a second duplication; swapped the Ch4 "reading real cost" sample lesson (found to mostly duplicate existing lesson 0008) for a Ch6 "bootstrap vocabulary" pick that exercises the prose->lesson conversion for real; added the 75-row concept-manifest as a required pre-build artifact so "every concept has a page" is actually checkable; moved the isolated workspace off /private/tmp (macOS periodic cleanup risk) to a git-init'd _scratch/ directory. |
