@@ -4,7 +4,178 @@ description: "prompt_engineering and skill_engineering are two distinct layers a
 sidebar:
   order: 0
 ---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>You can look at any behavior an SSSF agent exhibits and say which of the two layers it came
+  from — the agent's own `prompt_engineering` files or a vendored `skill_engineering` file — and
+  therefore which file you are allowed to edit to change it. Every fix in the rest of this chapter
+  depends on getting that call right.</p>
+</Callout>
 
 <p>The adoption playbook frames a factory's behavior as sitting in two distinct layers: `prompt_engineering` — the system prompts baked into each agent's own role, edited directly in your repo — and `skill_engineering` — named protocols vendored in per agent, covered in Chapter 1's "Vendoring a Skill" lesson. Going dark depends on knowing exactly which layer to edit for a given problem: the headless-interview fix in this chapter's bootstrap-vocabulary lesson, for instance, lives in an agent's own `system.md` (layer one), never in a vendored skill file (layer two) — editing the wrong layer either does nothing or silently breaks the next `vendor_skill.py --check`.</p>
 
-{/* TODO: full lesson content, see plans/2026-09-24-docs-reference-and-training.md */}
+## Layer one: prompt_engineering — who the agent is
+
+<p>Every agent in `sssf.config.yaml` has two required `prompt_engineering` paths, and the config
+reference defines them tightly: `prompt_engineering.system` is "who the agent is, its single
+purpose, its output contract," and `prompt_engineering.user` is "the task template with
+`{{prompt}}`, `{{previous_envelope}}`, `{{context_handoff_dir}}`." These files are yours. They
+are not provenance-stamped, they have no drift check, and the reference says outright that a
+downstream repo "is expected to customize" them. This is the layer where the agent's standing
+instructions live — scout's "Glossary first / OKF second / ast-grep third" ordering, the planner's
+"scope your plan to the delta only," the documenter's "everything you write must be traceable to
+that diff." All of it is plain markdown under `adws/adw_data/prompt_engineering/&lt;agent&gt;/`.</p>
+
+```yaml
+agents:
+  - name: planner
+    prompt_engineering:
+      system: adws/adw_data/prompt_engineering/planner/system.md
+      user: adws/adw_data/prompt_engineering/planner/user.md
+```
+
+<Callout kind="why" label="Why the system prompt replaces, not appends">
+<p>For the `claude_code` coding agent, the rendered system prompt goes in as `--system-prompt`,
+  which <em>replaces</em> Claude Code's default prompt rather than `--append-`ing to it. The
+  config reference's reasoning: "An SSSF agent is defined by its own `prompt_engineering`;
+  letting the default prompt survive underneath would mean two sets of instructions." The same
+  logic drives `--setting-sources ''` — the agent runs hermetic, and "`prompt_engineering` and
+  `tools` are supposed to be the whole of what an agent sees." Layer one is meant to be the
+  complete definition of the role, not a decoration on top of someone else's.</p>
+</Callout>
+
+## Layer two: skill_engineering — how rigorously it works
+
+<p>`skill_engineering` is a list of vendored, committed skill files — `tdd`, `codebase-design`,
+`wayfinder`, `to-spec`, anything shaped like a `SKILL.md` — that get composed onto an agent's
+system prompt at call time. The config reference names the gap it closes: SSSF "governs
+<em>where and when</em> an agent runs — phases, gates, the envelope. It says nothing about
+<em>how rigorously</em> the agent works once running." And because of that hermetic
+`--setting-sources ''`, every skill you have installed interactively is invisible to a headless
+node. The only way a protocol reaches an agent is to vendor it in as text.</p>
+
+```yaml
+agents:
+  - name: planner
+    skill_engineering:
+      - adws/adw_data/skill_engineering/tdd.md
+```
+
+<p>The vendoring command — `uv run &lt;skill&gt;/scripts/vendor_skill.py &lt;source&gt;` — copies the
+skill into `adws/adw_data/skill_engineering/` with a provenance header (source path, date,
+content hash), stripped before the text reaches a model. That header is what makes layer two
+different from layer one: `vendor_skill.py --check &lt;vendored-file&gt;` compares the vendored copy
+against its source and reports drift. Layer two files are meant to stay byte-identical to their
+upstream. Layer one files are meant to diverge.</p>
+
+## Which file do you edit?
+
+<table>
+  <tr><th></th><th>prompt_engineering</th><th>skill_engineering</th></tr>
+  <tr><td><strong>Lives at</strong></td>
+      <td>`adws/adw_data/prompt_engineering/&lt;agent&gt;/system.md` + `user.md`</td>
+      <td>`adws/adw_data/skill_engineering/&lt;skill&gt;.md`</td></tr>
+  <tr><td><strong>Attached by</strong></td>
+      <td>required on every `agents[]` entry</td>
+      <td>optional `skill_engineering:` list; per-agent list <em>replaces</em> the default's</td></tr>
+  <tr><td><strong>Origin</strong></td>
+      <td>SSSF's starter template, then yours</td>
+      <td>an upstream `SKILL.md`, provenance-stamped</td></tr>
+  <tr><td><strong>Drift check</strong></td>
+      <td>none — diff against the shipped template by hand</td>
+      <td>`vendor_skill.py --check`</td></tr>
+  <tr><td><strong>Expected to change?</strong></td>
+      <td>yes, that is the point</td>
+      <td>no — re-vendor from source instead</td></tr>
+  <tr><td><strong>Cost</strong></td>
+      <td>always paid</td>
+      <td>real tokens per call, reported by `just sessions`; `skill_token_budget` warns</td></tr>
+</table>
+
+<p>The rule that falls out: <strong>when a vendored skill says something that is wrong for a
+headless run, you do not edit the skill. You tell the agent, in its own `system.md`, what to do
+about it.</strong> That is exactly how the shipped planner template handles `wayfinder`'s "ask the
+user" fallback and `to-spec`'s self-applied `ready-for-agent` label — a section headed "On the
+skills composed below" in `prompt_engineering/planner/system.md` overrides them from layer one,
+while the vendored files underneath stay untouched. The playbook's Part C states the same
+constraint directly: add the overrides to "your `skill_engineering`-attached agent's own
+`system.md` (not the vendored skill file)."</p>
+
+<Callout kind="trap" label="Editing the vendored copy breaks quietly, later">
+<p>Patch a headless override straight into `adws/adw_data/skill_engineering/wayfinder.md` and it
+  will work — today. The next `vendor_skill.py --check` reports drift; the next re-vendor from
+  source silently reverts your patch; and nothing in the run tells you the override is gone.
+  Layer one has the opposite failure: the config reference notes that the planner's "On the skills
+  composed below" section has no drift check against the shipped template at all, so a fix that
+  lands upstream never reaches your copy unless you `diff` them by hand. Both layers can drift.
+  Only one of them is <em>supposed</em> to.</p>
+</Callout>
+
+## Where the two layers meet — and where they do not
+
+<p>The playbook's "Where the two layers sit" section draws the line as two boxes. The
+<strong>automatic</strong> path — your interactive Claude Code with its installed skills, and the
+SSSF headless nodes — "still does not cross": a human carries intent from one to the other, and
+`--setting-sources ''` keeps installed skills invisible. The <strong>deliberate</strong> path is
+the only bridge: vendor a skill, attach it with the config key, and that node runs with the
+protocol in its prompt. Two consequences the playbook spells out: "Outcome gates judge the
+result. No gate claims to verify process" — attaching `tdd` gets the protocol into the prompt,
+not a guarantee it was followed — and "Token cost of the vendored text is reported per run."</p>
+
+<Callout kind="why" label="Why tool-usage patterns are not skills">
+<p>Part C's Problem 2 adds glossary, knowledge-source, and `ast-grep` lookups to scout. It is
+  tempting to package those as a vendored skill. The playbook says no: they "are tool-usage
+  patterns baked into scout's own instructions, the same way `writes` and `protected_files`
+  already are. They don't belong in the same composition list as `wayfinder`/`to-spec`/
+  `to-tickets`/`tdd`, which are planning methodologies." Layer two is for <em>how to think</em>
+  about a task; layer one is for <em>what this agent does, in this repo</em>. A search order
+  specific to your repo's `.okf/` layout is the second kind.</p>
+</Callout>
+
+## Check yourself
+
+<Quiz
+  question="A vendored planning skill's text says 'ask the user how to proceed' and your run is headless. Where does the fix go?"
+  choices={["Into the vendored skill file under adws/adw_data/skill_engineering/", "Into the agent's own prompt_engineering system.md, as an override of the composed skill text", "Into sssf.config.yaml as a new key on the agent", "Into vendor_skill.py so it strips the line on vendoring"]}
+  answerIndex={1}
+  correctFeedback="The vendored copy stays byte-identical to its source — vendor_skill.py --check depends on that. The agent's own system.md is the layer that is yours to customize, and the shipped planner template already does exactly this in its 'On the skills composed below' section."
+  wrongFeedback="Editing the vendored file works until the next --check reports drift or a re-vendor reverts it. Overrides belong one layer up, in the agent's own system.md — the file the config reference explicitly expects a downstream repo to customize."
+/>
+
+<Quiz
+  question="Which of these does a drift check exist for?"
+  choices={["prompt_engineering/planner/system.md against the shipped template", "A vendored skill_engineering file against its upstream source", "Both", "Neither"]}
+  answerIndex={1}
+  correctFeedback="vendor_skill.py --check compares a vendored file's provenance hash against its source. The planner's system.md has no such check — the config reference says to diff it against the shipped template by hand, periodically."
+  wrongFeedback="Only layer two has tooling: vendor_skill.py --check works off the provenance header vendoring stamps in. Layer one files are not provenance-headered because they are expected to diverge — so drift there is caught only by a manual diff."
+/>
+
+<Quiz
+  question="Why do scout's glossary → OKF → ast-grep lookups go into prompt_engineering rather than a new skill_engineering entry?"
+  choices={["skill_engineering only works on the planner agent", "They are repo-specific tool-usage patterns, not planning methodologies", "Scout has writes: [] and cannot receive vendored skills", "ast-grep cannot be invoked from a composed system prompt"]}
+  answerIndex={1}
+  correctFeedback="The playbook draws this line explicitly: search order and knowledge-source layout are baked into scout's own instructions, like writes and protected_files already are. Vendored skills are for methodologies that travel between repos."
+  wrongFeedback="Nothing technical stops scout receiving a vendored skill. The distinction is what the text is: a repo-specific search order belongs to the agent's own instructions (layer one), while a portable methodology like tdd or wayfinder belongs in the composed list (layer two)."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> the adoption playbook's "Where the two layers sit" section, then
+`.claude/skills/sssf/references/config.md` — the `agents[]` field table for what
+`prompt_engineering.system`/`.user` are required to be, the `claude_code` subsection for why
+`--system-prompt` replaces rather than appends, and the "Skill engineering" section for
+vendoring, `--check`, and the note on the planner's undrift-checked "On the skills composed
+below" section. Then open the shipped `templates/prompt_engineering/planner/system.md` and read
+that section as a worked example of a layer-one override.</p>
+
+## Where this goes next
+
+<p>You can now say which layer a behavior belongs to and which file is safe to edit. The next
+lesson uses that immediately: `wayfinder`'s headless interview has no one to answer it, and the
+fix — relocating the interview to a bootstrap phase, then overriding the fallback from the
+agent's own `system.md` — is a layer-one change made on top of an untouched layer-two skill.</p>
+
+<p><strong>Ask me things.</strong> Bring me one behavior your factory does that you want changed,
+and we'll trace it to the file it actually comes from before you edit anything.</p>

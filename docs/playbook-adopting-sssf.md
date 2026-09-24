@@ -524,11 +524,16 @@ a run is unattended. Split it into two phases that run in different modes:
     own instructions say to apply. Skipping triage here would let a spec
     bypass this pipeline's own feasibility/compliance/redundancy judgment
     entirely.
-  - `to-tickets` files every ticket at `Status: needs-triage` too, and
-    writes plain `Status:`/`Blocked by:` lines — never the bold
-    `**Status:**`/`**Blocked by:**` its own local-ticket-template uses,
-    which `adw_watch.py`'s frontier scan (line-starting plain text only)
-    can't match.
+  - `to-tickets` files every ticket at `Status: needs-triage` too. Its own
+    local-ticket-template uses bold `**Status:**`/`**Blocked by:**` lines —
+    `adw_watch.py`'s `STATUS_RE`/`BLOCKED_BY_RE` tolerate up to two leading
+    and trailing `*` (`^\*{0,2}Status:\*{0,2}...`), added 2026-09-14 after
+    four real portfinder tickets in bold sat invisible to the frontier scan,
+    so bold-filed tickets are correctly matched today. What the regex still
+    does **not** tolerate: backtick-wrapped `` `Status:` `` — that form
+    is a real, still-open gap (see `docs/reference/the-queue/Frontier.md`
+    and the queue lesson `06-going-dark`/`07-the-queue` for the current
+    state of this).
 
 `grill-with-docs` should stay **out of `skill_engineering/`** — its
 `disable-model-invocation: true` is load-bearing, not an oversight. Vendoring
@@ -683,14 +688,11 @@ triage label themselves by default (their own "no need for additional
 triage" / "the tickets are agent-grabbable by construction" instructions) —
 this pipeline's headless planner overrides that (see Part C's AFK bullet
 list), but running either skill **by hand** gets you their unmodified
-behavior. Two ways that goes wrong: `/to-tickets`' own local-ticket-template
-uses bold `**Status:**`/`**Blocked by:**` lines, which `adw_watch.py`'s
-frontier scan can't match — filed exactly per that template, a ticket is
-silently invisible to the queue, a stall not an error. Or, if you (or the
-model) write plain lines instead, you get an **untriaged** `ready-for-agent`
-ticket — `just watch` will build it without anyone having judged
-feasibility, redundancy, or compliance first, exactly the check Part D's
-"judgment call stays interactive" section depends on `/triage` providing.
+behavior: an **untriaged** `ready-for-agent` ticket (bold or plain — both
+forms are visible to `adw_watch.py`'s frontier scan) — `just watch` will
+build it without anyone having judged feasibility, redundancy, or
+compliance first, exactly the check Part D's "judgment call stays
+interactive" section depends on `/triage` providing.
 After running either skill interactively, either hand its output to
 `/triage` before committing, or hand-edit the `Status:` line to
 `needs-triage` and confirm the file uses plain (not bold) `Status:`/

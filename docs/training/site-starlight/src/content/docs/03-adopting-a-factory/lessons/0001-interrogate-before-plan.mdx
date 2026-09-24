@@ -4,7 +4,154 @@ description: "A planner that has not been interrogated about a codebase's real b
 sidebar:
   order: 1
 ---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>You can say, for a codebase you are about to hand to a planner, which questions must be
+  answered interactively first, which files answer them (`CONTEXT.md`, `docs/adr/`, the roster's
+  `writes` and `protected_files`), and why `just plan` is downstream of that thinking rather
+  than a replacement for it.</p>
+</Callout>
 
 <p>A plan built without first interrogating the codebase's real boundaries — what's actually load-bearing, what's already implemented, what a `protected_files` list should exclude — is a plan built on guesses, and guesses compound across every phase that follows it. This lesson covers the interrogate-before-plan discipline: the questions worth forcing answered in an interactive session before you let a planner phase run unattended, and why doing this once, on purpose, up front costs far less than discovering the gap three phases deep in a failed build.</p>
 
-{/* TODO: full lesson content, see plans/2026-09-24-docs-reference-and-training.md */}
+## Two kinds of boundary, and neither is in the planner's head
+
+<p>Playbook A3 and A4 sit between "wire the gates" and "do work" for a reason: they are where you
+write down what the planner cannot discover on its own. There are two kinds of boundary, and the
+playbook is careful to keep them apart.</p>
+
+<p>The first kind is <strong>mechanical</strong>, set in `sssf.config.yaml` and enforced by
+`adw_modules/permissions.py` after every agent call. A3 states the distinction people conflate:
+`tools` is a capability list — what the agent <em>can</em> do; `writes` is a boundary — what it
+<em>may change in the repo</em>, enforced after every call by diffing the tree. `protected_files`
+is off-limits to everyone by default: `adws/adw_modules/`, `adws/adw_sssf_config/`,
+`adws/adw_*.py`, "so no agent can edit the machinery that grades its own work." A3's instruction
+for an existing codebase is to tighten `writes` before your first build run — documenter gets
+`docs/` and `**/*.md`, planner gets `specs/`, and the builder stays unrestricted "only if you are
+ready to review its whole diff" — and to add your CI config and any secrets path to
+`protected_files`.</p>
+
+<p>The second kind is <strong>semantic</strong>, and no config field carries it: what actually
+breaks today, what must not change, what you are assuming about the existing design, which
+concepts already have names. That is what A4 exists for.</p>
+
+<Callout kind="why" label="Why not just tell the planner in the prompt">
+<p>You could put "don't touch the payment module" in the `just plan` prompt. But a run prompt is
+  read once by one planner in one session; the next run starts from nothing. `CONTEXT.md` and
+  `docs/adr/` are read from the working tree by every scout and every planner afterwards, which
+  is why the grill writes there and not into a chat transcript. The planner's own job stays
+  narrow — turning agreed vocabulary and agreed constraints into a scoped plan — and it never
+  has to invent either.</p>
+</Callout>
+
+## The interrogation, in order
+
+<p>A4 is explicit that this happens interactively in Claude Code, "where your installed skills are
+available," and that the order is the same as Part B's: interrogation before spec-writing,
+spec-writing before slicing.</p>
+
+<ol class="steps">
+  <li><strong>`/grill-with-docs`</strong> — interrogate your own intent against the scout findings
+  from A1: what actually breaks today, what must not change, what you are assuming about the
+  existing design. It writes the resolved vocabulary to `CONTEXT.md`/`docs/adr/` as you go.</li>
+  <li><strong>`/to-spec`</strong> — synthesize that conversation into a spec. "No interview; it
+  already happened."</li>
+  <li><strong>`/to-tickets`</strong> — slice the spec into per-phase tickets with `Blocked by:`
+  edges.</li>
+  <li>Both (2) and (3) self-apply `ready-for-agent` by default — Part D's Filing sharp edge
+  applies before you commit their output (Chapter 7 covers the triage gate that must stay the sole
+  promoter).</li>
+</ol>
+
+<p>Then, and only then, hand one slice to SSSF. The playbook's closing line for A4 is the one to
+remember: "`just plan` is SSSF's own synthesis step, and it is downstream of your thinking, not a
+replacement for it."</p>
+
+## Why it must be interactive — the hermetic run cannot see your skills
+
+<p>This is not a stylistic preference. Part B1's boxed note gives the mechanical reason: SSSF
+agents run with `--setting-sources ''`, so they cannot see the skills installed on your machine.
+`config.md`'s `claude_code` section shows the flag in the actual command line and explains the
+posture — the agent runs hermetic, it does not inherit the engineer's hooks, plugins, custom
+agents or MCP servers, so that `prompt_engineering` and `tools` are the whole of what an agent
+sees. `grilling`, `domain-modeling`, `to-spec` — the things that do the interrogating — are your
+interactive toolkit, invisible to a headless planner unless you deliberately vendor one under
+`skill_engineering:`.</p>
+
+```
+claude -p --output-format stream-json --verbose \
+  --model <id> --system-prompt <the agent's rendered system prompt> \
+  --setting-sources '' --strict-mcp-config \
+  ...
+```
+
+<p>So the questions get answered where the tools to answer them exist, and the answers get
+written to files the hermetic run <em>can</em> read. That is the whole handoff.</p>
+
+<Callout kind="trap" label="The tree must be clean, and the answers must be committed">
+<p>A3's sharp edge: the commit phase runs `git add -A`, staging the entire working tree. Start
+  every run from a clean tree, or unrelated work in progress lands in the agent's commit. That
+  cuts both ways for interrogation — a `CONTEXT.md` you wrote but did not commit is exactly the
+  kind of dirty-tree state that will get swept into the planner's commit, and if you stash it to
+  get clean, the planner never sees it at all. Commit the interrogation's output as its own
+  commit before `just plan`.</p>
+</Callout>
+
+## What "already implemented" costs you when nobody asks
+
+<p>One of A4's three questions — "what you are assuming about the existing design" — has a
+specific expensive failure. A planner with no map of what exists will plan to build it again,
+and nothing downstream objects: the builder builds it, the gates pass because the new code works,
+the reviewer confirms the plan was followed. The playbook's Part C names this as its second
+headless problem and Chapter 6 covers the scout/planner overrides that close it; here the point
+is simply that the cheapest place to catch "this already exists" is an interactive grill against
+the scout findings, before a single planner token is spent. That is also why A5's architecture
+job routes through `just plan` alone first: "finding out the agent misunderstood your
+architecture costs one planner run instead of a full build plus a bad diff."</p>
+
+## Check yourself
+
+<Quiz
+  question="You want to stop every agent from touching .github/workflows/. Which field, and why not the other?"
+  choices={["tools — remove write and edit from every agent", "writes — set it to [] on the builder", "protected_files in defaults — it is off-limits to every agent that does not name it in its own writes, and tools cannot express a boundary because bash and write reach any path", "Add it to the planner's prompt"]}
+  answerIndex={2}
+  correctFeedback="A3 says to add your CI config to protected_files. tools is a capability list, not a boundary — bash runs git checkout and write reaches any path — so only writes/protected_files, enforced by permissions.py after each call, actually keep the claim."
+  wrongFeedback="tools cannot keep a boundary: bash runs anything and write reaches any path. writes: [] on the builder would stop it doing its job entirely. protected_files is the roster-wide off-limits list, and A3 tells you to put CI config there."
+/>
+
+<Quiz
+  question="Why does the playbook insist /grill-with-docs runs interactively rather than as the planner phase's first step?"
+  choices={["The planner has no bash tool, so it cannot run skills", "SSSF agents run with --setting-sources '', so your installed skills are invisible to them — the interrogation has to happen where the tools exist, and its output written to files the run can read", "Interactive runs are cheaper per token", "The planner's writes: [specs/] would block it writing CONTEXT.md"]}
+  answerIndex={1}
+  correctFeedback="Part B1's note and config.md's claude_code section both give the mechanism: the hermetic --setting-sources '' flag hides every user-installed skill. The grill happens in your session; CONTEXT.md/docs/adr/ carry the answers into the run."
+  wrongFeedback="It is not a tool or cost issue — it is hermeticity. --setting-sources '' means the headless planner cannot see grilling, domain-modeling, or any other installed skill, so the questions must be answered interactively and committed to files first."
+/>
+
+<Quiz
+  question="You ran /grill-with-docs and CONTEXT.md now has the resolved vocabulary, uncommitted. You run just plan. What happens to CONTEXT.md?"
+  choices={["The planner reads it from the working tree, and it stays uncommitted", "It is swept into the run's commit by git add -A along with anything else that is dirty", "The run refuses to start because the tree is dirty", "The planner ignores uncommitted files"]}
+  answerIndex={1}
+  correctFeedback="A3's sharp edge: the commit phase stages the entire working tree. Your uncommitted CONTEXT.md lands in the agent's commit alongside whatever else was dirty. Commit the interrogation output first, as its own commit."
+  wrongFeedback="just plan does not refuse a dirty tree (that check is just watch's, in Chapter 7). The commit phase runs git add -A, so the uncommitted CONTEXT.md — and anything else dirty — gets swept into the run's commit. Commit it first."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> the adoption playbook, `docs/playbook-adopting-sssf.md` — Part
+A's A3 ("Set the boundaries") and A4 ("Interrogate before you plan"), then Part B1's boxed note
+on why the interview stays interactive. For the `writes`/`protected_files` mechanism itself, the
+"Write permissions" section of `.claude/skills/sssf/references/config.md`, and the fork's glossary
+page `docs/reference/quality-gates-and-permissions/Permissions-and-writes.md`.</p>
+
+## Where this goes next
+
+<p>You now have the boundaries written down: mechanical ones in the roster, semantic ones in
+`CONTEXT.md` and `docs/adr/`. The next lesson names the four kinds of work you can hand a factory
+in an existing codebase — architecture, bugs, features, refactors — and the one cheap checkpoint
+each of them has before anything expensive runs.</p>
+
+<p><strong>Ask me things.</strong> Bring me the scout findings from a repo you are adopting and
+we'll draft the first three grill questions together — what breaks today, what must not change,
+what you are assuming.</p>

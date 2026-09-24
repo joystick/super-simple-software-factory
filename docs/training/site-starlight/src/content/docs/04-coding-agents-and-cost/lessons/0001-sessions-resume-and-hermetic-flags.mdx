@@ -4,7 +4,196 @@ description: "A session can be continued with --resume or run hermetically with 
 sidebar:
   order: 1
 ---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
 
 <p>Every agent call happens inside a session, and two knobs decide what that session can see and carry forward: `--resume`, which continues a prior session's context rather than starting cold, and the hermetic flags (like `--setting-sources ''`) that strip away your local skill directory so a headless run's environment is reproducible rather than accidentally dependent on whatever happens to be installed on the machine that launched it. This lesson covers both mechanics directly, and why a dark-factory run in particular needs to be run hermetically on purpose, not by accident.</p>
 
-{/* TODO: full lesson content, see plans/2026-09-24-docs-reference-and-training.md */}
+<Callout kind="win" label="The win">
+<p>You can read `agent_cc.build_command()` and say, flag by flag, which ones govern history
+  (`--session-id` vs `--resume`), which ones make the agent hermetic (`--setting-sources ''`,
+  `--strict-mcp-config`), why a JSON retry or gate correction lands in the same context window
+  the agent already built, and why the token figure attached to the hermetic flags is the least
+  important reason they are there.</p>
+</Callout>
+
+## The exact invocation
+
+<p>One `claude_code` turn is one non-interactive CLI call. `agent_cc.build_command()` is split out
+"so it can be asserted in tests without spawning anything or spending a cent," and the config
+reference prints its shape:</p>
+
+```
+claude -p --output-format stream-json --verbose \
+  --model <id> --system-prompt <the agent's rendered system prompt> \
+  --session-id <uuid>  |  --resume <uuid> \
+  --setting-sources '' --strict-mcp-config \
+  --allowedTools <mapped from the agent's tools> \
+  --permission-mode bypassPermissions \
+  <the prompt>
+```
+
+<p>Two groups of flags in that line are the subject of this lesson. The `--session-id | --resume`
+pair decides whether this turn starts a conversation or continues one. The
+`--setting-sources '' --strict-mcp-config` pair decides what the child process is allowed to
+inherit from the machine it runs on. Everything else — `-p`, `stream-json`, `--model`,
+`--system-prompt`, `--allowedTools`, `bypassPermissions` — was covered by the driver contract in
+the previous lesson.</p>
+
+## Sessions: mint once, resume every turn after
+
+<p>The history logic in `build_command()` is one line:</p>
+
+```python
+cmd += ["--resume", session_uuid] if resume else ["--session-id", session_uuid]
+```
+
+<p>Turn one of a phase mints the session with `--session-id`. Every later turn in the same phase —
+a malformed-JSON retry from `_parse_with_retries()`, a gate correction from the loop in
+`execute()` — passes `--resume` with the same id instead, so the correction lands inside the
+context window the agent already built rather than a fresh one that has to be re-explained. That
+is what the `agents.py` docstring means by "parse failures and gate violations re-prompt the SAME
+session with a correction — context intact, bounded retries."</p>
+
+<p>Two details make this work across separate ADW processes, not just within one:</p>
+
+<ul>
+  <li><strong>The id is deterministic.</strong> `--session-id` wants a UUID and SSSF session ids
+  (`sssf-<adw_id>-<agent>-<4 chars>`) are not, so `claude_session_id()` folds the SSSF id into a
+  UUIDv5 under a fixed `SESSION_NAMESPACE`. The same SSSF id always yields the same Claude
+  session, "which is what makes a rejoined run land in the context window it left." The
+  namespace constant is marked fixed forever: change it and every existing session becomes
+  unreachable.</li>
+  <li><strong>A marker file remembers that the session exists.</strong> Resuming a session that
+  was never minted fails; minting one that already exists fails too. `_session_marker()` writes
+  `<uuid>.opened` under `request.session_dir` after a successful turn, and `run()` checks
+  `marker.exists()` to pick `resume=True` or `False`. An in-memory flag "would forget between
+  runs, which is exactly when a rejoined session needs to resume."</li>
+</ul>
+
+<Callout kind="trap" label="A lost marker is recovered from Claude's own error, not guessed">
+<p>A minted session exists on Claude's side the moment it is created, even if that turn then
+  crashed before the marker was written. So `run()` has one retry: if the first attempt was a mint
+  (`not resuming`), exited non-zero, and stderr contains `"already in use"`, it writes the marker
+  and re-attempts with `resume=True`. It takes Claude's word for it rather than trying to infer
+  session state from the filesystem — without this, a wiped `session_dir` would strand the agent
+  forever on the same "Session ID ... is already in use" error.</p>
+</Callout>
+
+<p>Under `pi` the same idea needs no marker at all: `pi --session-id` "creates-or-continues, so
+running and continuing an agent are the same call: same session id = same context window."
+`agent_pi.run()` passes `--session-id` and `--session-dir` every time. The contract is identical
+either way — `execute()` computes one `session_id` per agent per run via `_agent_session_id()`
+and hands it to whichever driver is running.</p>
+
+## Hermetic flags: what the agent is not allowed to inherit
+
+<p>The second pair is added unconditionally, right after the history flag:</p>
+
+```python
+# Hermetic agents. Without these, every turn inherits the OPERATOR's
+# settings — their hooks, plugins, custom agents and MCP servers — and pays
+# for the tool schemas in the prompt. Measured on a trivial turn: 22,478
+# prompt tokens inherited vs 17,932 hermetic, so ~4.5k tokens (-20%) per
+# turn, on every send, for context an SSSF agent was never meant to have.
+# `--setting-sources ''` does the work; `--strict-mcp-config` closes the MCP
+# path that settings are not the only route into. (`-nc` was measured too
+# and saves nothing — CLAUDE.md is not in the cached prefix.)
+cmd += ["--setting-sources", "", "--strict-mcp-config"]
+```
+
+<p>`--setting-sources ''` tells Claude Code to load settings from nowhere: no user settings, no
+project settings, no hooks, no plugins, no custom agents, and — the part the lesson title names
+— none of the skills installed in your local `~/.claude/skills/` directory. `--strict-mcp-config`
+closes the one route that settings are not the only door into, so no MCP server the operator has
+configured reaches the child either. What the agent sees is exactly the roster's
+`prompt_engineering` (rendered into `--system-prompt`), the roster's `tools` (mapped into
+`--allowedTools`), and the prompt. Nothing else.</p>
+
+<Callout kind="why" label="The 20% is the least important reason">
+<p>The measured saving — 22,478 vs 17,932 prompt tokens on a trivial turn — is real and it recurs
+  on every send. But the config reference is explicit that "the point is not the 20% — it is that
+  `prompt_engineering` and `tools` are supposed to be the whole of what an agent sees." A
+  headless run has no one watching it. If it can reach an operator's hook that runs a command, a
+  plugin that adds a tool, or an MCP server that talks to something with credentials, then the
+  run's behavior depends on <em>which machine launched it</em>. A dark-factory run that passes on
+  your laptop and fails in a scheduled `just watch --once` from cron is not reproducible, and a
+  run that passes only because of a skill installed locally is not something you can hand to
+  anyone. Hermeticity is what makes the roster the complete description of the agent.</p>
+</Callout>
+
+<p>There is a fourth thing `--setting-sources ''` closes that has nothing to do with tokens: a
+settings `apiKeyHelper`. `agent_cc.py` strips `API_AUTH_VARS` (`ANTHROPIC_API_KEY`,
+`ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_CUSTOM_HEADERS`,
+`CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`) from the child's environment so an agent
+always runs on the logged-in Claude Code session and never on a metered API key. The comment
+calls the exposure "real, not theoretical": the justfile does `set dotenv-load`, `operator_env()`
+copies `os.environ` wholesale, and `env.sample` invites provider keys — one `ANTHROPIC_API_KEY=`
+line in `.env` would flip every agent onto per-token billing "silently — same output, same trace,
+a different invoice." Settings can inject a key too, and the hermetic flag is what closes that
+last route.</p>
+
+## The consequence: skills come in as vendored text, not from your machine
+
+<p>Hermeticity has a cost the rest of SSSF is built around. If `--setting-sources ''` hides every
+locally installed skill, then a skill you want an agent to follow cannot arrive through the
+operator's skill directory. The config reference states the design consequence directly:
+`skill_engineering` "routes the protocol in as vendored, committed text instead — reproducible
+across machines, reviewable in a diff, and it costs nothing extra in hermeticity." A skill an
+agent uses is a file under `adws/adw_data/skill_engineering/`, named by path in the roster, and
+composed onto the system prompt by `skill_engineering.compose()` in `execute()` — so it travels
+with the repo and into `--system-prompt`, not through any setting the flag just disabled.</p>
+
+<p>The same reasoning covers `CLAUDE_CONFIG_DIR`, which `agent_cc.run()` deliberately does
+<em>not</em> override: that directory holds credentials as well as sessions, so redirecting it per
+agent produces a child that "cannot authenticate ('Not logged in')." Sessions do not need the
+isolation anyway — every id is a UUIDv5 derived from the SSSF id, so two agents can never collide
+in the shared store. Hermetic means "sees nothing of the operator's configuration," not
+"runs in a separate account."</p>
+
+## Check yourself
+
+<Quiz
+  question="A builder's first response fails JSON parsing and _parse_with_retries() sends a correction. Under claude_code, which flag does that second turn use?"
+  choices={["--session-id with a freshly minted UUID, so the retry starts clean", "--resume with the same UUIDv5, so the correction lands in the context the agent already built", "--continue, which picks the most recent session on the machine", "No session flag at all — -p turns are stateless by design"]}
+  answerIndex={1}
+  correctFeedback="Turn one mints with --session-id; the marker file then exists, so every later turn in the phase passes --resume with the same deterministic UUIDv5. That is what keeps retries and gate corrections inside one context window rather than re-explaining the task from scratch."
+  wrongFeedback="Retries are deliberately not clean starts — the whole point of re-prompting the SAME session is that the agent keeps its context. build_command() picks --resume whenever the session marker exists, with the same UUIDv5 folded from the SSSF session id."
+/>
+
+<Quiz
+  question="Why does agent_cc pass --setting-sources '' on every turn?"
+  choices={["Primarily to save the measured ~4.5k prompt tokens per turn", "So the agent sees only the roster's prompt_engineering and tools — not the operator's hooks, plugins, skills, MCP servers, or apiKeyHelper", "Because Claude Code refuses --system-prompt when user settings are loaded", "To force the child into a separate CLAUDE_CONFIG_DIR per agent"]}
+  answerIndex={1}
+  correctFeedback="The token saving is real but secondary. The flag exists so a headless run's behavior depends on the roster, not on whichever machine launched it — and it closes the settings apiKeyHelper route onto metered billing that API_AUTH_VARS stripping alone would miss."
+  wrongFeedback="The 20% saving is measured and noted, but the config reference says outright that it is not the point. CLAUDE_CONFIG_DIR is deliberately NOT overridden (that would break authentication), and --system-prompt works fine with settings loaded — the flag is about making prompt_engineering and tools the whole of what the agent sees."
+/>
+
+<Quiz
+  question="You want a builder to follow the tdd skill you have installed in ~/.claude/skills/. What is the supported way to get it there under claude_code?"
+  choices={["Nothing — installed skills are already visible to every headless turn", "Remove --setting-sources '' from build_command so the child inherits your skill directory", "Vendor it into adws/adw_data/skill_engineering/ and name that path in the agent's skill_engineering list", "Set CLAUDE_CONFIG_DIR to a directory containing only that skill"]}
+  answerIndex={2}
+  correctFeedback="Hermetic runs hide every locally installed skill by design. skill_engineering exists precisely so a skill arrives as vendored, committed text composed onto --system-prompt — reproducible on any machine, reviewable in a diff, and reaching the agent through a channel the hermetic flag does not disable."
+  wrongFeedback="--setting-sources '' hides installed skills on purpose, and removing it or redirecting CLAUDE_CONFIG_DIR would either break hermeticity or break authentication. The supported route is vendor_skill.py into the repo plus a skill_engineering entry in the roster."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> `agent_cc.py`'s module docstring and then `build_command()`
+and `run()` in full — every claim above is a direct read of those, including the inline
+measurement and the `"already in use"` recovery. Then the `claude_code` section of
+`.claude/skills/sssf/references/config.md` ("what each part is doing, and why," and the
+"No Anthropic API calls" paragraph beneath it), and the "Skill engineering" section of the same
+file for the design consequence of hermeticity.</p>
+
+## Where this goes next
+
+<p>You now know what a session carries forward and what a hermetic turn is not allowed to
+inherit — including the ~4.5k-token difference that hermeticity makes on every send. The next
+lesson takes that thread into the numbers themselves: where `total_tokens` and `total_cost` come
+from, how they roll up from a single `result` event into a `sessions` row, and what those two
+figures genuinely do and do not tell you about whether a run was worth it.</p>
+
+<p><strong>Ask me things.</strong> Bring me a run where a retry seemed to "forget" what the agent
+had already done, and we'll check the session marker and the `agent_sessions` row together to see
+whether it actually resumed.</p>

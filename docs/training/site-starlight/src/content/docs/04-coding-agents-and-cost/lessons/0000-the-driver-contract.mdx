@@ -4,7 +4,202 @@ description: "agent_cc and agent_pi are two different drivers behind the same co
 sidebar:
   order: 0
 ---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
 
 <p>SSSF's `coding_agent` field selects between drivers — `agent_cc`, `agent_pi`, and others — that all sit behind one contract, so a chain's phases never need to know or care which one is actually running. This lesson covers what that contract requires of a driver (structured output, a usage/cost report, tool-call tracking) and why keeping drivers interchangeable behind it is what lets you swap `claude_code` for `pi` on one agent without touching the rest of the roster or a single phase definition.</p>
 
-{/* TODO: full lesson content, see plans/2026-09-24-docs-reference-and-training.md */}
+<Callout kind="win" label="The win">
+<p>You can name the three things every SSSF driver module must expose, point at the one
+  dictionary in `agents.py` where the seam actually lives, explain why `agent_cc.py` and
+  `agent_pi.py` speak the same `PiRequest`/`PiResult` shape despite driving completely different
+  CLIs, and say which parts of a roster entry survive a `coding_agent:` swap unchanged and which
+  quietly stop doing anything.</p>
+</Callout>
+
+## Where the seam is
+
+<p>The whole seam is one dictionary and one lookup at the top of
+`adws/adw_modules/agents.py`:</p>
+
+```python
+# The coding agents behind a phase. All expose the same surface —
+# run(request, on_event, on_spawn, on_exit) -> PiResult, resolve_model(pattern),
+# ToolCallTracker — so everything below picks a module and stops caring which.
+INTERFACES = {"pi": agent_pi, "claude_code": agent_cc, "agy": agent_agy,
+             "opencode": agent_opencode}
+
+
+def interface(agent: AgentConfig):
+    """The coding-agent module that runs this agent."""
+    try:
+        return INTERFACES[agent.coding_agent]
+    except KeyError:
+        raise SystemExit(...)
+```
+
+<p>`agents.execute()` — the one function every agent phase in every chain goes through — calls
+`coder = interface(agent)` once, then only ever uses `coder.run(...)`, `coder.ToolCallTracker()`,
+and (in `validate()`) `coder.resolve_model(...)`. That is the entire contract. Nothing in a chain
+script, a phase definition, a gate, or an envelope type ever names `agent_cc` or `agent_pi`
+directly; they name an <em>agent</em> from the roster, and the roster's `coding_agent:` value picks
+the module. Swapping `claude_code` for `pi` on one agent is therefore a one-line config change
+that no phase can observe.</p>
+
+<Callout kind="why" label="Why a module, not a class">
+<p>The four drivers are plain modules, not subclasses of an abstract base. There is no
+  `Driver` interface to inherit from — the contract is enforced by convention and by the fact that
+  `execute()` calls exactly three names. `agent_cc.py`'s own docstring says it plainly: it
+  "mirrors `agent_pi.run()` one-for-one so `agents.execute()` does not care which coding agent is
+  behind a phase." A fifth driver is a new module with those three names and a new entry in
+  `INTERFACES`, nothing more — which is also why the `skill_engineering_applies()` allowlist in the
+  same file is explicit rather than `return True`: a new driver has to be deliberately vouched
+  for, not inherit behavior by default.</p>
+</Callout>
+
+## The three obligations, read from the modules
+
+<p>Every module in `INTERFACES` honors the same three things. Side by side, from
+`agent_pi.py` and `agent_cc.py`:</p>
+
+<table>
+  <tr><th>Obligation</th><th>`agent_pi.py`</th><th>`agent_cc.py`</th></tr>
+  <tr><td><strong>`resolve_model(pattern) -> (provider, model_id)`</strong></td>
+      <td>Resolves against pi's merged catalog (`pi --list-models` plus
+      `~/.pi/agent/models.json`); an ambiguous bare id raises</td>
+      <td>Requires the provider half to be `anthropic`; anything else raises so the roster fails
+      at `validate()` "rather than on the first billed call"</td></tr>
+  <tr><td><strong>`run(request, on_event, on_spawn, on_exit) -> PiResult`</strong></td>
+      <td>Spawns `pi -p --mode json`, tails JSONL stdout line by line</td>
+      <td>Spawns `claude -p --output-format stream-json --verbose`, tails JSONL stdout line by
+      line</td></tr>
+  <tr><td><strong>`ToolCallTracker().observe(event) -> record | None`</strong></td>
+      <td>Folds `toolCall` / `tool_execution_start` / `tool_execution_end` into one record per
+      completed call</td>
+      <td>Folds a `tool_use` block on an assistant message plus the `tool_result` block on the
+      following user message into that same one record</td></tr>
+</table>
+
+<p>The two `run()` functions take the same `PiRequest` (defined once in `data_types.py`:
+`prompt`, `system_prompt`, `model`, `thinking`, `session_id`, `session_dir`, `raw_output_path`,
+`tools`, `extensions`, `cwd`) and return the same `PiResult` (`text`, `returncode`,
+`session_id`, `tokens`, `cost`, `usage: UsageBreakdown`, `context_tokens`, `context_window`).
+Both write every raw JSONL event to `request.raw_output_path` as it arrives, both call
+`on_spawn(pid)` / `on_exit(pid)` so the tracer's `processes` table can record a killable child,
+and both forward every parsed event to `on_event` while the agent is still working. The names are
+pi's because pi was, per `agent_pi.py`'s docstring, "v1's only coding agent" — `agent_cc` was
+written to fit that shape, not the other way round.</p>
+
+## What the contract normalizes so nothing downstream changes
+
+<p>The interesting work in a driver is translation. Claude Code and pi disagree about almost
+every detail, and the driver's job is to absorb each disagreement before it reaches
+`execute()`:</p>
+
+<ul>
+  <li><strong>Tool names.</strong> The roster speaks pi's lowercase names (`read`, `bash`,
+  `find`, `subagent_create`). `agent_cc._map_tools()` translates them through `TOOL_ALIASES`
+  (`find` and `ls` both become `Glob`, every `subagent_*` becomes `Task`) before passing
+  `--allowedTools`. A roster's `tools:` list is written once and means the same thing under either
+  driver.</li>
+  <li><strong>Usage shape.</strong> pi's `message_end` carries `{input, output, cacheRead,
+  cacheWrite, totalTokens, cost: {total}}`. Claude's `result` event carries
+  `{input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens}` plus
+  `total_cost_usd`. `agent_cc._pi_shaped_usage()` reshapes Claude's block into pi's keys so the
+  one `UsageBreakdown.add_turn()` in `data_types.py` folds either without a branch.</li>
+  <li><strong>Thinking.</strong> The roster's `thinking: medium` is a pi reasoning-effort word,
+  passed as `--thinking`. Claude Code has no such flag, so `agent_cc` maps the same word to a
+  token budget via `THINKING_BUDGETS` and exports it as `MAX_THINKING_TOKENS` in the child's
+  environment.</li>
+  <li><strong>Context occupancy.</strong> Both drivers must fill `PiResult.context_tokens` with
+  how full the window <em>was after the last turn</em> — not cumulative spend. pi reads it from
+  the last valid `message_end` usage; Claude reports it per assistant message, and `agent_cc`
+  explicitly does <em>not</em> read it from the `result` event, whose usage is cumulative over
+  every internal turn ("Reading it as occupancy reports 298k against a 200k window," per its own
+  comment).</li>
+  <li><strong>One record per real tool call.</strong> Both `ToolCallTracker`s emit the identical
+  `{tool, tool_call_id, args, ok, label, result_snippet, started_at, ended_at, duration_ms}`
+  record only when the result arrives — so `agents._event_forwarder()` builds one `tool_call`
+  trace event from either "without knowing the difference."</li>
+</ul>
+
+<Callout kind="why" label="Why the seam sits at the driver and not at the chain">
+<p>If a chain script chose between `claude -p` and `pi -p` itself, every chain would carry both
+  code paths and every new driver would touch every chain. Putting the seam under `execute()`
+  means the rest of the system — prompt rendering, JSON-retry loops, gates, the permissions
+  snapshot, the tracer — is written once against `PiRequest`/`PiResult` and has never needed to
+  change when a driver was added. The `head-to-head-agy-vs-claude.md` comparison in `docs/`
+  is exactly this in practice: same commit, same prompt, same chain, same gates, "the only
+  variable was `coding_agent` and the model behind it."</p>
+</Callout>
+
+## What does not survive a swap
+
+<p>The contract makes drivers interchangeable for a <em>phase</em>. It does not make every
+roster field mean the same thing under every driver, and the config reference is explicit about
+which ones go inert:</p>
+
+<ul>
+  <li>`harness_engineering` is a list of pi extension paths passed as `pi -e <path>`. Under
+  `claude_code`, `agy`, or `opencode` it is ignored — "not deferred, not partially honoured" —
+  and `agents.validate()` prints a warning naming the agent rather than failing.</li>
+  <li>`model:` must satisfy the new driver's `resolve_model()`. A `google/gemini-...` entry that
+  resolved fine under `pi` raises under `claude_code`, because Claude Code talks to Anthropic
+  only. The failure lands at `validate()`, before anything spawns.</li>
+  <li>`tools:` on a `coding_agent: opencode` agent is currently decorative — that CLI has no
+  allowlist flag to bind it to. `permissions.py`'s post-hoc `writes:` enforcement still applies
+  regardless of driver, which is the backstop the contract actually relies on.</li>
+  <li>Changing an agent's model invalidates its session: `_agent_session_id()` in `agents.py`
+  only rejoins an existing session if `entry.get("model") == agent.model`, so a joined run starts
+  that agent fresh rather than resuming a context window built by a different model.</li>
+</ul>
+
+<p>The rule of thumb: a driver swap is safe to make and safe to validate, but read the
+`validate()` warnings on stderr before trusting the run — they are the only signal that a field
+you configured has stopped doing anything.</p>
+
+## Check yourself
+
+<Quiz
+  question="A chain script wants to run its builder phase under Claude Code instead of pi. What has to change?"
+  choices={["The phase definition, to import agent_cc instead of agent_pi", "Only the builder's coding_agent: value in sssf.config.yaml (plus a model the new driver can resolve)", "Both the roster and every gate that inspects the builder's envelope", "Nothing — execute() auto-detects which CLI is installed"]}
+  answerIndex={1}
+  correctFeedback="The seam is INTERFACES[agent.coding_agent] inside agents.execute(). Chains, phases, and gates name agents, never driver modules, so the roster entry is the only thing that changes — and validate() will tell you if the model string doesn't resolve under the new driver."
+  wrongFeedback="No chain or gate ever imports a driver module directly — execute() looks one up from INTERFACES by the agent's coding_agent value. There is also no auto-detection: the roster decides, explicitly, per agent."
+/>
+
+<Quiz
+  question="Why does agent_cc.py convert Claude's usage block into pi's key names (input, output, cacheRead, cacheWrite) before returning it?"
+  choices={["Claude Code's stream-json format is undocumented, so the pi shape is the only stable one", "So the single UsageBreakdown.add_turn() in data_types.py can fold either driver's usage without a per-driver branch", "Because pi's cache accounting is more accurate than Claude's", "To hide that Claude Code does not report cost at all"]}
+  answerIndex={1}
+  correctFeedback="_pi_shaped_usage() exists precisely so PiResult.usage has one shape. UsageBreakdown mirrors pi's usage keys one-for-one, and both drivers feed it the same way — the translation happens once, in the driver, not everywhere the numbers are read."
+  wrongFeedback="Claude Code does report cost (total_cost_usd on the result event) and its cache accounting follows the same convention as pi's. The point of the reshape is that UsageBreakdown is written once against pi's keys, and every driver adapts to it rather than the other way round."
+/>
+
+<Quiz
+  question="An agent with harness_engineering: [.pi/extensions/ast_query.ts] is switched from coding_agent: pi to claude_code. What happens?"
+  choices={["validate() fails: harness_engineering is not allowed under claude_code", "agent_cc translates the extension into an equivalent MCP server", "The field is silently dropped and the run proceeds with no signal", "The field is ignored and validate() prints a warning naming the agent, but the run proceeds"]}
+  answerIndex={3}
+  correctFeedback="ignored_field_warnings() in agents.py reports exactly this case to stderr before anything spawns. It's a warning, never a failure — the roster is still valid, that one field just does nothing under claude_code, because pi extensions are TypeScript loaded into pi's own harness and have no faithful Claude Code translation."
+  wrongFeedback="It is neither fatal nor silent. agent_cc.build_command never reads harness_engineering, and there is no translation to MCP — but agents.validate() calls ignored_field_warnings() and prints a warning naming the agent so the operator knows the field went inert."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> `.claude/skills/sssf/templates/adws/adw_modules/agents.py`
+— read `INTERFACES`, `interface()`, `validate()`, and then `execute()` end to end, noting every
+place `coder.` appears. Then `agent_cc.py` and `agent_pi.py` side by side: start with each
+module's docstring, then `run()` in both, then the two `ToolCallTracker` classes. The
+"Coding agents" section of `.claude/skills/sssf/references/config.md` is the same contract
+stated as a field reference, including what each driver does and does not honor.</p>
+
+## Where this goes next
+
+<p>You can now say what a driver is required to provide and where a chain stops caring which
+one it got. The next lesson goes one level down into the `claude_code` driver's `build_command()`
+— the session flags that decide whether a turn starts cold or resumes, and the hermetic flags
+that decide what the agent is allowed to see of the machine it runs on.</p>
+
+<p><strong>Ask me things.</strong> Bring me a roster entry you want to move between drivers and
+we'll walk through `validate()` together to find out which fields carry over and which go
+inert.</p>

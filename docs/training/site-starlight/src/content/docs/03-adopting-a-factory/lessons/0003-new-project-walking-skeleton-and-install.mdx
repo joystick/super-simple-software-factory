@@ -4,7 +4,172 @@ description: "Starting from zero code is a different path than adopting an exist
 sidebar:
   order: 3
 ---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>You can run Part B of the playbook from an empty directory: say what a walking skeleton must
+  contain before `install.py` runs, why an empty repo puts you straight back at placeholder-green,
+  what the first commit after install must include, and why the first real slices go in one at a
+  time.</p>
+</Callout>
 
 <p>A brand-new project has no existing tests to recon and no existing boundaries to interrogate — the adoption path here is different: think through the shape interactively first, make it a real repo with a minimal walking skeleton (something that runs end to end, even if it does almost nothing), then install SSSF and wire its gates to that skeleton before adding a single real feature. This lesson covers why skeleton-first beats feature-first for a from-scratch install, and how to run the first few slices one at a time so the roster and gates prove themselves against real, if small, work before you trust them with anything bigger.</p>
 
-{/* TODO: full lesson content, see plans/2026-09-24-docs-reference-and-training.md */}
+## The other branch of the first question
+
+<p>The playbook opens with one decision: does the code already exist? Part A is the yes branch.
+Part B is the no branch, and its five steps run in this order: think (B1) → walking skeleton (B2)
+→ install and wire (B3) → tune the roster (B4) → run the slices one at a time (B5). Rule zero sits
+inside B3, early, exactly as it does in Part A. What changes is what comes <em>before</em> it —
+because there is nothing to recon yet, you have to make something worth reconning.</p>
+
+## B1: think before there is code
+
+<p>"SSSF is an execution engine. It is the wrong tool for deciding what to build." B1 happens
+interactively, with your installed skills, and in an order the playbook calls "the reverse of
+what most people assume": `/grill-with-docs` first — interrogate until nothing important is left
+silently assumed, writing vocabulary to `CONTEXT.md`/`docs/adr/` as you go — then `/to-spec` to
+synthesize the conversation into a spec, then `/to-tickets` to slice it into per-phase tickets
+with `Blocked by:` edges. The previous lessons covered this same sequence for an existing repo;
+B1 is where the playbook shows what the difference actually looks like. Same feature request,
+"let users export their data," straight to spec:</p>
+
+```
+Add a data export feature. Users can export their data as CSV.
+Acceptance: user clicks Export, receives a CSV file.
+```
+
+<p>After a grill that asked which data, how much, who is allowed, and what happens when it is
+slow:</p>
+
+```
+Export scope: only records the requesting user owns (confirmed: no team-shared
+  records in v1).
+Volume: 95th percentile account is ~40k rows → synchronous download times out.
+  Export is a background job; user gets an email link. Link expires in 24h.
+Format: CSV only. JSON was requested and deferred — decided in the grill, not
+  discovered mid-build.
+Excluded: soft-deleted records, other users' PII in shared audit rows.
+Acceptance: 40k-row account exports without timeout; a user cannot export a
+  record they do not own; expired link returns 410.
+```
+
+<p>"The second is not longer for its own sake. Every extra line is a question that would otherwise
+have been answered by the agent guessing, mid-build." The tickets from B1 become the run prompts
+in B5.</p>
+
+## B2: make it a repo with a walking skeleton
+
+```bash
+mkdir project && cd project && git init
+```
+
+<p>Before installing SSSF, build the thinnest thing that runs and is tested — by hand, or in one
+interactive session. The playbook's list is three items long:</p>
+
+<ul>
+  <li>one real module with one real function</li>
+  <li>a test runner that works, with at least one passing test</li>
+  <li>lint and typecheck configured</li>
+</ul>
+
+<p>Then `git add -A && git commit -m "Walking skeleton"`. That is the whole step, and the reason
+for it is the same sentence that drives Part A: "This is the target the factory needs. An empty
+repo gives the gates nothing to check, and you are back to placeholder-green."</p>
+
+<Callout kind="why" label="Why skeleton-first, not feature-first">
+<p>The obvious alternative is to install SSSF into the empty repo and let the first `just sdlc`
+  build both the project scaffold and the first feature. But rule zero needs a gate you can
+  watch fail, and a gate can only fail against something real: a test runner that exists, a
+  linter with a config, a typechecker that has a file to check. If the first run is also the
+  run that creates all of those, the gates were placeholders while it ran — which means the run
+  that created your test runner was itself unchecked. The skeleton is the smallest thing that
+  lets every gate be real <em>before</em> an agent writes a line, and it takes one interactive
+  session to build.</p>
+</Callout>
+
+## B3: install and wire — rule zero, again
+
+```bash
+uv run /path/to/sssf/.claude/skills/sssf/scripts/install.py
+# wire quality.py to your real commands, then prove each gate fails
+just quality "gates wired"
+git add -A && git commit -m "Install SSSF and wire the gates"
+```
+
+<p>`install.py` stamps `templates/` into the cwd — the roster at
+`adws/adw_sssf_config/sssf.config.yaml`, the prompts under `adws/adw_data/prompt_engineering/`,
+the starter `justfile`, and `adws/adw_modules/` including a `quality.py` where every block is
+still an `echo`. The skeleton is what makes the next line possible: the real commands you point
+those blocks at are the ones you just proved work in B2. Then break one thing, watch exactly one
+gate go red, restore, and commit the wired state <em>before</em> any agent runs.</p>
+
+<Callout kind="trap" label="Confirm the gitignore lines landed">
+<p>The install cookbook notes `install.py` appends `adws/adw_data/sessions/`,
+  `adws/adw_data/sssf.db*`, and `.env` to `.gitignore` for you. Check they are there before the
+  "Install SSSF and wire the gates" commit — all three are runtime or secrets, and a fresh repo
+  is exactly where a missing gitignore line gets committed on the very first run and never
+  noticed.</p>
+</Callout>
+
+## B4 and B5: tune, then one slice at a time
+
+<p>B4 is the roster pass — start with everything on `claude_code`, `writes: []` on read-only
+agents, documenter and planner scoped, cheaper models on scout and documenter, CI config in
+`protected_files`. The next lesson covers it in full. B5 is the payoff:</p>
+
+```bash
+just sdlc "<one slice, stated as an outcome with its acceptance criteria>"
+```
+
+<p>Feed the tickets from B1 in one at a time, and "review every diff before starting the next.
+The factory removes typing, not judgement. One slice per run keeps the blast radius small and the
+plan cheap." On a new project the first few slices are doing double duty: they are building the
+product, and they are the first evidence you have that the roster and the gates behave on this
+repo. Read the diff, run `just sessions` for the cost, and if a gate has not gone red across
+several runs, suspect the gate — the standing checklist's after-run items apply from slice one.</p>
+
+## Check yourself
+
+<Quiz
+  question="You git init an empty directory and immediately run install.py, then just quality 'baseline'. What do you see?"
+  choices={["Four passing gates, because an empty repo has nothing to fail", "PLACEHOLDER on every block — the gates are echoes, and there is nothing real to point them at yet", "install.py refuses to run in a repo with no tests", "The gates autodetect no test runner and skip themselves"]}
+  answerIndex={1}
+  correctFeedback="Every block ships as an echo that exits 0 and prints PLACEHOLDER. With no skeleton there is no runner, linter, or typechecker to wire them to — you are, in the playbook's words, back to placeholder-green. B2 comes before B3 for exactly this reason."
+  wrongFeedback="install.py runs fine in an empty repo — it just stamps placeholders. The problem is what comes next: with no test runner or lint config to wire quality.py to, every gate stays an echo, which is placeholder-green."
+/>
+
+<Quiz
+  question="What is the minimum the playbook says a walking skeleton must contain before install?"
+  choices={["The first feature, end to end, with its tests", "One real module with one real function, a working test runner with at least one passing test, and lint and typecheck configured", "A CI workflow and a Dockerfile", "CONTEXT.md and docs/adr/ from the grill"]}
+  answerIndex={1}
+  correctFeedback="That is B2's three-item list verbatim. It is deliberately thin — just enough that every gate has something real to check and something real to fail against."
+  wrongFeedback="The skeleton is not a feature — it is the thinnest thing that runs and is tested: one real module and function, a working runner with one passing test, lint and typecheck configured. Features come in B5, one slice per run."
+/>
+
+<Quiz
+  question="Why does B5 insist on one slice per run and a diff review between each, even on a tiny new project?"
+  choices={["The planner cannot hold more than one ticket in context", "Blocked by: edges only resolve one at a time", "Each early slice is also the first evidence the roster and gates behave on this repo — small blast radius, cheap plan, and judgement stays with you", "just sdlc refuses a prompt that names two tickets"]}
+  answerIndex={2}
+  correctFeedback="'The factory removes typing, not judgement.' One slice keeps the plan cheap and the blast radius small, and on a fresh install those first diffs are how you find out whether the gates and the roster are real before trusting them with more."
+  wrongFeedback="Nothing mechanical stops a bigger prompt — cost scales with plan size and you would just get a bigger, riskier diff. The reason is judgement and evidence: review each small diff, and let the first slices prove the roster and gates before anything bigger."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> the adoption playbook, `docs/playbook-adopting-sssf.md`, Part B
+in full — B1 through B5 — then "The standing checklist" immediately after it. For what
+`install.py` actually stamps and the gitignore lines it appends, read
+`.claude/skills/sssf/cookbooks/install.md`.</p>
+
+## Where this goes next
+
+<p>The factory is installed and its gates are real. The roster it came with is not yet yours —
+the next lesson covers B4 properly: reading what the stamped defaults actually say, which fields
+to override per agent, and running validation after every edit so a typo is a config error and
+not an unbounded run.</p>
+
+<p><strong>Ask me things.</strong> Bring me the stack you are starting a new project in and
+we'll sketch its walking skeleton together — the one module, the one test, and the three gate
+commands.</p>

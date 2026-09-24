@@ -4,7 +4,183 @@ description: "A skill claiming to have written a ticket file is not the same as 
 sidebar:
   order: 2
 ---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>You can run the six mandatory checkpoints from memory after any `/to-spec`, `/to-tickets`, or
+  `/triage` run, say for each one which line of `adw_watch.py` it protects, and explain why a
+  failing checkpoint never shows up as an error from `just watch` — only as a "queue empty" you
+  did not expect.</p>
+</Callout>
 
 <p>Filing a ticket is less manual than it looks — `/triage`'s own agent-brief-posting step is what creates `issues/NN-slug.md` on a local-markdown tracker — but every step in the chain has failed silently on a real repo: a file not where a skill's claim said, a status string that doesn't match what the frontier scan expects, an uncommitted change invisible to a fresh session. This lesson covers the mandatory checkpoints run after `/to-spec`, `/to-tickets`, or `/triage`: confirming the feature directory and expected files exist, that every `issues/` file's `Status:` line is parseable and one of the five canonical states, that nothing is left uncommitted, and that every `Blocked by:` reference actually resolves within the same feature.</p>
 
-{/* TODO: full lesson content, see plans/2026-09-24-docs-reference-and-training.md */}
+## What "filed" has to mean for the queue
+
+<p>`discover_issues()` is the whole of what the queue can see. It walks `sorted(scratch_dir.iterdir())`,
+looks for an `issues/` subdirectory in each feature, reads every `*.md` there, and keeps a file only
+if `STATUS_RE` finds a `Status:` line in it. Everything else — a spec sitting in the wrong directory,
+a ticket with a typo'd status, a file that exists in your editor but not in the working tree a fresh
+process reads — is not an error to this function. It is simply not an issue. The playbook's Part D
+puts it plainly: "a `Status:` typo or an uncommitted file doesn't error, it just makes `adw_watch.py`'s
+frontier scan silently skip the item forever, the same class of manufactures-confidence failure rule
+zero exists to catch at the gate level."</p>
+
+<Callout kind="why" label="Why a checklist and not a validator">
+<p>The playbook says every one of these checks "has failed silently on a real repo this playbook
+  was built against: a skill claims to have written something, and the file isn't where the claim
+  said, or isn't committed, or the status string doesn't match what the state machine expects."
+  The failures are on the boundary between a skill's <em>claim</em> and the filesystem — the same
+  boundary as an unwired gate reporting a phantom PASS in Chapter 1. `adw_watch.py` now warns on
+  near-miss `Status:` lines (next lesson), but it cannot warn about a file that isn't there or a
+  commit that never happened. Those checks stay yours.</p>
+</Callout>
+
+## The six checkpoints, verbatim
+
+<p>Run this after `/to-spec`, `/to-tickets`, or `/triage` — before assuming the queue can see the
+work. Substitute the real feature slug:</p>
+
+```bash
+# 1. The feature directory actually exists
+ls .scratch/<feature-slug>/                    # expect: spec.md, plan.md (if
+                                                 # planned), issues/ (if any
+                                                 # scope was deferred)
+
+# 2. spec.md / plan.md exist if the skills that claim to write them ran
+test -f .scratch/<feature-slug>/spec.md  && echo "spec.md: present"
+test -f .scratch/<feature-slug>/plan.md  && echo "plan.md: present"
+
+# 3. Every issues/ file has a parseable Status: line, exact shape
+grep -L "^Status: " .scratch/<feature-slug>/issues/*.md   # empty output = good
+
+# 4. Status values are one of the five canonical roles — a typo here is
+#    silent, not an error
+grep -h "^Status: " .scratch/<feature-slug>/issues/*.md \
+  | sort -u   # every line must be one of: needs-triage, needs-info,
+              # ready-for-agent, ready-for-human, wontfix
+
+# 5. Nothing is sitting uncommitted — invisible to a fresh session
+git status --short .scratch/<feature-slug>/    # expect: empty
+
+# 6. Blocked-by references actually resolve within the same feature
+grep -h "^Blocked by: " .scratch/<feature-slug>/issues/*.md
+# then confirm each NN referenced has a matching <feature-slug>/issues/NN-*.md
+```
+
+<p>Each one maps onto a specific line of the watcher that would otherwise skip your ticket
+without saying so:</p>
+
+<table>
+  <tr><th>Checkpoint</th><th>What in `adw_watch.py` it protects</th><th>What you see if it's wrong</th></tr>
+  <tr><td>1 — directory exists</td><td>`discover_issues()` iterates `.scratch/*/issues/`; a feature with no `issues/` dir is `continue`d over</td><td>"queue empty"</td></tr>
+  <tr><td>2 — spec/plan present</td><td>nothing in the watcher — this checks the skills upstream did what they claimed</td><td>a planner with no spec to scope against</td></tr>
+  <tr><td>3 — `Status:` parseable</td><td>`read_status()` returns `None` → file skipped as "not a tracked issue"</td><td>"queue empty", plus a near-miss warning if the line merely looks malformed</td></tr>
+  <tr><td>4 — one of five states</td><td>`frontier()` compares `i.status == READY` (`"ready-for-agent"`) by exact string</td><td>"queue empty"; `reddy-for-agent` is a valid-looking status that never matches</td></tr>
+  <tr><td>5 — committed</td><td>`run_once()` refuses to claim on a dirty tree; a fresh session sees only committed files</td><td>"working tree is dirty — refusing to claim anything", or "queue empty" from a clean checkout elsewhere</td></tr>
+  <tr><td>6 — blockers resolve</td><td>`is_unblocked()` returns `False` if any named blocker is missing or not `resolved`</td><td>"queue empty", plus a warning only if the value isn't a bare number</td></tr>
+</table>
+
+## Checkpoint 3 and 4: plain or bold, and exactly five strings
+
+<p>The checkpoint's `grep "^Status: "` checks the plain form, which is what the playbook's own stub
+template writes (`Status: needs-triage`). The watcher's `STATUS_RE` — `^\*{0,2}Status:\*{0,2}[ \t]*(\S+)`
+— also accepts the bold `**Status:** X` that `to-tickets`' template produces, so a bold ticket
+that fails checkpoint 3's literal grep is still visible to the queue. If you filed in bold, adapt
+the grep (`grep -L "^\**Status:\**"`) rather than rewriting the files; `set_status()` preserves
+whichever key formatting it finds when it later writes `claimed`. What neither the grep nor the
+regex accepts: underscore emphasis, a missing colon, wrong casing. Those trigger
+`_check_format()`'s loud stderr warning — "this ticket is INVISIBLE to the frontier scan until
+fixed" — instead of a silent skip. Backtick-wrapped `` `Status:` `` is a real gap in that
+detector, not covered: `_STATUS_NEAR_MISS_RE` is `^[*_\s]{0,3}status`, and a backtick matches
+none of `*`, `_`, or whitespace, so a backtick-formatted line is silently skipped by both the
+canonical regex and the near-miss warning — the exact silent-failure shape `_check_format()` was
+built to catch, missed for this one specific form. Don't wrap `Status:`/`Blocked by:` lines in
+backticks; only plain or `**bold**` are safe.</p>
+
+<p>Checkpoint 4 has no such safety net. `frontier()` does `i.status == READY`; a value that is a
+perfectly well-formed word but not one of the five canonical states (`ready`, `ready-for-agents`,
+`Ready-for-agent`) parses cleanly, is stored on the `Issue`, and simply never equals the constant.
+No warning fires, because nothing about the line is malformed. `sort -u` on the status values is
+the only place you will catch it.</p>
+
+## Checkpoint 5: the working tree is the only thing a fresh process sees
+
+<Callout kind="trap" label="Same rule as CONTEXT.md in Chapter 6">
+<p>"`/triage` and `just watch` read from the working tree, not from your conversation — an
+  uncommitted file is invisible to a fresh session, same reasoning as committing
+  `CONTEXT.md`/ADRs before the headless loop starts." And there is a second reason the commit
+  matters here specifically: `run_once()` checks `git_helper.is_dirty()` before it scans and refuses
+  to claim anything on a dirty tree, because claiming commits with `git add -A` reach and would sweep
+  your unrelated in-progress work into the claim commit. An unfiled ticket doesn't just hide itself —
+  it blocks the whole queue on that machine until the tree is clean.</p>
+</Callout>
+
+## Checkpoint 6: prefer omitting the line, but a clean "none" note is fine too
+
+<p>`read_blocked_by()` strips every `(parenthetical)` annotation from the whole matched value
+<strong>first</strong>, then splits what's left on commas, trims trailing punctuation, drops bare
+`none`/`n/a`, and keeps every remaining token as a blocker — printing a warning if a kept token
+isn't a bare ticket number, because "never silently unblocks something that might genuinely be
+blocked" is the safe default. `is_unblocked()` then requires each kept token to match a sibling
+whose status is `resolved`. One real consequence to know, and one near-miss that's already fixed:</p>
+
+<ul>
+  <li>A blocker number with no matching `issues/NN-*.md` in the <em>same</em> feature counts as
+  still-blocked forever. `group_by_feature()` scopes numbers per feature on purpose — a `01` in one
+  feature never refers to another feature's `01` — so a cross-feature reference is just a missing
+  blocker.</li>
+  <li>Prose like `Blocked by: none (API exists, see spec.md)` — a comma <em>inside</em> the
+  parenthetical — used to break this: the value got comma-split before the parenthetical was
+  stripped, leaving two fragments neither of which matched bare `none`. That bug is fixed (the
+  parenthetical is stripped from the whole value before any comma-split now) and covered by a
+  regression test, so this form resolves correctly today. The playbook's older advice — "if a
+  ticket has no real blocker, omit the `Blocked by:` line entirely; don't write one to say so" —
+  is still the simpler, more foolproof habit: no parenthetical to comma-split means nothing to
+  ever get wrong, on this parser or a future one.</li>
+</ul>
+
+## Check yourself
+
+<Quiz
+  question="A ticket's line reads Status: ready-for-agents (plural, a typo). What does just watch --once report?"
+  choices={["A loud near-miss warning naming the file", "An error: unknown status value", "queue empty — the line parses fine, the value just never equals READY", "It claims the ticket; the comparison is prefix-based"]}
+  answerIndex={2}
+  correctFeedback="STATUS_RE matches the line and captures ready-for-agents as a perfectly well-formed value; frontier() compares by exact string to ready-for-agent and it never matches. No warning, no error — only checkpoint 4's sort -u would show it."
+  wrongFeedback="The near-miss detector only fires when the line's shape is wrong (underscores, missing colon, casing on the key). A valid-looking value that isn't one of the five states parses cleanly and silently never matches READY. That is exactly why checkpoint 4 exists."
+/>
+
+<Quiz
+  question="You filed a ticket and ran every checkpoint except 5. You then run just watch --once on the same machine. What happens?"
+  choices={["The ticket is claimed and dispatched normally", "The watcher refuses to claim anything because the tree is dirty", "The watcher claims it but the claim commit fails", "queue empty — uncommitted files are skipped by discover_issues()"]}
+  answerIndex={1}
+  correctFeedback="run_once() checks git_helper.is_dirty() before scanning and refuses outright: claiming commits, and would sweep the uncommitted ticket (and anything else) into that commit. On a different, clean checkout the file simply wouldn't exist."
+  wrongFeedback="discover_issues() reads the filesystem, so locally the file is visible — but run_once() never gets that far: it refuses to claim on a dirty tree because the claim commit would sweep in whatever is sitting there."
+/>
+
+<Quiz
+  question="Ticket 03 in feature A says Blocked by: 02, but 02 exists only in feature B. Is 03 claimable?"
+  choices={["Yes — 02 is resolved in B, and numbers are global", "No — blockers resolve per feature; a missing sibling counts as still-blocked", "Yes — a missing blocker is dropped with a warning", "No — the watcher raises and stops the scan"]}
+  answerIndex={1}
+  correctFeedback="group_by_feature() scopes numbers to one feature's issues/ dir; is_unblocked() finds no sibling 02 in A and returns False. The safe default is to stay blocked, and no warning fires because 02 is a bare number."
+  wrongFeedback="Numbers are unique only within a feature. is_unblocked() looks for 02 among feature A's siblings, finds nothing, and returns False — silently, since a bare number is a well-formed blocker. Checkpoint 6 is the only thing that catches it."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> the adoption playbook's Part D, "Mandatory checkpoints — verify
+the filing actually happened," including the "Check 6's sharp edge, found live" paragraph beneath
+the script. Then, in `.claude/skills/sssf/templates/adws/adw_watch.py`, read `discover_issues()`,
+`read_blocked_by()`, `is_unblocked()`, and `_check_format()` against the table above. The reference
+glossary's `docs/reference/the-queue/Frontier.md` covers the per-feature blocker scoping on its own.</p>
+
+## Where this goes next
+
+<p>You now know how to prove a ticket is visible before you hand it to the queue. The next lesson
+reads `adw_watch.py` itself, top to bottom: the four stages of one cycle, the regexes that decide
+what the queue sees, what happens on success versus failure, and why every status write is
+committed the moment it happens.</p>
+
+<p><strong>Ask me things.</strong> Bring me the output of all six checkpoints on a real feature
+directory and we'll go line by line over anything that isn't empty where it should be.</p>

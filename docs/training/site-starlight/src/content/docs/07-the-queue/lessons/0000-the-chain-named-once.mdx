@@ -4,7 +4,143 @@ description: "grill-with-docs, to-spec, to-tickets, triage, and watch — the wh
 sidebar:
   order: 0
 ---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>You can recite the dark-factory chain in order, say which steps a human runs interactively and
+  which one runs headless, name the single state (`ready-for-agent`) that hands work from one half
+  to the other, and explain why the queue always dispatches the full SDLC chain rather than the
+  lighter one `just sdlc` wraps.</p>
+</Callout>
 
 <p>The full dark-factory chain is five steps, named once so every later lesson in this chapter can point back to a single ordered list instead of re-deriving it: `/grill-with-docs` (interactive, commits `CONTEXT.md`/`docs/adr/`), `/to-spec` (synthesizes the spec), `/to-tickets` (slices it into tickets), `/triage` (the only thing allowed to promote a ticket to `ready-for-agent`), and `just watch` (the headless scan-claim-dispatch-resolve loop covered in this chapter's `just watch` lesson). This lesson introduces the chain end to end before the following lessons go deep on any one link — commit the checkpoints and the mandatory-checks step between (4) and (6), covered next.</p>
 
-{/* TODO: full lesson content, see plans/2026-09-24-docs-reference-and-training.md */}
+## The list, exactly as the playbook writes it
+
+<p>Part D of the adoption playbook opens with a section literally titled "The whole chain, named
+once." It is six numbered lines, and this chapter's structure follows them one to one:</p>
+
+<table>
+  <tr><th>#</th><th>Step</th><th>Who runs it</th><th>Leaves behind</th><th>Lesson</th></tr>
+  <tr><td>1</td><td>`/grill-with-docs`</td><td>you, interactively</td><td>committed `CONTEXT.md`/`docs/adr/`</td><td>Chapter 6, "Bootstrap Vocabulary"</td></tr>
+  <tr><td>2</td><td>`/to-spec`</td><td>you or the planner</td><td>`.scratch/&lt;feature&gt;/spec.md`</td><td>this lesson</td></tr>
+  <tr><td>3</td><td>`/to-tickets`</td><td>you or the planner</td><td>`.scratch/&lt;feature&gt;/issues/NN-slug.md`, one per phase</td><td>this lesson</td></tr>
+  <tr><td>4</td><td>`/triage`</td><td>you, interactively</td><td>a ticket at `Status: ready-for-agent` carrying an agent brief</td><td>"Triage as Sole Promoter"</td></tr>
+  <tr><td>5</td><td>Commit; run the mandatory checkpoints</td><td>you</td><td>a clean tree the queue can actually see</td><td>"Filing Checkpoints"</td></tr>
+  <tr><td>6</td><td>`just watch`</td><td>headless</td><td>`resolved` or `ready-for-human`, plus a commit</td><td>"just watch, Concretely"</td></tr>
+</table>
+
+<p>Steps 1 and 4 are the two places a human's judgment is required; steps 2 and 3 produce
+artifacts; step 5 is verification; step 6 is the only unattended step. The playbook's Part D
+mermaid diagram draws the same shape with two nodes highlighted: the filing hand-off into
+`/triage`, and the `ready-for-agent` state itself — the two points where a human decision becomes
+something a headless loop is allowed to consume.</p>
+
+<Callout kind="why" label="Why name it once">
+<p>Every later lesson in this chapter points at a step by number or by name and never re-explains
+  the order. That is deliberate: the playbook's own reasoning for the queue is "don't build a new
+  work-item format" — reuse wayfinder's map/child/frontier/claim/resolve vocabulary verbatim. The
+  training mirrors that discipline. One list, one order, one set of names; if you find yourself
+  wondering "which chain does the queue run" or "who promotes a ticket," the answer is always in
+  this table, not in a per-ticket decision.</p>
+</Callout>
+
+## Interactive on the left, headless on the right
+
+<p>The chain has a seam down the middle. Everything up to and including `/triage` runs in your own
+harness with you present; everything from `just watch` onward runs with nobody present. The reference
+glossary's Dark-factory entry (`docs/reference/the-queue/Dark-factory.md`) makes the same cut from the
+skill side: five skills are vendored onto agent roles and run headless (`wayfinder`, `to-spec`,
+`to-tickets`, `tdd` on the planner; `code-review` on the reviewer), and two are deliberately
+<em>not</em> vendored — `grill-with-docs` and `triage` — because they only ever run interactively.
+Both carry `disable-model-invocation: true` for that reason.</p>
+
+<p>The seam is a single string in a single file. `adw_watch.py`'s module docstring says it only ever
+claims issues "already carrying `Status: ready-for-agent`, a state that should only be reached by an
+interactive triage session ... posting a durable agent brief. This script trusts that gate; it does
+not re-check it." Two vocabularies meet at that line on purpose: `triage`'s five canonical states
+(`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`) get an issue
+<em>to</em> `ready-for-agent`; the watcher then layers wayfinder's own `claimed`/`resolved` on top to
+track its own work, and a failed run flips back to `ready-for-human` — a triage state — so a person
+sees it.</p>
+
+## Which chain the queue runs, and why it is never the lighter one
+
+<p>Step 6 always dispatches `adw_simple_sdlc.py` — planner → builder → reviewer → revision loop →
+documenter → commit. The docstring gives the reason in one sentence: "an unattended queue dispatch
+gets no other independent check besides the test gate, so it needs the review/revision loop a
+supervised manual run could otherwise skip." When you run `just sdlc` by hand you can eyeball the
+plan before anything ships; nothing eyeballs a `just watch` dispatch, so the queue pays for the
+review loop every time.</p>
+
+```text
+$ just watch --once
+just watch: claiming .scratch/portfinder/issues/01-list-ports.md
+just watch: committed watcher state (a1b2c3d): just watch: claim .scratch/portfinder/issues/01-list-ports.md
+... adw_simple_sdlc runs: planner -> builder -> reviewer -> revision loop -> documenter -> commit ...
+just watch: committed watcher state (e4f5a6b): just watch: resolve .scratch/portfinder/issues/01-list-ports.md (session 8f2c1a9e)
+just watch: session 8f2c1a9e succeeded -- .scratch/portfinder/issues/01-list-ports.md
+```
+
+<p>The shape of those lines is what the rest of this chapter teaches you to read: a claim commit
+before any work, the full chain in the middle, a resolve (or fail) commit after. The `justfile`'s
+`watch` recipe is one line — `uv run adws/adw_watch.py --config <config> "$@"` — so every flag
+the script accepts (`--once`, `--interval`, `--scratch-dir`) passes straight through.</p>
+
+## The one manual hand-off in the chain
+
+<Callout kind="trap" label="grill ends at CONTEXT.md, not at a ticket">
+<p>Step 1 does not feed step 4 on its own. `/grill-with-docs` ends at a committed
+  `CONTEXT.md`/`docs/adr/` update and "does not hand `/triage` anything" — Part C's "The grill →
+  triage handoff is manual, on purpose" section records this as an accepted decision, not a gap
+  to close: a wrapper skill was evaluated and deliberately not built. The guard is a checklist
+  line in Part C's definition of done: if a grilling session ran, run `/triage` before leaving the
+  session. A settled-but-unfiled grill is invisible to the queue, and nothing lists "settled but
+  unfiled" work.</p>
+</Callout>
+
+## Check yourself
+
+<Quiz
+  question="Which step in the chain is the only one that runs with nobody present?"
+  choices={["/to-spec — it never interviews by design", "/triage — it posts the agent brief automatically", "just watch — everything before it is interactive or verification", "/grill-with-docs — it runs as Stage 0 before anyone is watching"]}
+  answerIndex={2}
+  correctFeedback="The seam is at ready-for-agent: steps 1–5 happen in your own harness with you present; step 6, just watch, is the headless half and the only unattended step."
+  wrongFeedback="to-spec not interviewing is about its skill text, not about who is present — you can still run it by hand. triage and grill-with-docs are explicitly interactive-only (disable-model-invocation: true). Only just watch runs unattended."
+/>
+
+<Quiz
+  question="Why does just watch dispatch adw_simple_sdlc.py rather than the lighter plan_build_test chain?"
+  choices={["plan_build_test cannot read a ticket file as its prompt", "An unattended dispatch has no other independent check besides the test gate, so it needs the review/revision loop", "The full chain is the only one that commits, which the watcher depends on", "adw_simple_sdlc.py is the only ADW that understands Status: lines"]}
+  answerIndex={1}
+  correctFeedback="Straight from adw_watch.py's module docstring: a supervised manual run has a human who can eyeball the plan; a queue dispatch has nobody, so it always takes the chain with the reviewer and revision loop."
+  wrongFeedback="It is not a technical limitation of the lighter chain — it is a deliberate choice recorded in the watcher's docstring: with no human watching, the review/revision loop is the only independent check besides tests."
+/>
+
+<Quiz
+  question="After /grill-with-docs commits CONTEXT.md, what carries the settled decision into the queue?"
+  choices={["Nothing automatic — you invoke /triage with the settled description yourself, before leaving the session", "wayfinder's no-fog fallthrough files a ticket on the next headless run", "just watch scans docs/adr/ for new entries and files them", "The domain-modeling skill posts the agent brief as part of writing the ADR"]}
+  answerIndex={0}
+  correctFeedback="Part C records this as an accepted manual step: grill-with-docs ends at CONTEXT.md/docs/adr/ and hands /triage nothing. The definition-of-done checklist line — run /triage before leaving the session — is the only guard."
+  wrongFeedback="No mechanism bridges grill to triage; a wrapper was evaluated and deliberately not built. The watcher only ever reads .scratch/<feature>/issues/*.md, never docs/adr/. You run /triage yourself."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> the adoption playbook's Part D, "The whole chain, named once" —
+the six-line list and the mermaid diagram beneath it — then the module docstring at the top of
+`.claude/skills/sssf/templates/adws/adw_watch.py` for the seam between the two status vocabularies.
+For the skill-side view of the same split, the reference glossary's `docs/reference/the-queue/Dark-factory.md`
+("The five vendored skills" and "Triage states and the agent brief"), and the playbook's "Cheat sheet
+— the five vendored skills" for the not-vendored table.</p>
+
+## Where this goes next
+
+<p>You now hold the whole chain in one table and know where the interactive half ends. The next
+lesson stays on step 4 — why `/triage` is the <em>only</em> thing allowed to write
+`ready-for-agent`, why that judgment stays interactive on purpose, and the sharp edge where running
+`/to-spec` or `/to-tickets` by hand quietly writes that state without any triage having happened.</p>
+
+<p><strong>Ask me things.</strong> Bring me a feature you want to push through the queue and we'll
+walk the six lines together, marking which ones you'll be present for and which one you won't.</p>

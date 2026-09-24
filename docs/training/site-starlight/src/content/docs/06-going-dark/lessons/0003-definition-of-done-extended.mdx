@@ -4,7 +4,195 @@ description: "Going dark adds checklist items on top of the standing definition 
 sidebar:
   order: 3
 ---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>You can run the four going-dark checklist items after any headless feature and say, for each
+  one, which silent failure it catches, what "pass" concretely looks like on disk, and why the
+  playbook chose a checklist line over a mechanism for the last of them.</p>
+</Callout>
 
 <p>Every capability this chapter adds comes with its own new way to fail silently, so the playbook extends the standing definition of done with checks specific to going dark: that `CONTEXT.md`/`docs/adr/` are committed and predate the headless run that used them, that a plan explicitly names what it's excluding as already-implemented rather than silently re-touching it, that your knowledge source got updated by the documenter stage if the feature changed anything it describes, and that a fresh grilling session's outcome actually reached `/triage` before the session ended — since nothing bridges that handoff automatically. This lesson walks each item and the silent failure it exists to catch.</p>
 
-{/* TODO: full lesson content, see plans/2026-09-24-docs-reference-and-training.md */}
+## The standing checklist, and why it needs extending
+
+<p>The playbook's "The standing checklist" applies before any run that writes: tree is clean,
+gates wired and each watched failing at least once, `writes` set, `protected_files` covering CI
+and the factory's own machinery, on a throwaway branch. After: read the diff not the green banner,
+`just sessions` for cost, and "if a gate never went red across several runs, suspect the gate."
+Every one of those items catches a failure inside a single run.</p>
+
+<p>Going dark introduces failures <em>between</em> runs and <em>around</em> them — things that
+happen before the loop starts or after it ends, in places no gate observes. Part C's "Definition
+of done, extended" is "Everything in the standing checklist above, plus" four items. Each maps to
+one thing this chapter added:</p>
+
+<table>
+  <tr><th>Checklist item</th><th>Chapter mechanism</th><th>Silent failure it catches</th></tr>
+  <tr><td>vocabulary committed <em>and predates</em> the run</td><td>bootstrap (Problem 1)</td>
+      <td>an interview that happened but the pipeline never saw</td></tr>
+  <tr><td>plan names what it's <em>not</em> doing</td><td>delta-scoping (Problem 2)</td>
+      <td>a well-formed plan that rebuilt what existed</td></tr>
+  <tr><td>knowledge source updated by the documenter</td><td>scout's OKF lookup (Problem 2)</td>
+      <td>the <em>next</em> feature's discovery reading stale claims</td></tr>
+  <tr><td>grill outcome filed via `/triage`</td><td>the manual grill → triage handoff</td>
+      <td>settled work that never enters the queue</td></tr>
+</table>
+
+## Item 1 — vocabulary is committed, and predates the run that used it
+
+<p>The playbook's wording: "If bootstrap ran, `CONTEXT.md`/`docs/adr/` are committed and predate
+the `just sdlc` run that used them." The first half repeats the bootstrap lesson's trap. The
+second half is new and easy to miss: it is not enough that the files are committed <em>now</em>.
+Scout reads the working tree at the moment it runs, so a `CONTEXT.md` committed five minutes
+after `just sdlc` started informed nothing — the run planned against the old vocabulary, and the
+commit merely makes it look as if it did not. The check is an ordering check: the bootstrap commit
+must be an ancestor of the run's own commit phase.</p>
+
+```sh
+# the bootstrap commit must come BEFORE the run's commit in history
+git log --oneline -- CONTEXT.md docs/adr/ | head -3
+git log --oneline -- specs/<adw_id>_*.md | head -1
+```
+
+<Callout kind="why" label="Why 'predate' and not just 'committed'">
+<p>A checklist that only said "committed" passes in the exact case it should fail: you forgot to
+  commit, the run planned blind, you noticed afterwards and committed. Everything now looks
+  right on disk. The word <em>predate</em> turns a state check into a history check, which is the
+  only kind that can tell those two stories apart.</p>
+</Callout>
+
+## Item 2 — the plan names what it is not doing
+
+<p>"The plan explicitly excludes anything scout marked as already implemented — check
+`specs/&lt;adw_id&gt;_*.md` names what it's <em>not</em> doing, not just what it is." This is the
+verification side of the previous lesson's planner instruction ("explicitly out of scope in the
+plan, not silently re-touched"). The planner keeps a copy of every plan under `specs/` precisely
+so this check has something durable to read — its own template tells it to "List `specs/` before
+naming that copy and pick a name nothing else holds," because "an overwritten spec is a lost
+record."</p>
+
+<p>What "pass" looks like: open the spec and find an explicit exclusion — a section, a bullet, a
+sentence — that names something from `scout_findings.md` as already present and out of scope.
+What "fail" looks like is subtler than a missing section: a spec that never mentions existing
+work at all. That silence can mean scout found nothing relevant, or it can mean the planner
+ignored what scout found. Read `scout_findings.md` alongside the spec to know which.</p>
+
+<Callout kind="trap" label="A green run does not check this for you">
+<p>No gate reads `specs/`. A plan that rebuilds an existing module produces a diff that compiles,
+  passes tests, and gets a clean review — the reviewer judges the change against the plan, not
+  the plan against what already existed. This item is the only place in the whole pipeline that
+  asks the question "did this need doing?" after the fact, which is why it is on a checklist you
+  run and not in a gate that runs itself.</p>
+</Callout>
+
+## Item 3 — the knowledge source got updated
+
+<p>"Your knowledge source (OKF, concept map, whatever you use) got updated by the documenter
+stage if the feature changed anything it describes — otherwise the next feature's discovery step
+is reading stale claims." This item exists because of Problem 2's fix: scout now reads OKF second
+and trusts it as a claim about what exists. A knowledge source that stops being maintained does
+not just become useless — it becomes actively misleading, because scout will report its stale
+concepts as "already implemented" and the planner will scope the next delta around code that has
+since changed.</p>
+
+<p>Note what the shipped documenter template does and does not say. Its instructions bind it to
+the diff — "Everything you write must be traceable to that diff," name a file "only if it is in
+`changed_files` or appears in the diff" — and have it write `app_docs/&lt;adw_id&gt;_&lt;slug&gt;.md`.
+They do not mention OKF or any knowledge source at all. Wiring the documenter to update your
+`.okf/` concepts is a layer-one edit you make in your own copy of its `system.md`, in the same way
+you wire scout's lookups. Until you do, this checklist item is checked by hand — and the
+`ast-grep` tie-break in scout is your only backstop when it is missed.</p>
+
+## Item 4 — the grill outcome actually reached /triage
+
+<p>"If this bootstrap session ran because of a fresh grilling (`/grill-with-docs` or
+`/improve-codebase-architecture`), its outcome is filed — run `/triage` before leaving the
+session. Nothing bridges this automatically; a settled-but-unfiled grill is invisible to the
+queue, not just slow to reach it."</p>
+
+<p>The playbook devotes a whole subsection to why this is a checklist line and not a mechanism:
+"The grill → triage handoff is manual, on purpose (accepted, not a gap to close)."
+`/grill-with-docs` ends at a committed `CONTEXT.md`/`docs/adr/` update and "does not hand
+`/triage` anything, and neither does upstream Pocock's own flow." The bootstrap/AFK audit flagged
+this as "the one place in the whole pipeline where forgetting a step loses work silently" —
+because "nothing lists 'settled but unfiled' work." There is no queue entry to be stuck, no
+status to be wrong. The feature simply does not exist as far as `just watch` is concerned.</p>
+
+<Callout kind="why" label="Why a checklist line beat a bridge skill">
+<p>The playbook records the decision explicitly: "Closing it would mean a thin wrapper skill (run
+  `/grill-with-docs`, then `/to-spec`, then remind `/triage`) — evaluated and deliberately not
+  built, since it adds a skill to maintain for one reminder a checklist line covers just as well.
+  The checklist item below is the actual guard." One more skill is one more vendored file with a
+  drift check and a token cost, to replace a sentence you read at the end of a session. When the
+  guard is a reminder, the cheapest reliable form of a reminder is text you already have to
+  read.</p>
+</Callout>
+
+## Running the four together
+
+<p>In practice the items split by <em>when</em> you run them. Item 4 belongs to the end of the
+interactive bootstrap session, before you leave it. Item 1 belongs to the moment just before
+`just sdlc` (or the moment `just watch` claims). Items 2 and 3 belong to the read-the-diff step
+after the run — the same moment the standing checklist already has you reading the diff rather
+than the green banner.</p>
+
+```text
+bootstrap session ends      → [4] /triage ran; outcome filed at needs-triage → ready-for-agent
+before the headless run     → [1] CONTEXT.md/docs/adr/ committed, ancestor of what's about to run
+after the headless run      → [2] specs/<adw_id>_*.md names its exclusions
+                            → [3] knowledge source reflects what the diff changed
+```
+
+<p>Part D extends this list once more — "Definition of done, extended again" adds queue-specific
+items on top, starting with: every dispatched ticket was `ready-for-agent` when `just watch`
+claimed it, "never a raw or `needs-triage` issue." That is where the next chapter picks up.</p>
+
+## Check yourself
+
+<Quiz
+  question="You forgot to commit CONTEXT.md before just sdlc, noticed after the run finished, and committed it then. Does checklist item 1 pass?"
+  choices={["Yes — the files are committed, which is all the item requires", "No — the item requires the commit to predate the run, and this one does not", "Yes, as long as the run's spec references the new terms", "No — CONTEXT.md must be committed by the documenter stage, not by hand"]}
+  answerIndex={1}
+  correctFeedback="The item says 'committed and predate the just sdlc run that used them.' Scout read the working tree at run time, so the late commit informed nothing — the run planned against old vocabulary and the commit only makes it look otherwise. That is exactly the case 'predate' was added to catch."
+  wrongFeedback="Committed-now is not the check. Scout and the planner read the tree when they run; a commit that landed afterwards was invisible to them. The word 'predate' turns this from a state check into a history check for precisely this scenario."
+/>
+
+<Quiz
+  question="Why did the playbook choose a checklist line over a bridge skill for the grill → triage handoff?"
+  choices={["A bridge skill is impossible because /triage has disable-model-invocation: true", "A wrapper skill would add a file to maintain for one reminder a checklist line covers as well", "Upstream Pocock already ships a bridge, so building one would duplicate it", "The handoff is automatic on the local-markdown tracker, so no guard is needed"]}
+  answerIndex={1}
+  correctFeedback="The decision is recorded verbatim: a thin wrapper (grill, then to-spec, then remind /triage) was 'evaluated and deliberately not built, since it adds a skill to maintain for one reminder a checklist line covers just as well.' The checklist item is the guard."
+  wrongFeedback="Nothing upstream bridges it either, and nothing about the tracker makes it automatic — the playbook is explicit that a settled-but-unfiled grill is invisible to the queue. The choice was a cost judgment: one more skill to maintain versus one line you read before leaving the session."
+/>
+
+<Quiz
+  question="Which of the four items can a passing gate run catch on its own?"
+  choices={["Item 2 — the reviewer compares the plan against scout_findings.md", "Item 3 — the documenter fails if .okf/ is stale", "Item 1 — the commit phase rejects an uncommitted CONTEXT.md", "None of them — each catches a failure no gate observes"]}
+  answerIndex={3}
+  correctFeedback="That is the whole reason they are a checklist rather than gates: an uncommitted bootstrap, a plan that silently rebuilt existing code, a stale knowledge source, and an unfiled grill all produce green runs. Each item lives before, after, or around a run, where no gate is looking."
+  wrongFeedback="No gate reads specs/ against scout's findings, the shipped documenter template does not mention a knowledge source, and the commit phase stages whatever is there without judging it. Every one of these failures looks like success from inside a run — which is why the playbook made them checklist lines you run yourself."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> the adoption playbook's Part C, "Definition of done, extended" —
+four lines, read alongside "The standing checklist" it builds on and the subsection just above
+it, "The grill → triage handoff is manual, on purpose," which is the reasoning behind item 4.
+Then Part D's "Definition of done, extended again" for the items the queue adds on top. For
+item 3, open the shipped `templates/prompt_engineering/documenter/system.md` and confirm for
+yourself what it does and does not say about your knowledge source.</p>
+
+## Where this goes next
+
+<p>This chapter took a factory that runs one feature safely and made it able to run many,
+unattended: two layers to know which file to edit, a bootstrap phase so the loop never has to
+ask, scout and planner wired to build only the delta, and a checklist for everything that can go
+wrong without a gate noticing. What it has not done is turn that into a standing queue — who
+files work, who judges whether it should be built, and what actually claims and dispatches it.
+Chapter 7, "The Queue," names that whole chain once, then reads `adw_watch.py` line by line.</p>
+
+<p><strong>Ask me things.</strong> Bring me the last headless feature you shipped and we'll walk
+the four items against it — starting with `git log` on `CONTEXT.md`, to see whether the
+bootstrap really came first.</p>

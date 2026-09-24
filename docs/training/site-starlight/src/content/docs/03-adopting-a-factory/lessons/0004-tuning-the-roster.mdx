@@ -4,7 +4,187 @@ description: "The default roster a fresh install ships with is a starting point,
 sidebar:
   order: 4
 ---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>You can read the stamped `sssf.config.yaml`, say for any agent which fields it inherited from
+  `defaults` and which it set itself, make the five overrides playbook B4 recommends without
+  breaking the list-replacement rule, and explain what `agents.validate()` catches — and what it
+  only warns about — before a single agent spawns.</p>
+</Callout>
 
 <p>A freshly stamped roster's defaults are a reasonable starting point, not a fit for your project — some agents need a different `model`, a tighter `writes` boundary, or a `coding_agent` swap, and getting this wrong shows up as either an agent that can't do its job or one that can do far more than it should. This lesson covers tuning the roster deliberately: reading what `defaults` merging actually does, which fields are worth overriding per-agent early, and running `agents.validate()` after every change so a typo in the roster is caught as a config error before it becomes a wasted, or worse an unbounded, run.</p>
 
-{/* TODO: full lesson content, see plans/2026-09-24-docs-reference-and-training.md */}
+## Read the defaults first — every entry is a diff against them
+
+<p>`config.md`'s "Defaults merging" section states the rule: `agents.py` merges each entry
+<strong>over</strong> `defaults`, key by key. An entry states only what differs; anything unset
+inherits. So a roster entry is never readable in isolation — to know what the builder's `model`
+is, you look at the builder's entry, find no `model:` line, and read `defaults.model` instead.</p>
+
+<p>The stamped `templates/sssf.config.yaml` sets these defaults: `coding_agent: claude_code`,
+`model: anthropic/claude-sonnet-4-6`, `thinking: medium`, `tools` set to all seven builtins
+(`read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`), and `protected_files` covering
+`adws/adw_modules/`, `adws/adw_sssf_config/`, `adws/adw_*.py`. Against that, the five stamped
+agents differ like this:</p>
+
+<table>
+  <tr><th>Agent</th><th>Sets its own</th><th>Inherits</th></tr>
+  <tr><td>`planner`</td><td>`model` opus, `thinking: high`, `writes: [specs/]`, its own `tools` (no `edit`)</td><td>`coding_agent`</td></tr>
+  <tr><td>`builder`</td><td>its own `tools` (all, incl. `edit`+`write`); <strong>no `writes` key</strong></td><td>`coding_agent`, `model` sonnet, `thinking`</td></tr>
+  <tr><td>`scout`</td><td>`model` haiku, `writes: []`, its own `tools`</td><td>`coding_agent`, `thinking`</td></tr>
+  <tr><td>`reviewer`</td><td>`model` opus, `thinking: high`, `writes: []`, its own `tools` (no `edit`)</td><td>`coding_agent`</td></tr>
+  <tr><td>`documenter`</td><td>`model` haiku, `writes: [app_docs/, docs/, "**/*.md", "*.md"]`, its own `tools`</td><td>`coding_agent`, `thinking`</td></tr>
+</table>
+
+<p>Two things to notice. The builder is the only agent with no `writes` key — the template's own
+comment says "unrestricted, and the only agent that is" — which is precisely the entry the
+previous lessons told you to think hardest about. And every agent already sets its own `tools`,
+which matters for the next rule.</p>
+
+<Callout kind="trap" label="A per-agent list replaces the default's list — it never appends">
+<p>`config.md`'s `agents[]` table is explicit: for `tools`, `harness_engineering`,
+  `skill_engineering` and the other list fields, a per-agent list <strong>replaces</strong> the
+  default's list entirely. Writing `tools: [ast_query]` on the reviewer to "add" a tool leaves
+  it with exactly one tool. And an empty list is not "all tools" — per the Tools section, "it is
+  a tool-less agent, and it will stall." When you narrow an agent's tools, write the whole list
+  you mean.</p>
+</Callout>
+
+## The five overrides worth making early
+
+<p>Playbook B4 is a short list, and every item maps to a field you have now read:</p>
+
+<ol class="steps">
+  <li><strong>Start with everything on `claude_code`</strong> — no API key, uses your logged-in
+  session. The template ships this way; leave `coding_agent` alone until you have a reason.</li>
+  <li><strong>`writes: []` on every read-only agent</strong> (scout, reviewer). Already set in the
+  template — confirm it survived any edits. Remember `writes: []` is read-only <em>with respect to
+  the repo</em>: the session runtime under `data_dir` is always writable, so the scout can still
+  land `scout_findings.md`.</li>
+  <li><strong>Documenter limited to docs paths, planner limited to `specs/`.</strong> Adjust the
+  documenter's list to where your docs actually live — the stamped `app_docs/` may not be a
+  directory you have.</li>
+  <li><strong>Cheap model on scout and documenter, stronger on planner and reviewer.</strong> The
+  template already does this (haiku vs opus). A6's advice applies before you change it: "do not
+  assume the expensive model plans better; run the same prompt through both on your own repo and
+  read the two specs."</li>
+  <li><strong>Add your CI config to `protected_files`.</strong> This is the one the template
+  cannot do for you, because it does not know where your CI lives.</li>
+</ol>
+
+```yaml
+defaults:
+  protected_files:
+    - adws/adw_modules/
+    - adws/adw_sssf_config/
+    - adws/adw_*.py
+    - .github/workflows/        # yours — the template cannot guess this
+
+agents:
+  - name: documenter
+    writes:
+      - docs/                   # trimmed: this repo has no app_docs/
+      - "**/*.md"
+      - "*.md"
+```
+
+<p>Two fields you will be tempted to touch early and should read about first. `thinking` under
+`claude_code` maps to a thinking-token budget exported as `MAX_THINKING_TOKENS`; `config.md`'s
+rough guidance is `high`/`xhigh` for planners and reviewers, `medium` for builders, `low` for
+mechanical read-and-report agents. And `model` must always be `provider/model-id` — under
+`claude_code` the provider half must be `anthropic`, and anything else "raises at `validate()`
+rather than on the first billed call."</p>
+
+## Validate after every edit — what fails, and what only warns
+
+<p>`agents.validate(cfg, REQUIRED_AGENTS)` runs at the top of every ADW, before `session.ensure()`
+— you can see the call order in `adw_scout.py`'s `main()`, and it is the same in every stamped
+`adw_*.py`. Its docstring is one line: "Fail fast: every required name must resolve to a usable
+agent." Read from `agents.py`, it collects problems for each required agent and raises
+`SystemExit("config validation failed: ...")` if any exist:</p>
+
+<ul>
+  <li>the name is not defined in the config (with the list of names that are)</li>
+  <li>`coding_agent` is not one of the known interfaces</li>
+  <li>either `prompt_engineering.system` or `.user` is not a file on disk</li>
+  <li>`resolve_model()` rejects the `model` string for that interface</li>
+  <li>a `skill_engineering` path is missing or empty — the code comment: "a typo in a roster is a
+  config error, not something discovered mid-run"</li>
+</ul>
+
+<p>Separately, `ignored_field_warnings()` <em>prints</em> to stderr and never fails: a
+non-`pi` agent with `harness_engineering` set gets a warning that the field "will be ignored." The
+stamped template has exactly this on the planner and scout (`subagents.ts`, with a comment saying
+`claude_code` ignores it), so expect that warning on a default install; it is telling you the
+truth, not reporting a bug.</p>
+
+```
+$ just scout "where is auth handled"
+warning: agent 'planner': harness_engineering is set but coding_agent is 'claude_code' — ...
+config validation failed:
+- agent 'reviewer': model pattern 'openai/gpt-5' ... 
+```
+
+<p>The cheapest way to run validation on its own is any read-only ADW — `just scout` with a
+trivial prompt, or `just quality "roster check"`, which runs zero agents. Do it after every roster
+edit, before the run you actually care about.</p>
+
+<Callout kind="why" label="Why validate before spawn, not on first use">
+<p>A roster with one bad agent could in principle run every phase until it reaches that agent.
+  The playbook's whole posture argues against it: three phases in, you have spent planner and
+  builder tokens, produced a partial diff, and possibly a commit, before discovering a model
+  string was mistyped. `config.md` puts it as a guarantee — "no agent is ever spawned against a
+  half-valid config." Chapter 7's watcher lesson shows the other half of that story: because
+  `validate()` raises `SystemExit`, `adw_watch.py` has to catch `SystemExit` explicitly or a
+  roster typo crashes the whole watcher instead of failing one ticket.</p>
+</Callout>
+
+## Check yourself
+
+<Quiz
+  question="The stamped builder entry has no model: line. What model does it run?"
+  choices={["anthropic/claude-opus-4-6, same as the planner", "anthropic/claude-sonnet-4-6 — inherited from defaults.model, because each entry is merged over defaults key by key", "Whatever claude -p defaults to, since no model is passed", "validate() fails: model is required per agent"]}
+  answerIndex={1}
+  correctFeedback="Defaults merging: an entry states only what differs and inherits everything else. The stamped defaults.model is anthropic/claude-sonnet-4-6, so that is the builder's model until you override it."
+  wrongFeedback="model is not required per agent — it is inherited from defaults, which the template sets to anthropic/claude-sonnet-4-6. Only planner and reviewer (opus) and scout and documenter (haiku) override it."
+/>
+
+<Quiz
+  question="You want the reviewer to also get an extension tool, so you write tools: [ast_query] on its entry. What happens?"
+  choices={["The reviewer gets the seven default tools plus ast_query", "The reviewer gets exactly one tool — a per-agent list replaces the default list entirely, it never appends", "validate() fails because ast_query is not a builtin", "ast_query is added, but only under coding_agent: pi"]}
+  answerIndex={1}
+  correctFeedback="config.md is explicit: a per-agent list replaces the default's list entirely. You have to write the whole list you mean — read, grep, find, ls, bash, write, ast_query — or the reviewer is left nearly tool-less."
+  wrongFeedback="Lists never merge. tools: [ast_query] gives the reviewer exactly one tool. Write out the full list you want; and note the extension itself only loads under coding_agent: pi anyway."
+/>
+
+<Quiz
+  question="You set harness_engineering on a claude_code agent. What does validate() do?"
+  choices={["Fails the run — harness_engineering requires coding_agent: pi", "Prints a warning to stderr naming the agent, and the run proceeds with the field ignored", "Silently ignores it", "Translates the extension into an MCP server config"]}
+  answerIndex={1}
+  correctFeedback="ignored_field_warnings() warns, never fails — a roster where someone might later flip the agent to pi is still valid. The stamped template triggers this warning on planner and scout by default; it is accurate, not a bug."
+  wrongFeedback="Neither silent nor fatal. agents.py's ignored_field_warnings() prints a warning to stderr before anything spawns and the run continues — config.md's harness_engineering section says the field is ignored under claude_code and explains why it is not translated."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> `.claude/skills/sssf/references/config.md` — the "Fields",
+"Defaults merging", "Tools", and "Write permissions" sections — read alongside the stamped
+`.claude/skills/sssf/templates/sssf.config.yaml`, whose inline comments explain each stamped
+choice. Then `validate()` and `ignored_field_warnings()` in
+`.claude/skills/sssf/templates/adws/adw_modules/agents.py`, and playbook B4 for the five
+overrides. The fork's glossary page `docs/reference/agent-configuration/Defaults-merging.md`
+frames the merge rule in one screen.</p>
+
+## Where this goes next
+
+<p>That closes the adoption chapter: gates wired to real commands, boundaries written down, work
+classified into its four jobs, a skeleton-first path for new projects, and a roster that is
+actually yours. Everything from here — owning your prompts and chains, vendoring skills, going
+dark, the queue — assumes this baseline holds. Before any run that writes, the playbook's standing
+checklist is the thing to reread.</p>
+
+<p><strong>Ask me things.</strong> Bring me your edited `sssf.config.yaml` and we'll walk each
+agent's entry together, saying out loud what it set and what it inherited, before you let it run
+unattended.</p>

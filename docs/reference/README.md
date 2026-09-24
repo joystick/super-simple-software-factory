@@ -72,12 +72,18 @@ there — link to it instead.
 
 ## What this pass built
 
-Per the governing plan's scoping decision, this pass fully authors a
-representative sample of the 44 own-page rows (36 link / 44 own-page,
-corrected by a fable review pass and this workspace's own link-checker
-script — see `concept-manifest.md`'s "Totals" section for why), not all of
-them:
+The first authoring pass (2026-09-24) fully authored a representative sample
+of the 44 own-page rows, and left the rest as honest stubs. A second pass,
+the same day, went back and closed the *genuine* remaining gap — after
+re-checking, most of the 34 "unauthored" rows turned out to already be
+covered inside one of these 10 pages (e.g. `Permissions-and-writes.md` alone
+answers 6 rows: `writes`, `protected_files`, `snapshot()`, `enforce()`,
+`always_writable`, `PermissionBreach`; `Gate.md` answers 9; `Dark-factory.md`
+answers 9). Only 13 rows had no real answer anywhere. This pass, run via 4
+parallel fable authoring agents each required to read and cite real source
+before writing, closed all 13:
 
+First pass (10 pages):
 - `quality-gates-and-permissions/Gate.md`
 - `quality-gates-and-permissions/Permissions-and-writes.md`
 - `quality-gates-and-permissions/Rule-zero.md`
@@ -89,8 +95,22 @@ them:
 - `agent-configuration/Defaults-merging.md` (worked link-example)
 - `handoff-and-output/Session-layout.md` (worked link-example)
 
-Every other own-page row in the manifest is tracked as follow-up work, not
-claimed done by this pass. The manifest itself (`concept-manifest.md`) is
-complete for all 80 concepts regardless — resolution status (link vs.
-own-page) is recorded for every row even where the own-page isn't written
-yet.
+Second pass (13 pages, the genuine remainder):
+- `core-execution-model/Four-param-rule.md`
+- `core-execution-model/AgentCall.md`
+- `core-execution-model/Chains.md`
+- `core-execution-model/Skip-plan.md`
+- `handoff-and-output/ChangeSet-and-BaseRef.md`
+- `agent-configuration/Ignored-field-warnings.md`
+- `coding-agent-drivers/PiRequest-and-PiResult.md`
+- `coding-agent-drivers/ToolCallTracker.md`
+- `coding-agent-drivers/UsageBreakdown.md`
+- `quality-gates-and-permissions/Quality-blocks.md`
+- `observability/Audit-skills.md`
+- `the-queue/The-four-jobs.md`
+- `the-queue/Bootstrap-vocabulary.md`
+
+All 44 own-page rows in the manifest now resolve to either a real dedicated
+page or a real section inside one of the 23 pages above — none are dead
+ends. This second pass is pending an in-depth opus review before being
+considered final (see `plans/2026-09-24-docs-reference-and-training.md`).

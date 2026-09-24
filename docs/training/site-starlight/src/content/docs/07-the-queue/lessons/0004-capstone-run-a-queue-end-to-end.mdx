@@ -4,7 +4,171 @@ description: "Put the whole chain to work for real: grill, spec, ticket, triage,
 sidebar:
   order: 4
 ---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>You have taken one small, real piece of work through all six steps of the chain yourself —
+  grilled it, specced it, ticketed it, triaged it, checkpointed it, and watched `just watch --once`
+  claim, dispatch, and resolve it — and you can read the ticket file and the git log afterward and
+  point to the exact commit, session id, and status transition each step left behind.</p>
+</Callout>
 
 <p>This chapter's capstone puts the whole named chain to work on real, if small, work: run `/grill-with-docs` on a genuine new concept, carry it through `/to-spec` and `/to-tickets`, hand the result to `/triage`, run every mandatory checkpoint from the filing lesson before proceeding, then run `just watch --once` and read the result — a resolved ticket with a session id and commit pointer on success, or a ticket flipped to `ready-for-human` with a comment explaining exactly what broke on failure. The point of the capstone is watching the entire dark-factory loop complete for real, end to end, on a ticket you filed yourself, rather than trusting any single piece of it in isolation.</p>
 
-{/* TODO: full lesson content, see plans/2026-09-24-docs-reference-and-training.md */}
+## Before you start: what has to already be true
+
+<p>Everything below assumes the factory is wired the way earlier chapters left it: gates proven to
+fail (rule zero), a roster in `sssf.config.yaml`, `docs/agents/issue-tracker.md` whose first line
+says `Local Markdown` (that is what `detect_tracker()` reads — a GitHub or GitLab first line makes
+`main()` return `2` and refuse), and a clean working tree. Pick a piece of work that is genuinely
+small — one phase, one ticket — and that introduces at least one term your `CONTEXT.md` does not
+yet name, so step 1 has something to do.</p>
+
+## Steps 1–3: grill, spec, ticket (you are present)
+
+<ol class="steps">
+  <li><p><strong>`/grill-with-docs`.</strong> Interactively, in your own harness. It composes
+  `grilling` with `domain-modeling` and ends at updated `CONTEXT.md`/`docs/adr/`. Commit those
+  before anything else — scout and the planner read the working tree, not your conversation
+  (Chapter 6). Remember it hands nothing to `/triage`; you carry the settled description forward
+  yourself.</p></li>
+  <li><p><strong>`/to-spec`.</strong> Writes `.scratch/&lt;feature-slug&gt;/spec.md`. Run by
+  hand, it will apply `ready-for-agent` by default — the sharp edge from "Triage as Sole Promoter."
+  Do not commit yet.</p></li>
+  <li><p><strong>`/to-tickets`.</strong> Slices the spec into `.scratch/&lt;feature-slug&gt;/issues/NN-slug.md`,
+  one per phase, with `Blocked by:` expressing phase order. Its template writes bold
+  `**Status:**`/`**Blocked by:**`; `STATUS_RE` accepts that form. Check every `Blocked by:` value
+  is a bare number or the line is absent — never prose.</p></li>
+</ol>
+
+## Step 4: triage (still present — this is the gate)
+
+<p>Hand the ticket to `/triage`. It checks feasibility, redundancy against what already exists,
+`.out-of-scope/` prior rejections, and compliance, waiting for your direction at each step. For
+approved work it posts a durable agent brief into the ticket and sets `Status: ready-for-agent` —
+the only string `frontier()` will ever match. If `/to-spec`/`/to-tickets` already wrote
+`ready-for-agent` before triage ran, that promotion did not go through the gate: either let
+`/triage` re-judge it now, or reset the line to `needs-triage` first and then triage. The ticket body
+as it stands after this step, verbatim, is what the planner will receive as its prompt
+(`utils.resolve_prompt(str(issue.path))`).</p>
+
+## Step 5: commit, then the six checkpoints
+
+<p>Commit `.scratch/&lt;feature-slug&gt;/` and run the "Filing Checkpoints" script. The two that
+bite most often on a first run:</p>
+
+<ul>
+  <li>Checkpoint 4 — `sort -u` over the status values must show `ready-for-agent` on the ticket
+  you intend to dispatch and one of the other four canonical strings on everything else. A
+  well-formed non-canonical word never warns.</li>
+  <li>Checkpoint 5 — `git status --short .scratch/&lt;feature-slug&gt;/` must be empty. `run_once()`
+  refuses to claim on a dirty tree, so an uncommitted stray file doesn't hide one ticket, it stops
+  the whole run.</li>
+</ul>
+
+## Step 6: just watch --once, and what comes back
+
+<p>Run it once, not looped, so you get an exit code and a bounded amount of output to read:</p>
+
+```text
+$ just watch --once
+just watch: claiming .scratch/<feature-slug>/issues/01-<slug>.md
+just watch: committed watcher state (<sha1>): just watch: claim .scratch/<feature-slug>/issues/01-<slug>.md
+...  adw_simple_sdlc: planner -> builder -> reviewer -> revision loop -> documenter -> commit  ...
+just watch: committed watcher state (<sha2>): just watch: resolve .scratch/<feature-slug>/issues/01-<slug>.md (session <adw_id>)
+just watch: session <adw_id> succeeded -- .scratch/<feature-slug>/issues/01-<slug>.md
+$ echo $?
+0
+```
+
+<p>Exit `0` means work was found and dispatched — regardless of outcome. Exit `1` means the queue
+was empty: go back to the checkpoints, because nothing in the watcher will tell you which check
+excluded your ticket. Exit `2` means the tracker isn't local-markdown.</p>
+
+<Callout kind="why" label="Read the trail, not the summary line">
+<p>The last `succeeded`/`FAILED` line is the least informative thing the run produces. The
+  durable evidence is in two places. First, the ticket file: its `Status:` line now reads
+  `resolved` (or `ready-for-human`), with the key's own formatting preserved because `set_status()`
+  splices only the captured value, and a `## Comments` section `append_comment()` added with a
+  line like <code>&gt; *just watch: resolved by session &lt;adw_id&gt;.*</code>. Second, the git
+  log: a claim commit, then the chain's own commit(s) from its commit phase, then a resolve commit —
+  three commits for one ticket, in that order, because `commit_watcher_state()` fires after every
+  status write. `just phases &lt;adw_id&gt;` opens the run itself.</p>
+</Callout>
+
+## If it came back ready-for-human instead
+
+<p>That is the chain working as designed, not the chain failing. `dispatch()` has two paths to
+`FAILED_STATE`: an exception or `SystemExit` raised inside `adw_simple_sdlc.main()` (crash), or a
+clean non-zero exit from it (a gate that stayed red through the revision loop, for instance). Both
+write `ready-for-human`, both append a comment naming the session id — the non-zero path explicitly
+says <em>see `just phases &lt;adw_id&gt;` for what broke</em> — and both commit. Nothing is retried.
+Your job now is what the playbook's extended definition of done asks: confirm the failed run is
+`ready-for-human` with a comment, not left `claimed` forever, read the phases, fix the cause, and
+re-triage.</p>
+
+## The whole factory, in one ticket's history
+
+<p>Look at what one small ticket's trail now contains, and where each piece was established:</p>
+
+<table>
+  <tr><th>Evidence</th><th>Mechanism</th><th>Where you learned it</th></tr>
+  <tr><td>a committed `CONTEXT.md`/ADR predating the run</td><td>bootstrap / AFK split</td><td>Chapter 6, "Bootstrap Vocabulary"</td></tr>
+  <tr><td>a ticket whose `ready-for-agent` came from `/triage`, not a hand-run skill</td><td>sole promoter; the string is the gate</td><td>"Triage as Sole Promoter"</td></tr>
+  <tr><td>six empty-where-expected checkpoint outputs</td><td>claim vs. filesystem boundary</td><td>"Filing Checkpoints"</td></tr>
+  <tr><td>a claim commit before any work</td><td>`set_status(CLAIMED)` + `commit_watcher_state()`</td><td>"just watch, Concretely"</td></tr>
+  <tr><td>a full planner → reviewer → documenter run with gates</td><td>`adw_simple_sdlc.py`, never the lighter chain</td><td>"The Chain Named Once"; Chapters 1–5 for the gates and roles</td></tr>
+  <tr><td>a resolve or fail commit with a session id in the ticket</td><td>`dispatch()`'s three outcomes</td><td>"just watch, Concretely"</td></tr>
+</table>
+
+<p>Every row is something you can point to in a file or a `git log` line. That is the whole claim
+of the dark factory: not that nobody looks, but that each thing a human decided — vocabulary,
+feasibility, filing — was written down once in a place a headless process reads, and each thing the
+process did left a commit a human can read back.</p>
+
+## Check yourself
+
+<Quiz
+  question="just watch --once exits 0 but the ticket now reads Status: ready-for-human. What does exit 0 tell you?"
+  choices={["The dispatched chain passed all gates", "Work was found and dispatched — the outcome is in the ticket's Status:, not the exit code", "The watcher crashed after claiming", "The ticket was resolved and then reopened by the documenter"]}
+  answerIndex={1}
+  correctFeedback="main() returns 0 whenever run_once() found and dispatched something, regardless of success or failure. The docstring says so explicitly: check the issue's new Status to know which."
+  wrongFeedback="Exit code 0 is about whether the queue had work, not whether the work succeeded. A ready-for-human ticket with a comment and a session id is a dispatched-and-failed run — read just phases <adw_id> for what broke."
+/>
+
+<Quiz
+  question="How many watcher-authored commits should a single successful ticket leave in git log, and why?"
+  choices={["One — the resolve commit at the end", "Two — a claim commit before work and a resolve commit after, because every status write is committed immediately", "Three — claim, dispatch, and resolve", "None — the chain's own commit phase covers everything"]}
+  answerIndex={1}
+  correctFeedback="commit_watcher_state() runs after set_status(CLAIMED) and again after set_status(RESOLVED). The chain's own commit(s) sit between them but are authored by the ADW's commit phase, not the watcher."
+  wrongFeedback="The chain's commit phase fires mid-run, before the watcher's final status write — which is exactly why the watcher commits its own claim and resolve writes itself. Two watcher commits bracket the chain's."
+/>
+
+<Quiz
+  question="Your first just watch --once reports queue empty. Which lesson's tool tells you why, and why can't the watcher?"
+  choices={["The just watch lesson — read the stderr warning, the watcher always names the excluded file", "The filing checkpoints — most exclusions (wrong status value, missing blocker, uncommitted file) are well-formed to the watcher and produce no warning", "The triage lesson — /triage prints the ticket's queue eligibility", "Chapter 6 — an unsettled CONTEXT.md term stops the scan"]}
+  answerIndex={1}
+  correctFeedback="_check_format() and read_blocked_by() warn only on malformed shapes. A canonical-looking but wrong status value, a bare blocker number with no sibling, or a file that was never committed are all silent — only the six checkpoints surface them."
+  wrongFeedback="The watcher warns only on near-miss formatting and non-numeric blockers. Everything else that hides a ticket is well-formed as far as the regexes are concerned, so you go back to the six checkpoints, not the watcher's output."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> the adoption playbook's Part D in full, read in one sitting now
+that you have run it — "The whole chain, named once" through "Definition of done, extended again" —
+with `.claude/skills/sssf/templates/adws/adw_watch.py` open beside it. Then the three reference
+glossary entries this chapter leaned on: `docs/reference/the-queue/Dark-factory.md`,
+`docs/reference/the-queue/Frontier.md`, and `docs/reference/the-queue/The-queue-watcher.md`.</p>
+
+## Where this goes next
+
+<p>There is no next lesson. You have now seen every layer of the factory do its job on one ticket
+you filed: the gates from Chapter 1 ran inside a chain from Chapter 5, on a prompt written by a
+human at a gate from this chapter, dispatched by a script you can read in one sitting. What
+remains is your own repo — its real gates, its real vocabulary, its real queue — and the playbook's
+standing checklists for keeping each of those honest as the work grows.</p>
+
+<p><strong>Ask me things.</strong> Bring me the ticket file and the `git log --oneline` from your
+first end-to-end run and we'll read the trail together, commit by commit, until every line has a
+name.</p>

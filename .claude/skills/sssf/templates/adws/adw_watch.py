@@ -89,6 +89,11 @@ BLOCKED_BY_RE = re.compile(r"^\*{0,2}Blocked by:\*{0,2}[ \t]*(.+)$", re.MULTILIN
 # emphasis right after the word) has no boundary there and would silently
 # pass a \b-anchored version straight through -- caught testing this exact
 # detector against itself.
+# Known gap, not yet closed: a backtick-wrapped `Status:` matches neither
+# STATUS_RE nor this near-miss detector ([*_\s]{0,3} doesn't include the
+# backtick character), so that one specific markup choice is still a silent
+# skip, not a loud warning -- found while writing docs/training's queue
+# lessons, 2026-09-24. Author advice: use plain or **bold**, never backticks.
 _STATUS_NEAR_MISS_RE = re.compile(r"^[*_\s]{0,3}status", re.MULTILINE | re.IGNORECASE)
 _BLOCKED_BY_NEAR_MISS_RE = re.compile(r"^[*_\s]{0,3}blocked\s+by", re.MULTILINE | re.IGNORECASE)
 

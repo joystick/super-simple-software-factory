@@ -4,7 +4,156 @@ description: "Only /triage may promote a ticket to ready-for-agent — this less
 sidebar:
   order: 1
 ---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>You can explain why `just watch` never judges a ticket itself and why that is the same
+  decision Chapter 6 already made about the headless interview; you can name what `/triage`
+  actually checks before it writes `ready-for-agent`; and, after running `/to-spec` or
+  `/to-tickets` by hand, you know the two ways the result can bypass triage and exactly what to
+  edit before you commit.</p>
+</Callout>
 
 <p>`just watch` only ever picks up issues already at `ready-for-agent` — every judgment about whether a ticket is feasible, compatible with what's already live, and compliant happens upstream of that label, interactively, inside `/triage`. This lesson covers why that judgment call stays a human's on purpose (an unattended loop making its own security/compliance calls has no one to catch it when it's wrong, the same failure shape Part C's headless-interview problem already fixed once), and the sharp edge where running `/to-spec` or `/to-tickets` interactively self-promotes a ticket past this gate by default — and what to check for before committing when that happens.</p>
 
-{/* TODO: full lesson content, see plans/2026-09-24-docs-reference-and-training.md */}
+## What the watcher refuses to decide
+
+<p>The obvious design is for `just watch` to read a raw issue, weigh it against `CLAUDE.md`,
+`CONTEXT.md`, your docs and plans, and decide for itself whether to build it. The playbook's Part D
+section "The judgment call stays interactive, on purpose" says don't, and gives the reason by
+reference: that "recreates the exact failure Part C already fixed once." `wayfinder`'s "ask the user
+how to proceed" fallback had no one to answer it headless; "an unattended loop making its own
+security/compliance judgment calls has no one to catch it when it's wrong, either."</p>
+
+<p>The code agrees with the prose. `adw_watch.py`'s module docstring: "The judgment call — is this
+issue feasible, compatible with what's already live, compliant, secure — is NOT this script's job.
+It only ever claims issues already carrying `Status: ready-for-agent` ... This script trusts that
+gate; it does not re-check it." `frontier()` filters on `i.status == READY` and nothing else about
+the ticket's content. Scout and planner's Part C wiring (glossary/OKF/ast-grep discovery,
+delta-scoping) still runs inside every dispatched chain underneath — the playbook calls that
+"defense-in-depth, not a substitute for the triage gate."</p>
+
+<Callout kind="why" label="Judgment once, by a human; only the result is consumed headless">
+<p>This is the same shape as bootstrap vocabulary in Chapter 6. `grill-with-docs` runs the
+  interview once, interactively, and writes the <em>result</em> into `CONTEXT.md` for every later
+  run to read. `/triage` runs the feasibility/compliance judgment once, interactively, and writes
+  the <em>result</em> — a durable agent brief plus `Status: ready-for-agent` — into the ticket for
+  the watcher to consume. In neither case does the judgment process itself run headless; in both
+  cases only its output does. The playbook states the parallel outright: "That's the same pattern
+  as `grill-with-docs`."</p>
+</Callout>
+
+## What /triage actually does before it writes ready-for-agent
+
+<p>The `triage` skill is not vendored in this repo — it lives in the same interactive-only table as
+`grill-with-docs` in the playbook's cheat sheet, and both carry `disable-model-invocation: true`.
+What the playbook records about it: it checks feasibility, redundancy against existing
+implementation, `.out-of-scope/` for prior rejections, and compliance; it "waits for maintainer
+direction at every step and never runs unattended"; and it owns five canonical states:</p>
+
+<table>
+  <tr><th>State</th><th>Meaning</th><th>Visible to the frontier scan?</th></tr>
+  <tr><td>`needs-triage`</td><td>filed, not yet judged — where `/to-spec`/`/to-tickets` should leave things</td><td>no</td></tr>
+  <tr><td>`needs-info`</td><td>judged, blocked on a question for a human</td><td>no</td></tr>
+  <tr><td>`ready-for-agent`</td><td>approved; a durable agent brief has been posted</td><td><strong>yes</strong></td></tr>
+  <tr><td>`ready-for-human`</td><td>needs a person — also where a failed dispatch lands</td><td>no</td></tr>
+  <tr><td>`wontfix`</td><td>rejected or already exists</td><td>no</td></tr>
+</table>
+
+<p>Only one of those five strings makes a ticket claimable. Part D is explicit that its terminal
+state for approved work "means a durable **agent brief** has been posted to the issue" — and on the
+local-markdown tracker, posting that brief on a not-yet-tracked item is what creates
+`issues/NN-slug.md` in the first place (the v4.5 correction in "Filing: less manual than it looks").
+The ticket body, verbatim, is then the literal prompt the dispatched chain receives:
+`utils.resolve_prompt(str(issue.path))` in `dispatch()`. Whatever `/triage` wrote into the file is
+what the planner reads; nothing in between rewrites it.</p>
+
+## The sharp edge: to-spec and to-tickets self-promote by default
+
+<p>Here is where the gate leaks. Part D's "Filing" section: `/to-spec` and `/to-tickets` "both apply
+the `ready-for-agent` triage label themselves by default (their own 'no need for additional triage'
+/ 'the tickets are agent-grabbable by construction' instructions)." Inside the headless planner
+that is overridden — Chapter 6's AFK bullet list forces both to file at `needs-triage` — but running
+either skill <strong>by hand</strong> in your own harness gets their unmodified behavior. Two ways
+that goes wrong, per the playbook:</p>
+
+<ol class="steps">
+  <li><p><strong>Bold lines, invisible ticket.</strong> `/to-tickets`' local-ticket-template writes
+  `**Status:**`/`**Blocked by:**` in bold. The playbook (written against an earlier
+  `STATUS_RE`) describes such a ticket as silently invisible to the queue — "a stall, not an
+  error." The current `adw_watch.py` regex tolerates exactly that bold form (`\*{0,2}` on both sides
+  of the key, with a comment dating the fix to four real tickets found live), so this specific
+  stall is closed; the next lesson covers what the regex still rejects.</p></li>
+  <li><p><strong>Plain lines, untriaged ticket.</strong> If you (or the model) write plain
+  `Status: ready-for-agent` instead, you get exactly what the gate exists to prevent: "`just watch`
+  will build it without anyone having judged feasibility, redundancy, or compliance first." The
+  watcher cannot tell a self-promoted `ready-for-agent` from a triaged one — the string is the
+  gate.</p></li>
+</ol>
+
+<Callout kind="trap" label="Before you commit a hand-run to-spec / to-tickets result">
+<p>The playbook gives two acceptable exits. Either hand the output to `/triage` before committing,
+  so the promotion happens through the gate; or hand-edit every `Status:` line to `needs-triage`
+  and confirm the files use the canonical plain or bold `Status:`/`Blocked by:` shape — "same shape
+  the Mandatory checkpoints below already check for." What you must not do is commit a
+  `ready-for-agent` ticket nobody triaged and let the next `just watch --once` find it.</p>
+</Callout>
+
+## A ceiling to know about: triage can reach further than the watcher
+
+<p>Current `triage` can also treat external pull requests as a request surface — "a PR is an issue
+with attached code," same roles, same states — if the tracker config marks them in scope (off by
+default). The playbook notes the ceiling: a PR only exists on a GitHub/GitLab tracker, and
+`adw_watch.py`'s `main()` returns exit code `2` for anything `detect_tracker()` reports as
+non-local. Triage can flip a PR to `ready-for-agent`; nothing will ever claim it until the
+GitHub/GitLab support the watcher's own docstring flags as unbuilt actually lands. Sole promoter
+means the gate is upstream of the queue — it does not mean everything it promotes has a queue
+behind it yet.</p>
+
+## Check yourself
+
+<Quiz
+  question="Why doesn't just watch analyze a ticket's feasibility and compliance itself before claiming it?"
+  choices={["The watcher has no access to CONTEXT.md or CLAUDE.md at scan time", "An unattended loop making its own security/compliance calls has no one to catch it when it's wrong — the same failure Part C fixed for the headless interview", "The triage skill is vendored onto the planner, so the check already happens inside the chain", "frontier() only has the file name and number, not the body"]}
+  answerIndex={1}
+  correctFeedback="Part D says it directly: putting the judgment in the loop recreates Problem 1 from Part C. The fix is the same shape — judge once, interactively, and let the headless half consume only the result."
+  wrongFeedback="Nothing technical stops the watcher from reading those files — it is a deliberate policy. triage is not vendored anywhere (disable-model-invocation: true); scout/planner discovery inside the chain is defense-in-depth, not the gate."
+/>
+
+<Quiz
+  question="You ran /to-tickets by hand and it wrote plain Status: ready-for-agent on three tickets. What is the actual problem?"
+  choices={["Plain Status: lines don't match STATUS_RE, so the tickets are invisible", "Nothing — plain lines are canonical, so the tickets are correctly queued", "They are untriaged but claimable — just watch will build them with no feasibility or compliance judgment having happened", "to-tickets cannot write ready-for-agent outside the headless planner, so the files are corrupt"]}
+  answerIndex={2}
+  correctFeedback="Plain ready-for-agent is exactly the string the frontier scan looks for. The watcher cannot distinguish self-promoted from triaged — either hand the tickets to /triage before committing, or edit them back to needs-triage."
+  wrongFeedback="Plain Status: lines are canonical and fully visible. That is the sharp edge: to-tickets' default self-promotes past the gate, and the watcher trusts the string. Run /triage on them or reset them to needs-triage before you commit."
+/>
+
+<Quiz
+  question="Which of the five triage states makes a ticket eligible for the frontier scan?"
+  choices={["needs-triage and ready-for-agent", "ready-for-agent only", "ready-for-agent and ready-for-human", "Any state except wontfix"]}
+  answerIndex={1}
+  correctFeedback="frontier() filters on i.status == READY, where READY is the single string ready-for-agent. Every other triage state — including ready-for-human, where failed dispatches land — is invisible to the queue."
+  wrongFeedback="Only ready-for-agent. ready-for-human is where a failed run is parked for a person to look at; needs-triage is where to-spec/to-tickets should leave things for /triage to judge. Neither is claimable."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> the adoption playbook's Part D, "The judgment call stays
+interactive, on purpose," then the "Sharp edge" paragraph inside "Filing: less manual than it
+looks, but one real gap remains." Pair it with the module docstring of
+`.claude/skills/sssf/templates/adws/adw_watch.py` (the "two status vocabularies meet here" paragraph)
+and the reference glossary's `docs/reference/the-queue/Dark-factory.md`, "Triage states and the agent
+brief."</p>
+
+## Where this goes next
+
+<p>You now know the gate is a single string, written by exactly one skill, and you know the two ways
+a hand-run skill can write that string without the gate. The next lesson is the verification step
+that sits between `/triage` and `just watch`: six mandatory checkpoints that catch a filing that
+claimed to happen but didn't — a missing directory, an unparseable `Status:`, an uncommitted file, a
+`Blocked by:` that never resolves.</p>
+
+<p><strong>Ask me things.</strong> Bring me the output of a `/to-spec` or `/to-tickets` run you did
+by hand and we'll find every `Status:` line in it together and decide which of the two exits to
+take.</p>

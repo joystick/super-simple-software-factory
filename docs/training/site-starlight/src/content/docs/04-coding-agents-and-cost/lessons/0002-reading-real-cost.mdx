@@ -4,7 +4,189 @@ description: "total_tokens and total_cost are already visible per session — th
 sidebar:
   order: 2
 ---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
 
 <p>`just sessions` already surfaces `total_tokens` and `total_cost` per run — this lesson is about reading those numbers honestly rather than mechanically: what a cost figure does and doesn't tell you (it says what a run cost, not whether the result was worth it), why costs from someone else's repo never transfer to yours, and how to measure your own factory's real cost on a throwaway branch before budgeting against it for real.</p>
 
-{/* TODO: full lesson content, see plans/2026-09-24-docs-reference-and-training.md */}
+<Callout kind="win" label="The win">
+<p>You can trace a `total_cost` figure from the `sessions` row back through `agent_end`
+  events to the driver that produced it, say which of the four components it is made of, tell
+  spend apart from context occupancy on sight, recognize a `$0.00` that means <em>unknown</em>
+  rather than <em>free</em>, and explain why the only cost baseline worth budgeting against is one
+  you measured on your own repo.</p>
+</Callout>
+
+## Where the two numbers come from
+
+<p>`just sessions` is a one-line SQL query against the trace database:</p>
+
+```
+select adw_id, status, substr(request,1,50), total_tokens, round(total_cost,4)
+from sessions order by started_at desc limit 10;
+```
+
+<p>Those two columns are accumulated, never computed after the fact. Every `send()` inside
+`agents.execute()` calls `run.add_usage(result.tokens, result.cost)`, and the tracer applies it
+as `UPDATE sessions SET total_tokens=total_tokens+?, total_cost=total_cost+? WHERE adw_id=?`.
+So the session row is the sum of every driver call the run made — first prompts, malformed-JSON
+retries, gate corrections, fix-loop iterations — across every agent phase. A phase that retried
+three times is in there three times.</p>
+
+<p>Where the driver gets each number depends on the CLI behind it. Under `claude_code`, the
+terminal `result` event of a `claude -p` turn carries `total_cost_usd` and a `usage` block, and
+`agent_cc.run()` reads both from there — that event is "the run's billed usage — CUMULATIVE over
+every internal turn (13 model calls in a routine scout run)." Under `pi`, each assistant
+`message_end` carries `usage.cost.total`, and `agent_pi.run()` sums them. Either way the result
+lands in the same two `PiResult` fields, `tokens` and `cost`, plus a per-component
+`UsageBreakdown`.</p>
+
+## The breakdown: four components, one nested share
+
+<p>`UsageBreakdown` in `data_types.py` "mirrors pi's `usage` shape one-for-one so the numbers
+reconcile with what pi itself reports":</p>
+
+<table>
+  <tr><th>Field</th><th>What it counts</th></tr>
+  <tr><td>`input_tokens`</td><td>Prompt tokens sent at the full input rate — <strong>excludes</strong> cache reads</td></tr>
+  <tr><td>`output_tokens`</td><td>Tokens the model wrote, including its thinking</td></tr>
+  <tr><td>`cache_read_tokens`</td><td>Prompt tokens served from cache, billed at the cheaper cache-read rate</td></tr>
+  <tr><td>`cache_write_tokens`</td><td>Prompt tokens written into cache this turn</td></tr>
+  <tr><td>`reasoning_tokens`</td><td>The thinking <em>share</em> of `output_tokens` — nested, not a fifth component</td></tr>
+  <tr><td>`total_tokens`</td><td>The four components above, summed</td></tr>
+  <tr><td>`*_cost`, `total_cost`</td><td>Dollars per component, and their sum</td></tr>
+</table>
+
+<p>Two reading rules fall out of that shape. First, `input_tokens` alone understates the prompt:
+"add them to learn the size of the prompt that was sent" — meaning `input + cache_read` is the
+real prompt size, and a run with a large `cache_read_tokens` figure is one whose stable system
+prompt (including any vendored `skill_engineering` text) was being served cheaply. Second,
+`reasoning_tokens` is inside `output_tokens`: "measured across every session on disk, reasoning
+is always ≤ output and the four components above always sum to `totalTokens`." Adding it to the
+total double-counts.</p>
+
+<p>The per-phase view lives on the `agent_end` event, whose payload carries `cost`, `usage`
+(this breakdown), `context_tokens`, and `context_window`. The observability reference notes it
+is "summed across every send the phase made, so a phase that retried on a bad envelope or a
+failed gate shows what all its attempts cost, not just the last one." That is the number to look
+at when one phase is eating the budget — `just sessions` only tells you the run total.</p>
+
+## Spend is not occupancy
+
+<Callout kind="trap" label="total_tokens only ever grows; the context window does not">
+<p>`sessions.total_tokens` and `events.tokens` bill every turn, so they accumulate. `context_tokens`
+  on the `agent_sessions` row is a different quantity: "how full the window actually was when the
+  agent stopped," measured against `context_window`. The observability reference's own example:
+  "an agent that burned 100k tokens may be sitting in a 15k window." `agent_cc.py` learned this the
+  hard way — reading the cumulative `result` usage as occupancy "reports 298k against a 200k
+  window," which is why occupancy is read from the per-message assistant usage instead. When you
+  read a big `total_tokens`, you are reading a bill, not a context-pressure warning.</p>
+</Callout>
+
+## When $0.00 means unknown
+
+<p>A zero in the cost column is only trustworthy if the driver behind it reports dollars at all.
+From the config reference: `agy` "reports tokens but never dollars, so `PiResult.cost` stays 0.00
+for this interface. A `$0.00` in the trace means <em>unknown</em>, not <em>free</em>." `opencode`,
+by contrast, carries a numeric `cost` on each `step_finish` event and sums it — "the one place
+`opencode` is stronger than its closest sibling interface." Before comparing two runs by cost,
+check the `coding_agent` column on their `agent_sessions` rows; a `$0.00` `agy` run has not
+beaten a `$4.42` `claude_code` run on price, it has simply declined to say.</p>
+
+<p>Under `claude_code` there is a second thing the dollar figure is quiet about: whose bill it
+is. The previous lesson covered `API_AUTH_VARS` stripping — agents run on the logged-in Claude
+Code session, never on a metered API key. `total_cost_usd` is what the CLI reports the turn
+would cost at API rates; it is the right number for comparing runs, and it is not necessarily an
+invoice.</p>
+
+## What a cost figure does not tell you
+
+<p>The adoption playbook's "Read what happened" step is the honest frame: "check cost per run
+early and often, and build your own baseline from those numbers — no figure from someone else's
+repo transfers to yours." Its list of things not to assume names the reason: "Language, suite
+size, and repo shape dominate. Measure your own on a throwaway branch before budgeting." The
+playbook's own history is instructive here — its v2.0 and v2.1 changelog rows record that it
+<em>removed</em> the last cost figures it used to quote "so the measure-it-yourself stance is
+consistent."</p>
+
+<Callout kind="why" label="Cost is a fact about the run, not a verdict on it">
+<p>`total_cost` says what a run spent. It says nothing about whether the diff is any good, whether
+  the reviewer's `approved: true` was earned, or whether a cheaper model would have produced the
+  same spec. The playbook's instruction when one agent dominates spend is not "switch to the cheap
+  model" — it is "try a cheaper model on it and compare both the price <em>and</em> the output it
+  produces. Do not assume the expensive model plans better; run the same prompt through both on
+  your own repo and read the two specs." A cost number is one input to that comparison. Reading
+  it as the answer skips the part where you read the diff.</p>
+</Callout>
+
+<p>The one cost figure the playbook does still carry is deliberately framed as evidence for a
+specific claim, not a benchmark: the first live end-to-end dark-factory dispatch cost "$4.42,
+4.3M tokens" for ten passed phases and a reviewer-approved change on one particular repo. That
+number tells you the loop ran and what <em>that</em> run cost. It does not tell you what yours
+will.</p>
+
+## How to build your own baseline
+
+<ol class="steps">
+  <li>Cut a throwaway branch on your real repo — not a sample project. Repo shape is what
+  dominates cost.</li>
+  <li>Run a representative prompt through `just sdlc` two or three times. Repeated runs matter:
+  a single figure hides retry variance.</li>
+  <li>Read `just sessions` for the run totals, then `just phases <adw_id>` and the `agent_end`
+  payloads to see which phase and which component (input vs cache-read vs output) carries the
+  spend.</li>
+  <li>If `skill_engineering` is set on any agent, remember the config reference's note that skill
+  text "is billed on every internal turn of a phase." Set `skill_token_budget` so you are warned —
+  never failed — when a composed prompt exceeds what you expected to pay for it.</li>
+  <li>If one agent dominates, change its `model:` and re-run the same prompt. Compare the two
+  `total_cost` figures <em>and</em> the two outputs before deciding.</li>
+  <li>Budget against what you measured. Throw the branch away.</li>
+</ol>
+
+## Check yourself
+
+<Quiz
+  question="A run's sessions row shows total_tokens = 410,000. The builder's context_window is 200,000. What does that tell you?"
+  choices={["The builder overflowed its context window and auto-compaction must have fired", "Nothing about context — total_tokens is cumulative spend across every send; context_tokens on agent_sessions is the occupancy figure", "The run must have used a 1M-window model, because 410k could not fit otherwise", "The cache_read component was miscounted and should be subtracted"]}
+  answerIndex={1}
+  correctFeedback="total_tokens bills every turn of every phase and only grows. Occupancy is a separate column, context_tokens, read from the last valid assistant turn — an agent that spent 100k tokens may be sitting in a 15k window. Reading spend as occupancy is exactly the 298k-against-200k mistake agent_cc.py's comments warn about."
+  wrongFeedback="Spend and occupancy are different quantities stored in different columns. total_tokens is a bill summed over every send the run made; context_tokens (on agent_sessions) is how full the window was after the agent's last turn. A large total says nothing about window pressure."
+/>
+
+<Quiz
+  question="Two runs of the same prompt: one under coding_agent: claude_code at $3.10, one under coding_agent: agy at $0.00. Which was cheaper?"
+  choices={["The agy run, by $3.10", "The agy run, but only if its total_tokens was also lower", "Unknown — agy reports tokens but never dollars, so $0.00 means unknown, not free", "The claude_code run, because agy always bills at a higher rate"]}
+  answerIndex={2}
+  correctFeedback="The config reference is explicit: agy reports tokens but never dollars, so PiResult.cost stays 0.00 for that interface, and a $0.00 in the trace means unknown. Compare token counts if you must, but the dollar column cannot settle this one."
+  wrongFeedback="A $0.00 under agy is not a price — it is the absence of one. agy never reports cost, so the driver leaves PiResult.cost at 0.00. Only opencode, pi, and claude_code carry a real dollar figure into the trace."
+/>
+
+<Quiz
+  question="Why did the adoption playbook remove the cost figures it used to quote?"
+  choices={["Model pricing changed and the numbers went stale", "Because language, suite size, and repo shape dominate cost, so no figure from another repo transfers — the stance is measure your own on a throwaway branch", "Because total_cost under claude_code is not a real invoice", "Because reasoning_tokens were being double-counted in the old figures"]}
+  answerIndex={1}
+  correctFeedback="The playbook's own changelog says it removed the last cost figures so the measure-it-yourself stance is consistent, and its list of things not to assume names the reason: repo shape dominates, so someone else's number is not your baseline."
+  wrongFeedback="The playbook's reason is about transferability, not staleness or accounting: language, suite size, and repo shape dominate cost, so a figure from one repo tells you little about another. It kept exactly one figure, framed as evidence that a specific run happened, not as a benchmark."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> `UsageBreakdown` and `PiResult` in
+`.claude/skills/sssf/templates/adws/adw_modules/data_types.py`, then the "Spend is itemised per
+phase" and "Context is occupancy, not spend" paragraphs of
+`.claude/skills/sssf/references/observability.md`, and the `sessions` and `agent_sessions`
+table definitions beneath them. For the reading stance, the adoption playbook's Part A step
+"Read what happened" and its closing list of things not to assume. For a real worked comparison
+where cost is one column among several, `docs/head-to-head-agy-vs-claude.md`.</p>
+
+## Where this goes next
+
+<p>This closes the chapter: you can name the driver contract, say what a session carries and what
+a hermetic turn may not inherit, and read the cost a run reports without mistaking it for a
+verdict. The next chapter turns from reading the factory to owning it — building a workflow of
+your own from a skeleton, with a new envelope type and a new gate, so that every cost figure
+you read from now on is for a chain you wrote.</p>
+
+<p><strong>Ask me things.</strong> Bring me a `just sessions` line that surprised you and we'll
+pull its `agent_end` payloads apart together to find which phase, and which component, the money
+actually went to.</p>

@@ -132,7 +132,7 @@ enforcement and permission concepts: `quality-gates-and-permissions/Permissions-
 | Concept | Category | Link-or-Own | Source citation |
 |---|---|---|---|
 | Dark factory | the-queue | own-page | `docs/playbook-adopting-sssf.md` (Part D) |
-| The four jobs | the-queue | own-page | `docs/playbook-adopting-sssf.md` (Part D) |
+| The four jobs | the-queue | own-page | `docs/playbook-adopting-sssf.md` (Part A5, "The four jobs" — corrected 2026-09-24, two independent authoring passes found this row wrongly said Part D) |
 | Two layers | the-queue | own-page | `docs/playbook-adopting-sssf.md` ("two layers" framing) |
 | Five vendored skills | the-queue | own-page | `.claude/skills/sssf/templates/justfile` + `docs/playbook-adopting-sssf.md` |
 | The chain named once | the-queue | own-page | `.claude/skills/sssf/templates/adws/adw_watch.py:1-9` |

@@ -4,7 +4,167 @@ description: "Adopting a factory into an existing codebase breaks into four dist
 sidebar:
   order: 2
 ---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>You can take any request against an existing codebase, say which of the four jobs it is —
+  architecture, bug, feature, refactor — name the cheap checkpoint that job runs before `just
+  sdlc`, and explain why skipping that checkpoint turns a one-planner-run mistake into a full
+  build plus a bad diff.</p>
+</Callout>
 
 <p>Part A of the adoption playbook breaks bringing SSSF into an existing codebase into four distinct jobs, each with its own boundary and its own cheap checkpoint — reading a generated spec file yourself before trusting it, rather than taking an agent's summary on faith. This lesson names the four jobs explicitly and shows why keeping them distinct (rather than letting recon bleed into planning, or planning bleed into execution) is what makes each one auditable on its own, the same way a chain's phases stay auditable because each one owns exactly one question.</p>
 
-{/* TODO: full lesson content, see plans/2026-09-24-docs-reference-and-training.md */}
+## Four jobs, four checkpoints
+
+<p>Playbook A5 opens with one branching question — "what are you trying to do?" — and gives each
+answer its own path to `just sdlc`. Every path has a step before the build that costs almost
+nothing and catches the most expensive class of mistake for that job:</p>
+
+<table>
+  <tr><th>Job</th><th>Cheap checkpoint</th><th>What it catches</th></tr>
+  <tr><td><strong>Improve architecture</strong></td>
+      <td>grill → spec → slice (A4), then `just plan` one slice and <em>read the spec file</em></td>
+      <td>the planner misunderstood your design</td></tr>
+  <tr><td><strong>Find and fix a bug</strong></td>
+      <td>reproduce it as a failing test, commit it red</td>
+      <td>the fix loop having nothing real to repair</td></tr>
+  <tr><td><strong>Implement a feature</strong></td>
+      <td>state it narrowly and name the tests</td>
+      <td>a plan too big for one run to express</td></tr>
+  <tr><td><strong>Refactor</strong></td>
+      <td>characterisation tests <em>first</em>, committed</td>
+      <td>"working" being mistaken for "unchanged"</td></tr>
+</table>
+
+<p>Each row ends the same way: `just sdlc`, then "review the diff, not the banner." The
+checkpoint is what differs, and it differs because the expensive mistake differs.</p>
+
+## Architecture: plan alone, then read the file yourself
+
+<p>The playbook is blunt: "Do not hand this to a build workflow." Grill, spec and slice first,
+then plan one slice and decide:</p>
+
+```bash
+just plan "extract the payment provider calls behind one interface; no behaviour change"
+# read specs/<adw_id>_*.md yourself — this is the cheap checkpoint
+just sdlc  "<same slice, once the plan is right>"
+```
+
+<p>`just plan` runs the planner alone. The playbook's arithmetic: "finding out the agent
+misunderstood your architecture costs one planner run instead of a full build plus a bad diff."
+The checkpoint is you opening `specs/&lt;adw_id&gt;_*.md` and reading it — not the planner's envelope
+summary, not a chat recap, the file. If it does not describe your design, sharpen the slice and
+re-plan; the A5 flowchart loops back to `just plan` until it does.</p>
+
+<Callout kind="why" label="Why read the spec file, not the summary">
+<p>An envelope summary is the planner's claim about its own plan, and this system does not take
+  claims on their word — that is the whole reason gates exist. The spec file is the thing the
+  builder will actually read. If the two disagree, the builder follows the file, so the file is
+  the only artifact worth your attention at this checkpoint. It is also cheap: one planner run
+  produced it, and reading it takes minutes.</p>
+</Callout>
+
+## Bugs: give the repair machine something red
+
+<p>"The fix loop is a repair machine, so give it something red to repair." Reproduce the bug as a
+failing test first — by hand, or with a cheap agent — commit it red, then:</p>
+
+```bash
+just sdlc "make the failing test in tests/test_x.py pass; do not modify the test"
+```
+
+<p>The `do not modify the test` clause is not decoration. The builder has write access, and the
+playbook names the cheapest path to green: deleting an assertion. "Constrain it explicitly rather
+than relying on virtue you have not asked for." Committing the test red also means the gate has
+been watched failing on this exact defect before the builder touches anything — rule zero,
+applied per bug.</p>
+
+## Features: the main line, kept narrow
+
+<p>This is what the factory is for, and the checkpoint is the smallest of the four: keep the slice
+narrow enough that one plan can express it, and name the tests in the prompt.</p>
+
+```bash
+just sdlc "add X; follow existing conventions; add tests covering A, B and C"
+```
+
+<p>"Cost scales with plan size." The playbook's instruction is to measure your own first few runs
+with `just sessions` before you budget the rest — no figure from someone else's repo transfers to
+yours.</p>
+
+## Refactors: the dangerous one
+
+<p>The playbook calls refactoring "the most dangerous job, because 'working' and 'unchanged' are
+different claims." A green suite after a refactor proves the code works; it only proves the
+behaviour is unchanged if the suite pinned that behaviour <em>before</em> the refactor. So:</p>
+
+<ol class="steps">
+  <li>Check coverage of the code you are about to move. If it is thin, spend a run adding
+  characterisation tests <strong>first</strong>, and commit them.</li>
+  <li>Then refactor with an explicit no-behaviour-change constraint.</li>
+</ol>
+
+```bash
+just sdlc "extract the discount rules in the cart-pricing module behind one interface. No behaviour change: every existing test must pass unchanged. Do not modify or delete any existing test."
+```
+
+<p>"The green suite is your evidence the refactor was safe. Without it you are not refactoring,
+you are rewriting and hoping." The A5 flowchart makes this a loop, not a step: <em>behaviour
+covered?</em> — no → characterisation tests first → ask again.</p>
+
+## Why the jobs stay separate
+
+<Callout kind="why" label="One question per step, same as one question per phase">
+<p>It is tempting to collapse this: recon and planning in one `just sdlc` prompt, "find the bug
+  and fix it" in one run, "refactor and add tests" together. Each collapse removes a checkpoint.
+  Recon folded into planning means nobody read the scout findings before the planner used them;
+  "find and fix" means there was never a red test to prove the fix repaired anything; "refactor
+  and add tests" means the tests were written to the new behaviour, not the old. The playbook
+  keeps the four jobs distinct for the same reason a chain keeps its phases distinct — each one
+  owns exactly one question, so when the answer is wrong you know which step to re-run, and it is
+  always the cheap one.</p>
+</Callout>
+
+## Check yourself
+
+<Quiz
+  question="You want to extract a payment provider behind an interface. What is the cheap checkpoint before just sdlc?"
+  choices={["Run just sdlc with a no-behaviour-change clause and review the diff", "Run just plan on one slice and read specs/<adw_id>_*.md yourself", "Run just scout to map the payment module", "Ask the reviewer agent to assess the plan"]}
+  answerIndex={1}
+  correctFeedback="A5's architecture path: grill, spec, slice, then just plan one slice and read the spec file yourself. A misunderstood design costs one planner run to discover instead of a full build plus a bad diff."
+  wrongFeedback="Going straight to just sdlc skips the checkpoint. The architecture job's cheap step is just plan alone, then you reading the spec file — not the envelope summary, the file — before anything expensive runs."
+/>
+
+<Quiz
+  question="Why does the bug-fix prompt say 'do not modify the test'?"
+  choices={["The test file is in protected_files", "Modifying tests invalidates the session id", "The builder has write access, and deleting an assertion is the cheapest path to green — you constrain it explicitly rather than rely on virtue you have not asked for", "The reviewer cannot diff test files"]}
+  answerIndex={2}
+  correctFeedback="That is the playbook's exact reasoning. The fix loop rewards green; unconstrained, the fastest route to green is weakening the test. The clause makes the constraint explicit."
+  wrongFeedback="Nothing mechanical stops the builder editing the test — tests are not in protected_files by default. The clause exists precisely because the builder can edit it, and deleting an assertion is the cheapest path to green."
+/>
+
+<Quiz
+  question="You refactor a module with thin coverage, the suite is green afterwards. What has been established?"
+  choices={["The refactor preserved behaviour", "The code works — but not that behaviour is unchanged, because nothing pinned the old behaviour first", "The refactor is safe because the reviewer confirmed the plan was followed", "Nothing, because refactors should never run through just sdlc"]}
+  answerIndex={1}
+  correctFeedback="'Working' and 'unchanged' are different claims. Only characterisation tests written and committed before the refactor make a green suite evidence of preserved behaviour. Without them you are rewriting and hoping."
+  wrongFeedback="A green suite over thin coverage proves the new code passes the tests that exist — not that behaviour the tests never pinned is unchanged. The playbook's rule: characterisation tests first, committed, then refactor."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> the adoption playbook, `docs/playbook-adopting-sssf.md`, Part
+A's A5 ("The four jobs") in full, including its flowchart, then A6 ("Read what happened") for
+`just sessions` and `just phases`. A5's architecture path depends on A4, covered in the previous
+lesson.</p>
+
+## Where this goes next
+
+<p>Everything so far assumed code already existed to recon, interrogate, and hand jobs against.
+The next lesson takes the other branch of the playbook's opening question — there is no code yet
+— and shows why that path builds a walking skeleton before it installs anything.</p>
+
+<p><strong>Ask me things.</strong> Bring me a request you are about to hand to `just sdlc` and
+we'll work out together which of the four jobs it really is — and whether it is secretly two.</p>
