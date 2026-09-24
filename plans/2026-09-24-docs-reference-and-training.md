@@ -353,7 +353,7 @@ docs-training-test/
 - [x] Isolated test workspace (`_scratch/docs-training-test/`) removed, its job done
 
 ### Explicitly NOT this pass's definition of done
-- [ ] Full authoring of all ~20 net-new lessons (2 of 20 done as the sample, 18
+- [ ] Full authoring of all 17 net-new lessons (2 of 17 done as the sample, 15
       honest stubs remain)
 - [ ] Full authoring of all 44 own-page reference rows (10 of 44 done as the
       sample, 34 remain)
