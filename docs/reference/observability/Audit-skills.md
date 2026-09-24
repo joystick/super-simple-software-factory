@@ -22,7 +22,7 @@ billed on every internal turn of every phase
 `defaults` or per agent, and the vendored copies live under
 `adws/adw_data/skill_engineering/`. Over time three questions become hard to
 answer by reading YAML by hand — and `audit_skills()`'s docstring
-(`agents.py:146-150`) frames the audit as exactly that, "without reading YAML
+(`agents.py:146-151`) frames the audit as exactly that, "without reading YAML
 by hand":
 
 1. **Which vendored files are unused?** Every `*.md` under the vendored dir is

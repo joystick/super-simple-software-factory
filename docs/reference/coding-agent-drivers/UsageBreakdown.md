@@ -39,7 +39,7 @@ Source: `data_types.py:414-428`.
 | `cache_read_tokens` | `int` | prompt tokens served from cache |
 | `cache_write_tokens` | `int` | prompt tokens written to cache |
 | `reasoning_tokens` | `int` | the thinking **share** of `output_tokens` — see below |
-| `total_tokens` | `int` | sum of the four billable components |
+| `total_tokens` | `int` | the CLI's own reported total when it has one, else the sum of the four billable components — see `add_turn()` below; empirically the two agree, but the field is not *defined* as the sum |
 | `input_cost` / `output_cost` / `cache_read_cost` / `cache_write_cost` | `float` | dollars per component |
 | `total_cost` | `float` | the CLI's own turn total, summed |
 

@@ -90,9 +90,14 @@ template writes (`Status: needs-triage`). The watcher's `STATUS_RE` — `^\*{0,2
 that fails checkpoint 3's literal grep is still visible to the queue. If you filed in bold, adapt
 the grep (`grep -L "^\**Status:\**"`) rather than rewriting the files; `set_status()` preserves
 whichever key formatting it finds when it later writes `claimed`. What neither the grep nor the
-regex accepts: underscore emphasis, a missing colon, wrong casing, backticks. Those trigger
+regex accepts: underscore emphasis, a missing colon, wrong casing. Those trigger
 `_check_format()`'s loud stderr warning — "this ticket is INVISIBLE to the frontier scan until
-fixed" — instead of a silent skip.</p>
+fixed" — instead of a silent skip. Backtick-wrapped `` `Status:` `` is a real gap in that
+detector, not covered: `_STATUS_NEAR_MISS_RE` is `^[*_\s]{0,3}status`, and a backtick matches
+none of `*`, `_`, or whitespace, so a backtick-formatted line is silently skipped by both the
+canonical regex and the near-miss warning — the exact silent-failure shape `_check_format()` was
+built to catch, missed for this one specific form. Don't wrap `Status:`/`Blocked by:` lines in
+backticks; only plain or `**bold**` are safe.</p>
 
 <p>Checkpoint 4 has no such safety net. `frontier()` does `i.status == READY`; a value that is a
 perfectly well-formed word but not one of the five canonical states (`ready`, `ready-for-agents`,
@@ -112,24 +117,28 @@ the only place you will catch it.</p>
   it blocks the whole queue on that machine until the tree is clean.</p>
 </Callout>
 
-## Checkpoint 6: omit the line, never explain it
+## Checkpoint 6: prefer omitting the line, but a clean "none" note is fine too
 
-<p>`read_blocked_by()` strips `(parenthetical)` annotations, splits on commas, trims trailing
-punctuation, drops bare `none`/`n/a`, and keeps every remaining token as a blocker — printing a
-warning if the token isn't a bare ticket number, because "never silently unblocks something that
-might genuinely be blocked" is the safe default. `is_unblocked()` then requires each kept token to
-match a sibling whose status is `resolved`. Two consequences the playbook spells out under "Check 6's
-sharp edge, found live":</p>
+<p>`read_blocked_by()` strips every `(parenthetical)` annotation from the whole matched value
+<strong>first</strong>, then splits what's left on commas, trims trailing punctuation, drops bare
+`none`/`n/a`, and keeps every remaining token as a blocker — printing a warning if a kept token
+isn't a bare ticket number, because "never silently unblocks something that might genuinely be
+blocked" is the safe default. `is_unblocked()` then requires each kept token to match a sibling
+whose status is `resolved`. One real consequence to know, and one near-miss that's already fixed:</p>
 
 <ul>
   <li>A blocker number with no matching `issues/NN-*.md` in the <em>same</em> feature counts as
   still-blocked forever. `group_by_feature()` scopes numbers per feature on purpose — a `01` in one
   feature never refers to another feature's `01` — so a cross-feature reference is just a missing
   blocker.</li>
-  <li>An unblocked ticket must have <strong>no</strong> `Blocked by:` line at all. Prose like
-  `(none — API exists, see spec.md)` leaves fragments after cleanup that aren't ticket numbers; they
-  are kept, never resolve, and the ticket sits at `ready-for-agent` invisible. "If a ticket has no
-  real blocker, omit the `Blocked by:` line entirely; don't write one to say so."</li>
+  <li>Prose like `Blocked by: none (API exists, see spec.md)` — a comma <em>inside</em> the
+  parenthetical — used to break this: the value got comma-split before the parenthetical was
+  stripped, leaving two fragments neither of which matched bare `none`. That bug is fixed (the
+  parenthetical is stripped from the whole value before any comma-split now) and covered by a
+  regression test, so this form resolves correctly today. The playbook's older advice — "if a
+  ticket has no real blocker, omit the `Blocked by:` line entirely; don't write one to say so" —
+  is still the simpler, more foolproof habit: no parenthetical to comma-split means nothing to
+  ever get wrong, on this parser or a future one.</li>
 </ul>
 
 ## Check yourself

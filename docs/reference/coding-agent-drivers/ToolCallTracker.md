@@ -42,15 +42,17 @@ class ToolCallTracker:
 
 `observe()` is called once per raw event. It returns `None` for everything
 that is not a completed tool call and a record dict for the one event that is.
-The record's keys are the same across all four drivers:
+The record's key **names** are the same across all four drivers, but two of
+them carry driver-specific meaning — this is not uniform normalization,
+just a uniform shape:
 
 | Key | Meaning |
 |---|---|
 | `tool` | tool name (`bash`, `read`, `edit`, …) |
 | `tool_call_id` | the CLI's own id for the call |
 | `args` | the call's arguments, string values clipped to `ARG_VALUE_CHARS` |
-| `ok` | `True` unless the CLI flagged an error |
-| `label` | a short human line, e.g. `bash: ls -la src` — becomes the event's `name` |
+| `ok` | `agent_cc`/`agent_pi`/`agent_agy`: `False` only when the CLI reported an error (agy: `state == "ERROR"`, `agent_agy.py:279`). **`agent_opencode`: always `True`** — its tracker hardcodes `"ok": True` (`agent_opencode.py:213`) because opencode's event stream never surfaces a failed-tool-call signal this tracker can read; opencode can never report a failed tool call through this path. |
+| `label` | `agent_cc`/`agent_pi`/`agent_agy`: a short human line built from tool + args, e.g. `bash: ls -la src`. **`agent_opencode`: just the bare tool name** (`record["label"] = tool`, `agent_opencode.py:213`) — no argument summary. |
 | `result_snippet` | first `RESULT_SNIPPET_CHARS` of the result, if any |
 | `started_at` / `ended_at` / `duration_ms` | the call's real span, when the CLI exposes it |
 
@@ -64,14 +66,15 @@ The trackers differ only in *which* raw events open and close a call:
 |---|---|---|---|
 | `agent_pi` | `toolCall` block in `message_end`, or `tool_execution_start` | `tool_execution_end` | 160-196 |
 | `agent_cc` | `tool_use` block on an `assistant` message | `tool_result` block on the next `user` message — "Only the result knows whether it worked" | 232-268 |
-| `agent_agy` | `step_update` with `step_type == "tool"` and status ACTIVE | the same `step_index` reported DONE, "with the output attached" | 238-297 |
+| `agent_agy` | `step_update` with `step_type == "tool"` and status ACTIVE | the same `step_index` reported `DONE` **or** `ERROR` | 238-297 |
 | `agent_opencode` | — | a single `tool_use` event with `state.status == "completed"`; "there's nothing to open and close" | 188-225 |
 
 The three pairing trackers keep `self._open: dict[str, dict]` keyed by call
 id, recording the tool, args, and a `time.monotonic()` clock at announce time
 so `duration_ms` measures the harness's own wall-clock span
-(`agent_cc.py:270-279`). opencode's tracker has no `__init__` at all because
-the CLI already delivers input, output, and timing in one event.
+(`agent_cc.py:270-279`, `_announce()`). opencode's tracker has no `__init__`
+at all because the CLI already delivers input, output, and timing in one
+event.
 
 ## Where it is consumed
 
