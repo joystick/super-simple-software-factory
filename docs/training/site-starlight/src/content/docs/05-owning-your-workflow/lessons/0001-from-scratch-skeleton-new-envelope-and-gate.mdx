@@ -4,7 +4,248 @@ description: "Beyond copy-the-closest-chain: building an ADW from a blank skelet
 sidebar:
   order: 1
 ---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>You can start a new ADW from the 45-line `adw_prompt.py` skeleton instead of a copied chain,
+  define an `EnvelopeBase` subclass for a phase whose output no shipped type carries, write a
+  `gate(envelope, run) -> GateReport` that checks that envelope's claims, and say exactly where in
+  `agents.execute()` your gate runs, how many times, and what the agent sees when it fails.</p>
+</Callout>
 
 <p>Chapter 1's "Composing a Chain" lesson teaches copy-the-closest-and-edit — the fast, correct default for most new workflows. This lesson covers what that approach doesn't: starting from a genuinely blank skeleton when no existing chain is close enough, defining a new `EnvelopeBase` subclass when a phase's output doesn't fit any shipped output type, and writing the gate that checks that new envelope's claims the same way `gates.diff_matches_claims` checks a build's — because a new envelope type with no gate behind it is exactly the ungated-phase trap Chapter 1 already warned against, just with novel output instead of a shipped one.</p>
 
-{/* TODO: full lesson content, see plans/2026-09-24-docs-reference-and-training.md */}
+## When copying the closest chain is the wrong move
+
+<p>Copy-and-edit assumes the phase you need already has an output type and a gate. It usually
+does: plan, build, scout, review, and document each ship with an `EnvelopeBase` subclass in
+`adw_modules/data_types.py` and at least one gate in `adw_modules/gates.py` that knows its
+fields. The moment your phase produces something none of those types carry — a benchmark result,
+a migration pair, a dependency audit — copying `adw_build.py` and renaming things leaves you with
+a builder-shaped envelope holding non-builder facts, gated by `diff_matches_claims`, which reads
+`changed_files` and nothing else. Every gate on it goes green, and none of them looked at the
+thing you actually cared about.</p>
+
+<p>The signal to start blank is simple: <strong>if you cannot name a shipped output type whose
+fields are the claims you want checked, you need a new one</strong> — and a new output type
+without its own gate is the ungated-phase trap from Chapter 1, wearing a new name.</p>
+
+## The blank skeleton is adw_prompt.py
+
+<p>There is no separate template. The smallest shipped chain, `adw_prompt.py`, <em>is</em> the
+skeleton — one engineer phase, one agent phase, `run.finish()`. Here is its `main()`, complete:</p>
+
+```python
+def main(prompt: str, agent: str = "builder",
+         config: str = "adws/adw_sssf_config/sssf.config.yaml", adw_id: str | None = None) -> int:
+    cfg = agents.load_config(config)
+    agents.validate(cfg, [agent])
+    run = session.ensure(cfg, adw_id)
+
+    with run.phase(PhaseParams(name="request", kind="engineer", owner=run.engineer,
+                               description="Capture the incoming ask")) as ph:
+        ph.log(input=prompt)
+
+    with run.phase(PhaseParams(name="prompt", kind="agent", owner=agent,
+                               description=f"Send the request straight to {agent} and parse its envelope")) as ph:
+        ph.call(AgentCall(output_type=GenericOutput, prompt=prompt))
+
+    return run.finish()
+```
+
+<p>Three things are worth noticing before you touch it. `agents.validate(cfg, [agent])` is called
+up front with the list of agent names the chain will use — it raises `SystemExit` on a bad model
+string or missing prompt file <em>before</em> any phase opens, which is why Chapter 7's watcher
+catches `SystemExit` explicitly. `output_type=GenericOutput` is the "I have not decided yet"
+type: `GenericOutput` is literally `class GenericOutput(EnvelopeBase): pass`. And `gates` is
+absent from the `AgentCall`, which means `gates=[]` by default. That last line is the one you are
+going to replace.</p>
+
+<Callout kind="trap" label="A description that only restates the name is rejected at construction">
+<p>`PhaseParams.description` is validated by `_description_must_be_earned`: an empty string, or
+  text that casefolds to the phase name with underscores turned into spaces, raises `ValueError`
+  before the phase ever opens. `PhaseParams(name="benchmark", description="Benchmark")` is a
+  construction-time error, not a warning. Say what the phase does and why — it is the only
+  sentence the trace and the UI will ever show about intent.</p>
+</Callout>
+
+## Defining the new envelope type
+
+<p>`EnvelopeBase` is four fields, and every agent's final JSON is parsed against a subclass of it
+via `call.output_type.model_validate(payload)` in `agents._parse_with_retries()`:</p>
+
+```python
+class EnvelopeBase(BaseModel):
+    """Base of every agent's final JSON response. Output types extend this."""
+
+    status: Literal["success", "fail"]
+    summary: str = ""
+    artifacts: list[str] = Field(default_factory=list)
+    notes_for_next_agent: str = ""
+```
+
+<p>The shipped subclasses add only the fields their gate will read. `BuildOutput` adds
+`changed_files` and `commit_message`; `ReviewOutput` adds `approved`, `findings`, and `blocking` —
+exactly the three fields `verdict_consistent` inspects. Follow that discipline: <strong>a field
+belongs on the envelope if a gate is going to check it or a later phase is going to read
+it.</strong> Anything else is prose, and prose goes in `summary` or `notes_for_next_agent`.</p>
+
+<p>Suppose the phase runs a benchmark and the claim you want verified is "the candidate is faster
+than the baseline." The new type, added alongside the others in `data_types.py`:</p>
+
+```python
+class BenchmarkOutput(EnvelopeBase):
+    """A measured comparison — numbers the gate can check against the verdict."""
+
+    results_path: str = ""          # where the raw timings were written
+    baseline_ms: float = 0.0
+    candidate_ms: float = 0.0
+    improved: bool = False          # the agent's verdict on the two numbers above
+```
+
+<Callout kind="why" label="Why the numbers and the verdict both go on the envelope">
+<p>`verdict_consistent` never reads the code — it checks a `ReviewOutput` against
+  <em>itself</em>: an approval that ships blocking items is a contradiction the harness can
+  refute without judgment. The same trick works here. If the envelope carries only `improved`,
+  the gate has nothing to refute it with. If it carries `baseline_ms` and `candidate_ms` too,
+  "improved=true while candidate is slower" becomes mechanically checkable. Design the envelope
+  so the gate has something to hold the verdict against.</p>
+</Callout>
+
+<Callout kind="trap" label="The schema is not injected into the prompt for you">
+<p>`agents.execute()` renders the agent's `system.md`/`user.md` with exactly three variables —
+  `prompt`, `previous_envelope`, and `context_handoff_dir`. The output type's field list reaches
+  the agent only on a <em>parse failure</em>, when `_parse_with_retries` sends
+  "Respond again with ONLY a JSON object with these fields: ..." (up to `JSON_FIX_ATTEMPTS = 2`
+  times). So the agent's `user.md` must spell the new envelope out, the way the shipped
+  `reviewer/user.md` ends with a `Respond with ONLY valid JSON matching ReviewOutput` block and
+  a literal example. Add a `benchmarker` entry to `sssf.config.yaml` with its own
+  `prompt_engineering.system`/`.user` paths, and put the `BenchmarkOutput` example in that
+  `user.md`. Skip this and every first attempt costs a wasted send.</p>
+</Callout>
+
+## Writing the gate
+
+<p>`gates.py`'s docstring gives the whole contract in one line: a gate is `gate(envelope, run) ->
+GateReport` — one check per item it looked at, violations derived from the failed checks, every
+check recorded either way so a green gate says <em>what</em> it verified. Authoring one is a loop
+and a return. Here is the gate for `BenchmarkOutput`, in the same shape as the shipped ones:</p>
+
+```python
+def benchmark_supports_verdict(envelope: EnvelopeBase, run) -> GateReport:
+    """The improved flag must agree with the two timings, and the timings must be on disk."""
+    report = GateReport()
+    p = Path(getattr(envelope, "results_path", ""))
+    report.check(str(p), p.exists(),
+                 f"exists, {_size(p)}" if p.exists() else "declared results file does not exist")
+
+    baseline = float(getattr(envelope, "baseline_ms", 0.0))
+    candidate = float(getattr(envelope, "candidate_ms", 0.0))
+    improved = bool(getattr(envelope, "improved", False))
+    faster = candidate < baseline
+    report.check("improved vs timings", improved == faster,
+                 f"baseline {baseline:.1f}ms, candidate {candidate:.1f}ms, improved={improved}")
+    return report
+```
+
+<p>Two conventions carried over from the shipped gates matter. First, fields are read with
+`getattr(envelope, name, default)` rather than attribute access — `diff_matches_claims` does the
+same for `changed_files` — because the parameter is typed `EnvelopeBase`, and a gate accidentally
+attached to a different envelope type should report a clean "nothing to check," not crash the
+phase. Second, the `note` on a passing check is real evidence (`exists, 2.1KB`, the actual
+timings), because `GateCheck.note` is what the trace shows and, on failure, what the agent is
+told.</p>
+
+<Callout kind="why" label="Why the gate does not re-run the benchmark">
+<p>It could — `tests_pass(command)` is a shipped factory that wraps any shell command and
+  passes iff it exits 0, and you can put `gates.tests_pass("bun run bench")` on the same
+  `AgentCall`. But that answers "does the benchmark run," not "does the verdict match the
+  numbers." Keep the two separate, the way `adw_simple_sdlc` keeps `code(test)` and
+  `agent(reviewer)` separate: one gate checks the envelope against itself, one checks a command
+  against the world. Neither can answer the other's question.</p>
+</Callout>
+
+## Wiring it into the chain, and what happens when it fails
+
+<p>The finished phase in your new chain replaces the `GenericOutput` line of the skeleton:</p>
+
+```python
+with run.phase(PhaseParams(name="benchmark", kind="agent", owner="benchmarker", retries=1,
+                           description="Time baseline against candidate and report which is faster.")) as ph:
+    bench = ph.call(AgentCall(output_type=BenchmarkOutput, prompt=prompt,
+                              gates=[gates.artifacts_exist, gates.benchmark_supports_verdict]))
+
+return run.finish(accepted=bench.improved, reason="candidate was not faster than baseline")
+```
+
+<p>Read `agents.execute()` for what that `retries=1` buys. After the envelope parses, the gate
+loop runs `for gate_attempt in range(1, max(1, phase.params.retries + 1) + 1)`. Every gate in
+`call.gates` is called in order; each `GateReport` is written to the trace via
+`tracer.gate_row()` and emitted as a `gate_pass`/`gate_fail` event, pass or fail. If the combined
+`violations` list is empty the loop breaks. Otherwise, if `gate_attempt` has exceeded `retries`,
+`GateFailure` is raised and the phase fails. If not, the agent's <em>same session</em> receives
+"Your previous response failed validation:" followed by the violation lines — each one is
+`GateReport.violations`' `item: note` pair, so the note you wrote is the correction the agent
+reads — and is asked to
+re-emit its Report JSON. With `retries=0`, the default, one violation is terminal.</p>
+
+<p>Note the last line: the gate proves the envelope is internally honest, but `improved=false`
+with correct numbers is a <em>truthful</em> failed benchmark, so every phase goes green. Whether
+the run is accepted is a separate question — Chapter 1's "green phase does not make a green run"
+— and `run.finish(accepted=..., reason=...)` is where you answer it.</p>
+
+<Callout kind="trap" label="AgentCall's inline comment says list[str]; gates.py says GateReport">
+<p>`AgentCall.gates` is annotated `list[Callable]` with the comment `gate(envelope, run) ->
+  list[str]` — the older shape. `agents._as_report()` still accepts a plain list of violation
+  strings and wraps each as a failed `GateCheck` with no note, but a gate written that way loses
+  the whole point of the report: a green run of it records nothing at all. Return a
+  `GateReport`; the `list[str]` path exists for legacy gates, not new ones.</p>
+</Callout>
+
+## Check yourself
+
+<Quiz
+  question="You copy adw_build.py for a benchmark phase, keep output_type=BuildOutput, and leave gates=[gates.diff_matches_claims]. The agent reports improved=true in its summary. What does the gate verify?"
+  choices={["That the benchmark's numbers support the improved verdict", "Only that every path in changed_files exists on disk — nothing about the benchmark", "That the summary field is non-empty and parses as JSON", "Nothing — diff_matches_claims skips envelopes with an empty changed_files list and raises"]}
+  answerIndex={1}
+  correctFeedback="diff_matches_claims reads getattr(envelope, 'changed_files', []) and checks each path exists. Every other field on the envelope — including any benchmark claim buried in summary — is invisible to it. Green gate, unchecked claim."
+  wrongFeedback="diff_matches_claims only ever looks at changed_files. An empty list means zero checks, which is a passing GateReport, not an error — the benchmark claim in summary was never examined by anything."
+/>
+
+<Quiz
+  question="You add BenchmarkOutput to data_types.py and wire it as output_type. How does the benchmarker agent learn the field names it must emit?"
+  choices={["agents.execute() renders the output_type's JSON schema into the system prompt automatically", "Only from the agent's own user.md template — the harness sends the field list just on a parse failure", "Pydantic sends the schema over the coding-agent session at spawn time", "The tracer writes model_fields into envelope.json before the first send"]}
+  answerIndex={1}
+  correctFeedback="execute() renders prompts with exactly prompt, previous_envelope, and context_handoff_dir. The output_type's model_fields only appear in the correction _parse_with_retries sends after invalid JSON. The reviewer's user.md shows the pattern: spell the envelope out with a literal example."
+  wrongFeedback="Nothing injects the schema up front. The three template variables are prompt, previous_envelope, and context_handoff_dir; model_fields reaches the agent only inside the 'Respond again with ONLY a JSON object with these fields' retry. Put the example in user.md."
+/>
+
+<Quiz
+  question="A phase with retries=0 runs two gates; the second returns one failed check. What happens?"
+  choices={["The agent's same session gets the violation and one more attempt", "The phase fails immediately with GateFailure — one violation is terminal at retries=0", "The failed gate is skipped and the envelope is accepted with a warning", "The run continues but run.finish() returns non-zero"]}
+  answerIndex={1}
+  correctFeedback="The loop is range(1, max(1, retries + 1) + 1) — one iteration at retries=0. After collecting violations, gate_attempt (1) > retries (0), so GateFailure is raised before any correction is sent. Both gates' reports are still in the trace."
+  wrongFeedback="Corrections back into the same session only happen while gate_attempt <= retries. At retries=0 the first violation exceeds that immediately and GateFailure is raised — no re-prompt, and the phase (not just the run) is marked failed."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> `.claude/skills/sssf/templates/adws/adw_modules/gates.py` in
+full — nine lines of docstring state the contract, and `verdict_consistent` (lines 71–95) is the
+model for any envelope-against-itself gate. Then `EnvelopeBase` and its subclasses at the top of
+`adw_modules/data_types.py`, and `GateCheck`/`GateReport` further down. For the loop that actually
+calls your gate, read `agents.execute()` from the `# claim gates` comment onward. The fork's
+reference glossary has a compact entry for the concept:
+<a href="../../../../../../../reference/quality-gates-and-permissions/Gate.md">Gate</a>.</p>
+
+## Where this goes next
+
+<p>You can now own a workflow end to end: skeleton, envelope, gate, acceptance. The remaining
+chapters assume that. Chapter 6 takes a chain like this one headless, where nobody is reading the
+console when a gate fails; Chapter 7 puts it behind a queue so `just watch` dispatches it on your
+behalf — and the gate you just wrote is the only thing standing between an unattended run and a
+plausible-sounding envelope nobody checked.</p>
+
+<p><strong>Ask me things.</strong> Bring me a phase whose output fits none of the shipped types,
+and we will decide together which fields belong on its envelope and what its gate can refute.</p>

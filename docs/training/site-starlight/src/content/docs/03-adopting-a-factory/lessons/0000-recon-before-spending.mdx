@@ -4,7 +4,161 @@ description: "Before wiring a single gate, spend a short recon pass finding out 
 sidebar:
   order: 0
 ---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>You can walk into a repo you did not write, find its real test, lint, typecheck and build
+  commands in a few minutes, say which of the four stamped quality blocks you will keep and
+  which you will delete, and explain why a stamped factory refuses to guess any of this for
+  you.</p>
+</Callout>
 
 <p>Adopting SSSF into an existing codebase starts with recon, not installation: before <code>/sssf install</code> touches anything, spend a short pass reading the repo's actual test runner, linter, typechecker, and build command, because <code>quality.py</code> can only be wired to commands that genuinely exist and genuinely fail on a real defect. Skipping recon is how a gate ends up pointed at a placeholder — the exact failure mode Chapter 1 spent a whole lesson teaching you to distrust. This lesson walks the recon checklist: what to look for, where the answers usually live (<code>package.json</code> scripts, a <code>Makefile</code>, CI config), and why this is cheap insurance against the single most common way a new install goes wrong on day one.</p>
 
-{/* TODO: full lesson content, see plans/2026-09-24-docs-reference-and-training.md */}
+## Why a stamped factory ships blind
+
+<p>Open `adws/adw_modules/quality.py` in any freshly stamped repo and the first thing you hit is
+a banner, not code: <em>REPLACE THE PLACEHOLDER COMMANDS BELOW.</em> Every one of the four
+blocks — `test`, `lint`, `typecheck`, `build` — calls `_placeholder(name)`, which returns an
+`echo` that exits 0 and prints `PLACEHOLDER &lt;name&gt;: edit adws/adw_modules/quality.py and replace
+this echo with the real &lt;name&gt; command`. The banner says why in one sentence: a stamped repo has
+no way to guess your test runner, and a wrong-but-plausible command that silently passes is worse
+than one that says so out loud.</p>
+
+<p>That is the whole reason recon is a separate step. The factory is not going to discover your
+tooling; it is going to run whatever argv you write into those four functions, and report the
+result as if it meant something. If you write the argv from memory, or from what a similar repo
+used, the gate is pointed at a guess. The adoption playbook's rule zero names the consequence: a
+green trace that proves nothing, "worse than having no factory, because it manufactures
+confidence."</p>
+
+<Callout kind="why" label="Why placeholders that announce themselves, not a best-effort autodetect">
+<p>An installer could try to sniff `package.json` and stamp `npm test` for you. The problem is
+  the cases where the sniff is <em>almost</em> right — a monorepo where `npm test` at the root
+  runs nothing, a `pytest` that needs `uv run` in front of it, a lint script that is a no-op
+  stub someone added to satisfy CI. Each of those exits 0 and looks wired. A placeholder that
+  prints `PLACEHOLDER` cannot be mistaken for a real gate by anyone who reads the output, and
+  `just quality "baseline"` exists precisely so you read it before anything else runs.</p>
+</Callout>
+
+## The recon checklist
+
+<p>You are answering four questions, one per block. For each, you want the exact argv you could
+paste into a terminal at the repo root and watch fail on a real defect:</p>
+
+<table>
+  <tr><th>Block</th><th>Question</th><th>Where the answer usually lives</th></tr>
+  <tr><td><strong>`test`</strong></td><td>What runs the suite, and does it currently pass?</td>
+      <td>`package.json` `scripts.test`, `pyproject.toml` `[tool.pytest]`, a `Makefile`/`justfile`
+      target, the CI workflow's test step</td></tr>
+  <tr><td><strong>`lint`</strong></td><td>Which linter, with which config, over which paths?</td>
+      <td>`scripts.lint`, `biome.json`/`.eslintrc*`/`ruff.toml`, the CI lint step</td></tr>
+  <tr><td><strong>`typecheck`</strong></td><td>Is there a typechecker at all, and is it strict?</td>
+      <td>`tsconfig.json`, `mypy.ini`/`[tool.mypy]`, `scripts.typecheck`, CI</td></tr>
+  <tr><td><strong>`build`</strong></td><td>Is there a real build artifact, or is "build" just tests?</td>
+      <td>`scripts.build`, a bundler config, the CI deploy step — or nothing</td></tr>
+</table>
+
+<p>The CI config is the highest-signal source in most repos, because it is the one place the
+commands have to actually work unattended. A `Makefile` target that nobody has run in a year can
+be stale; the CI step ran last week. Read CI first, then confirm each command by running it
+yourself from a clean checkout before you write it anywhere.</p>
+
+<p>The playbook adds three rules for what you eventually write into `quality.py`, and recon is
+where you gather the material for them: `argv` is a <strong>list</strong>, never a shell string;
+call binaries by <strong>bare name</strong> so they resolve in the operator's environment
+(`quality.py`'s own banner is explicit: never hard-code `/Users/you/.bun/bin/bun`, that bakes your
+machine into the trace); and put scope and strictness in your config files — `pyproject.toml`,
+`package.json` — rather than in the argv, so the gate and a local run can never disagree.</p>
+
+```python
+# adws/adw_modules/quality.py — the shape recon feeds into. Not from a guess:
+# each argv is a command you already ran by hand and watched fail on a real defect.
+argv=["uv", "run", "pytest", "-q"]        # test
+argv=["npm", "run", "lint"]               # lint — scope lives in biome.json, not here
+argv=["bun", "x", "tsc", "--noEmit"]      # typecheck
+```
+
+## Delete the blocks you do not have
+
+<p>Recon also tells you which blocks to <em>remove</em>. If the repo has no build artifact — a
+library, a pure-Python service, a docs site — there is nothing for a `build` block to check, and
+leaving it as an `echo` is not harmless. Playbook A2 states the consequence directly: a `build`
+block running `echo` is a phantom check, and `run_quality()` reports it as passed. You can see
+that yourself in `run_quality()`: it runs every block in its `blocks` list, collects only the
+failures, and returns `passed=not failures`. An `echo` that exits 0 contributes nothing to
+`failures`, so the phantom counts as a pass in the summary the builder reads. The fix is
+mechanical, and the banner tells you: delete the block, and drop it from `run_quality()`'s
+list.</p>
+
+<Callout kind="trap" label="A slow suite is a recon finding, not a reason to skip the gate">
+<p>If recon shows the full suite takes twenty minutes, do not wire it whole and then quietly turn
+  it off in a week. The playbook's guidance is to scope the test gate to a fast subset now and
+  widen later — "a gate nobody waits for gets disabled, and a disabled gate is a placeholder with
+  extra steps." Note the subset in the test runner's own config where you can, and write yourself
+  a reminder to widen it once the roster has proven itself.</p>
+</Callout>
+
+## Where `just scout` fits — and where it does not
+
+<p>Playbook A1 has you run `just scout "map this codebase: entry points, layers, test setup,
+build commands"` right after install. `just scout` runs `adw_scout.py`, whose own docstring calls
+it "read-only recon workflow. Just looking for stuff." — one `scout` phase, `writes: []` in the
+starter roster, findings landing in
+`adws/adw_data/sessions/&lt;adw_id&gt;/context_handoff/scout_findings.md`. It is a genuinely useful
+second pair of eyes on a large repo, and the playbook's instruction is to <em>read</em> those
+findings: "you are checking whether the agent understood your repo before you let it change
+anything."</p>
+
+<p>What it is not is a substitute for you confirming the commands. The scout can tell you that
+`package.json` has a `test` script; it cannot tell you that the script passes today, or that it
+fails when you break something. That is the part only running the command yourself establishes,
+and it is the part rule zero depends on. Treat scout output as a map of where to look, then look.</p>
+
+## Check yourself
+
+<Quiz
+  question="A freshly stamped quality.py has a build block, but the repo you are adopting is a pure library with no build artifact. What should you do with that block?"
+  choices={["Leave it — an echo that exits 0 is harmless and keeps run_quality()'s list complete", "Point it at the test command so it does something useful", "Delete the block and remove it from run_quality()'s blocks list", "Set its timeout to 0 so it is skipped"]}
+  answerIndex={2}
+  correctFeedback="run_quality() only collects failures, so an echo that exits 0 is reported as a pass — a phantom check. The banner and playbook A2 both say the same thing: delete blocks you do not have, and drop them from the list."
+  wrongFeedback="An echo that exits 0 is not harmless: run_quality() computes passed=not failures, so the phantom block counts as a passing check in the summary the builder reads. Delete it and remove it from the blocks list."
+/>
+
+<Quiz
+  question="Why does quality.py tell you to write argv=['bun', 'test'] rather than argv=['/Users/you/.bun/bin/bun', 'test']?"
+  choices={["Absolute paths are rejected by subprocess", "The blocks inherit the operator's environment, so bare names resolve as they do in the terminal — an absolute path bakes one machine into the trace", "Bare names are required for the tracer to attribute the command to a phase", "Absolute paths bypass protected_files enforcement"]}
+  answerIndex={1}
+  correctFeedback="quality.py's banner says exactly this: blocks inherit the operator's environment via utils.operator_env, so bun, uv, pytest resolve exactly as in your terminal. An absolute path works on one machine and bakes that machine into every trace."
+  wrongFeedback="Nothing rejects an absolute path — it would run. The reason is portability: the blocks inherit the operator's environment, so a bare name resolves the same way it does in your terminal, while an absolute path ties the gate to one machine."
+/>
+
+<Quiz
+  question="just scout reports that package.json has a test script. What has that established about the test gate?"
+  choices={["Enough to wire it — the scout is read-only, so its findings are trustworthy", "Where to look, and nothing about whether the command passes today or fails on a real defect", "That the gate is already wired, since scout runs the quality blocks", "That the repo's suite is fast enough to gate on"]}
+  answerIndex={1}
+  correctFeedback="The scout maps the repo; it does not run your suite or break anything to see the gate go red. Confirming the command passes on a clean tree and fails on a deliberate defect is rule zero, and only you running it establishes that."
+  wrongFeedback="Read-only means the scout changed nothing — it says nothing about whether the command it found actually works. The playbook has you read scout_findings.md as a map, then run the commands yourself before wiring them."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> the adoption playbook, `docs/playbook-adopting-sssf.md` —
+"Rule zero: wire the gates before an agent writes a line," then Part A's A1 ("Recon before
+spending") and A2 ("Wire the gates"). Then read the banner at the top of
+`.claude/skills/sssf/templates/adws/adw_modules/quality.py` and `run_quality()` at the bottom of
+the same file; the two together are the whole mechanism this lesson describes. The fork's glossary
+page `docs/reference/quality-gates-and-permissions/Rule-zero.md` places rule zero in the adoption
+order.</p>
+
+## Where this goes next
+
+<p>Recon tells you what the repo can already check about itself. It does not tell you what the
+repo's real boundaries are — what is load-bearing, what must not change, what an agent should
+never be allowed to touch. The next lesson covers interrogating those boundaries interactively,
+before the first plan phase is allowed to run.</p>
+
+<p><strong>Ask me things.</strong> Bring me a repo's `package.json`, `Makefile`, or CI workflow
+and we'll work out together which four commands belong in `quality.py` and which blocks you
+should delete.</p>

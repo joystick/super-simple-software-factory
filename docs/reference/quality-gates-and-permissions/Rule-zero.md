@@ -52,6 +52,8 @@ touch what it wasn't supposed to.
 
 ## See also
 
+- `quality-gates-and-permissions/Quality-blocks.md` — what a quality block
+  is and how `quality.py` runs one.
 - `quality-gates-and-permissions/Gate.md`
 - `quality-gates-and-permissions/Permissions-and-writes.md`
 - `docs/playbook-adopting-sssf.md` — full Rule Zero walkthrough with the

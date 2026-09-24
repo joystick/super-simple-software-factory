@@ -4,7 +4,186 @@ description: "Running dark surfaces two problems no interactive session ever hit
 sidebar:
   order: 2
 ---
+import Callout from '@components/Callout.astro'
+import Quiz from '@components/Quiz.astro'
+
+<Callout kind="win" label="The win">
+<p>You can name both problems going dark surfaces, say why they have the same shape, and point
+  at the exact lines in scout's and the planner's `system.md` that close the second one — the
+  glossary → OKF → ast-grep lookup order and the delta-only scoping rule — including why those
+  fixes live in `prompt_engineering` and not in a new vendored skill.</p>
+</Callout>
 
 <p>Going fully headless — many features, unattended, across days — surfaces two problems an interactive session never has to face. The first, covered in this chapter's bootstrap-vocabulary lesson, is that a vendored planning skill's "ask the user" fallback has no one there to answer. The second is scope: nothing in `prompt_engineering` or any shipped `skill_engineering` skill tells scout or the planner to check what's already built before scoping new work, so left unfixed every feature costs a full plan-and-build cycle even when most of it already exists. This lesson covers both problems and the fixes the playbook prescribes — glossary-then-knowledge-source-then-code-search lookups added to scout's own instructions, and delta-only scoping added to the planner's.</p>
 
-{/* TODO: full lesson content, see plans/2026-09-24-docs-reference-and-training.md */}
+## One shape, two problems
+
+<p>The playbook's Part C opens by naming what the two problems have in common: "something a human
+normally supplies mid-conversation has to be supplied <em>before</em> the headless loop starts
+instead, or the loop stalls or guesses." In an interactive session you supply the missing
+vocabulary when `wayfinder` asks, and you supply the "we already have that" when a plan proposes
+rebuilding a module you wrote last month. Headless, both go missing at once:</p>
+
+<table>
+  <tr><th></th><th>Problem 1 — the interview</th><th>Problem 2 — the re-implementation gap</th></tr>
+  <tr><td><strong>What a human supplied</strong></td>
+      <td>answers to "what does this term mean here?"</td>
+      <td>"that already exists — don't rebuild it"</td></tr>
+  <tr><td><strong>Headless failure</strong></td>
+      <td>the run stalls, or the model role-plays both sides</td>
+      <td>a full plan-and-build cycle for work that is 80% done</td></tr>
+  <tr><td><strong>Where it's supplied instead</strong></td>
+      <td>a committed `CONTEXT.md`/`docs/adr/`, before the loop</td>
+      <td>scout's findings, read by the planner, inside the loop</td></tr>
+  <tr><td><strong>Which layer changes</strong></td>
+      <td>the planner's own `system.md` (overrides on composed skills)</td>
+      <td>scout's and the planner's own `system.md` (new instructions)</td></tr>
+</table>
+
+<p>The previous lesson covered Problem 1 in full: relocate the interview to a bootstrap phase,
+commit its output, and override the composed skills' "ask the user" text from the agent's own
+`system.md`. What it left open — and what its closing paragraph pointed here for — is that even
+with vocabulary settled, nothing stops a plan from quietly re-implementing what already exists.</p>
+
+## Problem 2 — nothing stops a plan from re-implementing what already exists
+
+<p>The playbook states the gap flatly: "Neither `prompt_engineering/` nor any shipped
+`skill_engineering/` skill tells scout or the planner to check what's already built before
+scoping new work. Left unfixed, every feature costs a full plan-and-build cycle even when 80% of
+it already exists — the opposite of minimal diff." Nothing in the pipeline is <em>wrong</em>
+here; the plan is well-formed, the gates pass, the diff is green. It is simply larger than it
+needed to be, and in a loop running unattended across many features, that overhead compounds
+silently — no gate ever goes red for "you rebuilt something."</p>
+
+<Callout kind="why" label="Why this only shows up dark">
+<p>In a supervised run you read `specs/&lt;adw_id&gt;_*.md` before the builder starts (the playbook
+  calls this "the cheap checkpoint") and you notice the plan proposes a module you already have.
+  Across many unattended features nobody reads every spec, so the only thing that can catch a
+  redundant plan is something scout reports and the planner honors. The fix is not a new judgment
+  agent — it is giving the two agents that already exist the lookups a human would have done.</p>
+</Callout>
+
+## The fix in scout: three lookups, in a fixed order
+
+<p>The playbook prescribes two lookups "before any other search" — then, in practice, three
+steps. The shipped `templates/prompt_engineering/scout/system.md` carries them as the first three
+instructions of the agent, in exactly this order:</p>
+
+<ol class="steps">
+  <li><p><strong>Glossary first.</strong> "If `CONTEXT.md` exists at the repo root, read it before
+  anything else — it's the canonical vocabulary for this domain, kept current by a human-run
+  interview outside this pipeline." Scout notes any request term that is missing from or conflicts
+  with the glossary — and the instruction is explicit that this is "a signal for the planner, not
+  something to resolve yourself." It also skims `docs/adr/` titles, because "ADRs record
+  hard-to-reverse decisions that must not get silently re-litigated."</p></li>
+  <li><p><strong>OKF second.</strong> Read `.okf/providers/index.md` (or a repo-root
+  `.okf/index.md`) for progressive disclosure, open only the relevant concept files, and "report
+  what's <em>already implemented</em> and how, citing OKF concept paths." The playbook's reason for
+  concept paths over line numbers: line numbers drift.</p></li>
+  <li><p><strong>ast-grep third.</strong> Run structural queries for the request's key symbols "to
+  confirm OKF's claims against actual code and catch anything OKF hasn't caught up to yet." The
+  tie-break is written into the instruction: "OKF is documentation; ast-grep is ground truth —
+  when they disagree, trust ast-grep and flag the OKF file as stale in your findings."</p></li>
+</ol>
+
+<p>All of it lands in `&lt;context_handoff_dir&gt;/scout_findings.md`, the same handoff file scout
+already wrote before Part C existed. Scout stays read-only throughout — "search, read, and
+report — never write to the codebase."</p>
+
+<Callout kind="trap" label="The order is the point, not decoration">
+<p>Glossary before OKF before code is a trust gradient, not a checklist you can reorder. The
+  glossary is human-settled vocabulary — it decides what the request <em>means</em>. OKF is a
+  claim about what exists. `ast-grep` is what actually exists. Running code search first
+  produces findings phrased in whatever names the code happens to use, which may not be the
+  glossary's — and then the planner inherits a term conflict scout never noticed.</p>
+</Callout>
+
+## The fix in the planner: scope to the delta only
+
+<p>The planner's side is a single instruction, first in its list in the shipped
+`templates/prompt_engineering/planner/system.md`:</p>
+
+```markdown
+- Read `<context_handoff_dir>/scout_findings.md` first — it maps what's already
+  implemented, cited by OKF concept path and file:line, and flags any term the request
+  uses that's missing from or conflicts with `CONTEXT.md`. Scope your plan to the delta
+  only: anything scout already marked as implemented is explicitly out of scope in the
+  plan, not silently re-touched.
+```
+
+<p>Two words carry the weight. <strong>"Explicitly"</strong> — the plan has to name what it is
+<em>not</em> doing, which is what the next lesson's checklist verifies in
+`specs/&lt;adw_id&gt;_*.md`. <strong>"Silently"</strong> — the failure mode being prevented is
+not a plan that touches existing code (sometimes the delta genuinely requires it) but a plan that
+touches it without saying it knew the code was there. The same instruction block also closes the
+loop on Problem 1 from the planner's side: `CONTEXT.md` is "the binding vocabulary for this
+plan," relevant ADRs are honored rather than re-litigated, and a load-bearing term scout flagged
+as missing means "the bootstrap interview … hasn't happened for it yet — do not invent the
+vocabulary yourself."</p>
+
+## Why none of this is a new agent or a new skill
+
+<Callout kind="why" label="Tool-usage patterns, not planning methodologies">
+<p>The playbook is deliberate about where these fixes live: "None of this needs a new SSSF agent
+  role or a new `skill_engineering` entry — `ast-grep` and a knowledge-source lookup are
+  tool-usage patterns baked into scout's own instructions, the same way `writes` and
+  `protected_files` already are. They don't belong in the same composition list as
+  `wayfinder`/`to-spec`/`to-tickets`/`tdd`, which are planning methodologies." That is this
+  chapter's "Two Layers" lesson applied: a search order tied to your repo's `.okf/` layout is
+  layer one — yours to customize — not a portable protocol to vendor. It also means these
+  lookups cost nothing extra in composed-skill tokens; they are part of the prompt the agent
+  already carries.</p>
+</Callout>
+
+<p>One limit the playbook is careful to state in Part D: scout and planner's "glossary/OKF/ast-grep
+discovery, delta-scoping" wiring "still runs inside every `just sdlc` call underneath this —
+defense-in-depth, not a substitute for the triage gate." Delta-scoping stops the planner rebuilding what exists; it does not decide
+whether the feature should be built at all. That judgment — feasibility, compliance, redundancy
+against `.out-of-scope/` — stays with `/triage`, interactively, and Chapter 7 covers why.</p>
+
+## Check yourself
+
+<Quiz
+  question="Scout's OKF concept file says a feature is implemented; ast-grep finds no such code. What does the shipped scout template tell scout to do?"
+  choices={["Report the feature as implemented — OKF is the canonical knowledge source", "Trust ast-grep, report it as not implemented, and flag the OKF file as stale", "Stop and ask the planner which source to believe", "Re-run the OKF lookup with a broader concept search"]}
+  answerIndex={1}
+  correctFeedback="The instruction is explicit: 'OKF is documentation; ast-grep is ground truth — when they disagree, trust ast-grep and flag the OKF file as stale in your findings.' That flag is also what the next lesson's knowledge-source checklist item exists to catch upstream."
+  wrongFeedback="OKF is a claim; code is what exists. The shipped template resolves the disagreement in code's favour and has scout mark the OKF file stale — scout never pauses to ask, because headless there is no one to answer."
+/>
+
+<Quiz
+  question="Why does the playbook put the glossary/OKF/ast-grep lookups in scout's system.md rather than vendoring them as a skill_engineering entry?"
+  choices={["Scout runs with writes: [] and cannot receive vendored skills", "They are repo-specific tool-usage patterns, like writes and protected_files — not planning methodologies", "Vendored skills only compose onto the planner agent", "skill_engineering text is invisible to scout because of --setting-sources ''"]}
+  answerIndex={1}
+  correctFeedback="The playbook draws exactly this line: ast-grep and knowledge-source lookups are 'tool-usage patterns baked into scout's own instructions,' not methodologies like wayfinder or tdd that travel between repos. Layer one, not layer two."
+  wrongFeedback="Nothing technical prevents scout receiving a vendored skill. The distinction is what the text is: a search order tied to your repo's .okf/ layout is the agent's own instruction (prompt_engineering), while a portable protocol is a skill (skill_engineering)."
+/>
+
+<Quiz
+  question="A plan touches a module scout marked as already implemented, and says so — 'extending the existing X to add Y.' Does this violate the delta-only rule?"
+  choices={["Yes — anything scout marked implemented must not appear in the plan at all", "No — the rule forbids silently re-touching existing work; naming it as the base of the delta is the point", "Yes — the planner should have filed a needs-triage ticket instead", "No — scout's findings are advisory and the planner may ignore them"]}
+  answerIndex={1}
+  correctFeedback="The instruction says implemented work is 'explicitly out of scope in the plan, not silently re-touched.' A plan that names existing X and scopes its change to adding Y is doing exactly what delta-scoping asks — the failure is a plan that rebuilds X without acknowledging it exists."
+  wrongFeedback="Delta-scoping is about explicitness, not avoidance. Sometimes the delta genuinely touches existing code; what the rule prevents is a plan that does so without saying it knew the code was already there — the next lesson checks specs/ for exactly that."
+/>
+
+## Read this next
+
+<p><strong>Primary source:</strong> the adoption playbook's Part C, "Problem 2 — nothing stops a plan
+from re-implementing what already exists," in full, then the three lookup bullets at the top of
+`.claude/skills/sssf/templates/prompt_engineering/scout/system.md` and the first instruction
+block of `templates/prompt_engineering/planner/system.md` — the lesson quotes both, but read them
+in place so you see what surrounds them. Part D's "The judgment call stays interactive, on
+purpose" states the limit of what delta-scoping is allowed to decide.</p>
+
+## Where this goes next
+
+<p>Both headless problems now have a fix, and both fixes share a property: they can fail without
+any gate going red. A bootstrap that ran but was never committed, a plan that touched existing
+code without naming it, a knowledge source the documenter never updated, a grilled feature that
+never reached `/triage` — each looks like success from the outside. The next lesson is the
+extended definition of done: one checklist line per silent failure this chapter introduced.</p>
+
+<p><strong>Ask me things.</strong> Bring me a `scout_findings.md` from a real run and we'll check
+whether it actually reports what's already implemented — by concept path — or just where things
+live.</p>
