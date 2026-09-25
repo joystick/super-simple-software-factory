@@ -1,7 +1,7 @@
 ---
 title: docs/reference (full SSSF concept glossary) + docs/training (playbook + full learning arc)
 created: 2026-09-24
-status: in-progress
+status: done
 ---
 
 # docs/reference + docs/training — supersedes the earlier handbook/reference split
@@ -317,10 +317,10 @@ docs-training-test/
       re-verified and found to be CORRECT as originally written, not a bug —
       see the fix commit's message for the trace. `npm run build` re-verified
       clean (58 pages, 0 errors) after all fixes.
-- [ ] Test scripts run: build check done (see above); internal-link check and
-      concept-inventory completeness check NOT yet run as separate automated
-      scripts — done so far via manual/agent spot-checks during the review
-      pass, not a standing script. Still open.
+- [x] Test scripts run: `scripts/docs-check/{check_reference_manifest,
+      check_markdown_links}.py`, wired to `just docs-check`. Both pass:
+      36/36 link rows, and (as of the citation-cleanup pass) 73 real
+      markdown links checked, up from 2.
 
 ### Follow-up discovered during this pass — fixed 2026-09-24 (commit `aae7aa8`)
 - [x] **Real bug in `adw_watch.py`'s `read_blocked_by()`**: a `Blocked by:`
@@ -352,11 +352,35 @@ docs-training-test/
       and matching local before deletion; GitHub repo itself untouched
 - [x] Isolated test workspace (`_scratch/docs-training-test/`) removed, its job done
 
-### Explicitly NOT this pass's definition of done
-- [ ] Full authoring of all 17 net-new lessons (2 of 17 done as the sample, 15
-      honest stubs remain)
-- [ ] Full authoring of all 44 own-page reference rows (10 of 44 done as the
-      sample, 34 remain)
+### Step 8 — full content authoring + citation cleanup (done, 2026-09-25)
+- [x] All 18 net-new lesson files authored in full (2 were already done as
+      the v1.0 sample; the true count was 18, not the "17" v1.0 claimed --
+      corrected during this pass). 9 parallel fable agents, each grounded
+      in real source before writing.
+- [x] Re-audited the "34 unauthored own-page rows" claim first: most were
+      already covered *inside* one of the 10 sample pages (e.g.
+      `Permissions-and-writes.md` alone answers 6 rows, `Gate.md` 9,
+      `Dark-factory.md` 9). Only 13 rows had no real answer anywhere --
+      those 13 authored by 4 parallel fable agents. All 44 own-page rows
+      now resolve to a real answer (23 as dedicated pages, 21 bundled).
+- [x] Opus adversarial review of all new content: 6 real findings (2 stale
+      claims left over from bug fixes made earlier in the session, 1 dead
+      link, 1 code-comment gap, 3 false cross-driver claims in
+      `ToolCallTracker.md`), all fixed and verified against source directly
+      before merging, not trusted on the reviewer's word alone.
+- [x] Citation cleanup pass: ~150 file:line citations across all 23
+      `docs/reference/` pages + `concept-manifest.md` verified against
+      real current source; 16 had drifted and are fixed. Stale
+      `gate() -> list[str]` signature in `SKILL.md:66` fixed to `GateReport`.
+      ~40 backticked cross-reference paths converted to real
+      `[text](path)` markdown links (`check_markdown_links.py`: 2 -> 73
+      real links found).
+- [x] `npm run build` clean (58 pages, 0 errors) and both `docs-check`
+      scripts passing after every commit in this step.
+- [x] Merged to `origin/main` across 2 commits (`f7ce5ec`, `a272ec8`),
+      each on its own branch, reviewed and spot-verified before merging.
+
+### Explicitly NOT done (genuinely remaining, unrelated to content completeness)
 - [ ] `training/`'s screencast scripts -> `03-screencasts` conversion (Phase 2 of
       the site-move mechanics, Open Question 2 -- deliberately deferred, `training/`
       is untouched)
@@ -369,6 +393,7 @@ docs-training-test/
 
 | Version | Date | Changes |
 |---|---|---|
+| 2.0 | 2026-09-25 | Status: done. Step 8: all 18 net-new lessons and all 13 genuinely-missing reference pages authored (9 parallel fable agents), opus-reviewed (6 findings fixed), citation-cleaned (16 drifted citations fixed, SKILL.md's stale gate signature fixed, ~40 cross-references turned into real clickable links). Corrected the lesson-count arithmetic again (18, not 17) and the reference-gap arithmetic (13 genuine gaps, not 34 -- most "unauthored" rows were already covered inside a sibling page). Only genuinely remaining items: the deferred `training/`-screencast conversion and 11 files with historical "sssf-learn" prose, both explicitly out of scope by design, not oversights. |
 | 1.1 | 2026-09-24 | Fixed the `read_blocked_by()` comma-inside-parenthetical bug tracked as an open follow-up in v1.0 (commit `aae7aa8`): stripped the parenthetical from the whole matched value before splitting on commas, added 2 regression tests, full 49-test suite passes. |
 | 1.0 | 2026-09-24 | Step 7 (real-fork application) done: wrote and ran the standing test scripts for real (`scripts/docs-check/`, wired to `just docs-check`), found and fixed a fresh batch of real bugs running them (a regex over-match, a genuine citation-shape error, 4 anchor typos); applied `docs/reference/` and `docs/training/` to the real fork in two coherent commits, added the root `justfile` (`training-*` recipes) and `.gitignore` rules, removed `learn/`; `npm install`/`npm run build` run for real from the fork (58 pages, 0 errors); pushed to `origin/main`; removed `sssf-learn`'s local clone only after re-confirming GitHub still has the full history; removed the now-done isolated test workspace. Marked `in-progress` rather than `done` -- the explicit follow-ups (remaining lesson/reference authoring, the `read_blocked_by()` bug, the screencast conversion) are real, tracked, and none of them were silently claimed complete. |
 | 0.3 | 2026-09-24 | Isolated test implementation built (3 builder passes: site move + baseline build, reference glossary, chapters 3-7 scaffold) and reviewed by a fable pass (`a6173d4265a575410`), which found several real issues — most notably a stale claim in the bootstrap lesson directly contradicting this session's own earlier `adw_watch.py` fix, and a genuinely new follow-up bug in `read_blocked_by()` discovered while verifying one of the review's findings (a comma inside a "none (explanation)" parenthetical still breaks resolution). All findings fixed except the new bug, which is tracked as an explicit follow-up. `npm run build` clean (58 pages) after fixes. Not yet: automated test scripts (link-checker, concept-completeness check) as standing scripts, and step 7 (real-fork application + `sssf-learn` deletion) — both still open, pending go-ahead. |
