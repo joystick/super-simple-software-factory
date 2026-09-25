@@ -1,7 +1,7 @@
 ---
 title: "Adoption playbook — putting SSSF to work on real code"
-version: 4.17
-updated: 2026-09-14
+version: 4.18
+updated: 2026-09-25
 status: active
 ---
 
@@ -788,17 +788,19 @@ typo or an uncommitted file doesn't error, it just makes `adw_watch.py`'s
 frontier scan silently skip the item forever, the same class of
 manufactures-confidence failure rule zero exists to catch at the gate level.
 
-**Check 6's sharp edge, found live:** an unblocked ticket must have **no**
-`Blocked by:` line at all — never a line saying "none" or explaining why in
-prose. `adw_watch.py`'s `BLOCKED_BY_RE` captures everything after the colon
-and splits it on commas, treating every resulting fragment as a blocking
-ticket number to resolve. A hand-written value like `(none — API exists,
-see spec.md)` splits into two fragments, neither matching a real sibling
-ticket, so `is_unblocked()` returns `False` — the ticket sits at
-`ready-for-agent`, passes every other checkpoint, and is still invisible to
-the frontier scan. No error, no warning: `just watch --once` just reports
-"queue empty." If a ticket has no real blocker, omit the `Blocked by:` line
-entirely; don't write one to say so.
+**Check 6's sharp edge, found live (since fixed):** an earlier
+`adw_watch.py` captured everything after `Blocked by:` and split it on
+commas, treating every fragment as a blocking ticket number. A hand-written
+value like `none (API exists, see spec.md)` — a comma *inside* the
+parenthetical — split into two fragments, neither matching a real sibling
+ticket, so `is_unblocked()` returned `False` and the ticket sat at
+`ready-for-agent`, invisible to the frontier scan, with `just watch --once`
+reporting "queue empty." The parser now strips any parenthetical from the
+whole value *before* the comma split, and drops bare `none`, so that exact
+line is read as "no blockers" — covered by a regression test. The simpler
+habit still holds: if a ticket has no real blocker, omit the `Blocked by:`
+line entirely; a value with nothing to parse is the one that can never
+mis-parse.
 
 ### The judgment call stays interactive, on purpose
 
@@ -867,8 +869,11 @@ whether issues live on GitHub or under `.scratch/`):
    or grep `Status: ready-for-agent` across `.scratch/*/issues/*.md`.
 2. **Frontier**: filter to unblocked (every `Blocked by:` target already
    resolved) and unclaimed; oldest/lowest-numbered first.
-3. **Claim**: set `Status: claimed` before touching anything else — same as
-   wayfinder, so two concurrent `just watch` runs never double-pick.
+3. **Claim**: set `Status: claimed` before touching anything else and commit
+   that write immediately — same as wayfinder. This is ordering, not a lock:
+   a second `just watch` whose scan runs after the first's claim commit sees
+   the ticket taken, but two runs scanning at the same instant, before either
+   commits, is a gap the design does not close. Run one watcher per repo.
 4. **Dispatch**: extract the agent brief, run the full SDLC chain on it —
    `adw_simple_sdlc.py` (`planner -> builder -> reviewer -> revision loop ->
    documenter -> commit`), not the lighter `plan_build_test` chain `just
@@ -963,6 +968,7 @@ next run and what a human reads afterward.
 
 | Version | Date | Changes |
 |---|---|---|
+| 4.18 | 2026-09-25 | Two corrections surfaced by a teacher/student assessment round against the docs. (1) The Filing section's `Blocked by:` comma-split sharp edge is now described as fixed — `adw_watch.py` strips parentheticals before splitting and has a regression test — matching Chapter 7's filing-checkpoints lesson, which already said so. (2) Part D's "Claim" step no longer says concurrent watchers "never double-pick": claim-then-commit is ordering, not a lock, and a same-instant scan race is an acknowledged gap — matching Chapter 7's `just watch` lesson and `adw_watch.py` itself. |
 | 4.17 | 2026-09-14 | Added a "Cheat sheet" section: three lookup tables for the five vendored skills (role/mode/output per skill), the two interactive-only skills (`grill-with-docs`, `triage`), and the handoff format/location between every conveyor stage (scout→planner→builder→reviewer→documenter, plus the queue's watcher→planner path). Also fixed the frontmatter `version:` field, which had drifted two versions behind the version-history table's own top row (said 4.14 while the table already listed 4.16) — bumping this same edit closes that gap rather than leaving it to compound further. |
 | 4.16 | 2026-09-13 | B1 closed out: `just watch --once` succeeded live end to end after the v4.15 fix (a downstream project, device-management-ui, `adw_id: c1eff7ac` — 10/10 phases, reviewer approved 12/12 plan requirements and 6/6 acceptance criteria, real commits for plan/build/docs, ticket auto-resolved). Updated "What this playbook does not claim" from "not yet run live" to the actual result, including the one real defect the run surfaced and fixed along the way — framed as evidence the chain can work, not a reliability guarantee. |
 | 4.15 | 2026-09-13 | B1 (first live end-to-end run, a downstream project, device-management-ui): found a real Mandatory-checkpoints gap. `/grill-with-docs` wrote a hand-authored `Blocked by: (none — API exists, see spec.md)` on an unblocked ticket — check 6's own `grep` passed (the line parses), but `adw_watch.py`'s `BLOCKED_BY_RE` splits its value on commas into fragments and treats each as a real blocker; neither fragment matched a sibling ticket, so the ticket sat at `ready-for-agent`, passed every checkpoint, and was still silently invisible to the frontier scan (`just watch --once` reported "queue empty" with no error). Added a "Check 6's sharp edge" callout: an unblocked ticket must omit the `Blocked by:` line entirely, never write "none" in prose. Also confirmed live: `/grill-with-docs` can write `spec.md` and the ticket itself inline during grilling, rather than stopping for separate `/to-spec`/`/to-tickets` runs — "The whole chain, named once" describes 4 distinct human-run steps, but a single grilling session can legitimately collapse steps 1–3 into one. Not yet reflected in that list; flagging here pending a decision on whether to document it as a valid shortcut or leave the list as the general case. |

@@ -53,7 +53,7 @@ reconcile with what pi itself reports":</p>
   <tr><td>`cache_read_tokens`</td><td>Prompt tokens served from cache, billed at the cheaper cache-read rate</td></tr>
   <tr><td>`cache_write_tokens`</td><td>Prompt tokens written into cache this turn</td></tr>
   <tr><td>`reasoning_tokens`</td><td>The thinking <em>share</em> of `output_tokens` — nested, not a fifth component</td></tr>
-  <tr><td>`total_tokens`</td><td>The four components above, summed</td></tr>
+  <tr><td>`total_tokens`</td><td>The CLI's own reported total when it has one (pi's `totalTokens`), else the four components above summed — `add_turn()` takes it as a parameter rather than re-deriving it; empirically the two agree</td></tr>
   <tr><td>`*_cost`, `total_cost`</td><td>Dollars per component, and their sum</td></tr>
 </table>
 

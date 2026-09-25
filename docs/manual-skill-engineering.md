@@ -1,7 +1,7 @@
 ---
 title: "Manual — Skill Engineering"
-version: 1.0
-updated: 2026-08-31
+version: 1.1
+updated: 2026-09-25
 status: draft
 ---
 
@@ -90,18 +90,23 @@ file, not an environment.
    the agent names that actually receive it, separating agents that named
    a skill but whose `coding_agent` means it never applies.
 
-## The one hard boundary: `claude_code` only
+## The one hard boundary: the allowlist in `skill_engineering_applies()`
 
-Skill engineering takes effect **only** under `coding_agent: claude_code`.
-Skills ride in `--system-prompt`, a delivery mechanism specific to how
-SSSF drives Claude Code headlessly; `pi` and `agy` have no equivalent path
-for it.
+Skill engineering takes effect for every coding agent named in
+`skill_engineering_applies()`'s allowlist tuple in `adws/adw_modules/agents.py`
+— on the current version, all four shipped drivers: `claude_code`, `pi`,
+`agy`, `opencode`. What differs is the delivery channel. `claude_code` and
+`pi` take the composed text as a real `--system-prompt` CLI flag; `agy` and
+`opencode` have no such flag, so their drivers fold it into the user turn
+instead — a weaker channel (advice inside the conversation, not beside it),
+but the text arrives and is billed the same way.
 
-Naming `skill_engineering` on a `pi` or `agy` agent is not a config error —
-a roster might genuinely be mid-migration between coding agents — but it
-does nothing, and SSSF says so: `agents.validate()` prints a warning
-naming the agent, before anything spawns, and `just skills` marks that
-agent as `[ignored by: ...]` rather than counting it as a user.
+Naming `skill_engineering` on an agent whose `coding_agent` is *not* in that
+tuple — a future fifth driver, or a version older than this one — is not a
+config error, but it does nothing, and SSSF says so: `agents.validate()`
+prints a warning naming the agent, before anything spawns, and `just skills`
+marks that agent as `[ignored by: ...]` rather than counting it as a user.
+The tuple, not this manual, is the source of truth; check it on your version.
 
 This boundary was tightened during the feature's own build: an early
 version's warning correctly *said* the field was ignored under `pi`/`agy`
@@ -184,4 +189,5 @@ tracked here.
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.1 | 2026-09-25 | Corrected the "claude_code only" boundary: `skill_engineering_applies()` now allowlists all four shipped coding agents (`claude_code`/`pi` via `--system-prompt`, `agy`/`opencode` folded into the user turn). Found as a docs-internal contradiction against `config.md`, the playbook, and the Chapter 4 lesson during a teacher/student assessment round. |
 | 1.0 | 2026-08-31 | Initial manual. Covers the skill_engineering feature end to end, post the branch's adversarial-review correction rounds (the claude_code-only boundary is now enforced, not just claimed). |

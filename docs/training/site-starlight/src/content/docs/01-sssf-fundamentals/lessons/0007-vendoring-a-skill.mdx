@@ -43,12 +43,16 @@ agents:
 path — there is no registry lookup, no name resolution. If the path is wrong, `agents.validate()`
 raises before any agent spawns; a typo in the roster is a config error, not a wasted turn.</p>
 
-<Callout kind="trap" label="claude_code only">
-<p>`skill_engineering_applies(agent)` is `agent.coding_agent == "claude_code"` — nothing else.
-Set the field on a `pi` or `agy` agent and it is silently ignored at compose time, though
-`agents.validate()` does warn: "skill_engineering is set but coding_agent is ... and will be
-ignored." Read that warning; it is the whole difference between a config that does something
-and one that only looks like it does.</p>
+<Callout kind="trap" label="All four coding agents — by two different channels">
+<p>`skill_engineering_applies(agent)` returns true for every coding agent SSSF ships a driver
+for — `claude_code`, `pi`, `agy`, `opencode` — but the composed text does not arrive the same
+way. `claude_code` and `pi` take it as a real `--system-prompt` CLI flag; `agy` and `opencode`
+have no such flag, so the driver folds it into the user turn instead — a weaker channel (advice
+inside the conversation rather than beside it), but it arrives. The function's allowlist tuple
+in `agents.py` is the single source of truth; a coding agent not in that tuple gets a warning
+from `agents.validate()` — "skill_engineering is set but coding_agent is ... and will be
+ignored" — and no skill text. Read that warning when it fires; it is the whole difference
+between a config that does something and one that only looks like it does.</p>
 </Callout>
 
 ## Vendor, then attach
@@ -132,21 +136,23 @@ gate that watched something fail, then pass.</p>
     not alphabetical.</p>
   </li>
   <li>
-    <p><strong>[run]</strong> <strong>Watch the mismatch warning fire.</strong> Set
-    `skill_engineering` on an agent whose `coding_agent` is `pi` or `agy`, and run
-    `agents.validate()` (or just start a run). Read the exact warning text yourself instead of
-    trusting the quote above, then confirm the skill did not compose onto that agent's prompt.</p>
+    <p><strong>[run]</strong> <strong>Watch the delivery channel change.</strong> Set the same
+    `skill_engineering` list on a `claude_code` agent and on an `agy` agent, run each once, and
+    compare the recorded request: under `claude_code` the skill text is in `--system-prompt`;
+    under `agy` it is prepended to the user turn. Then read `skill_engineering_applies()` in
+    `adw_modules/agents.py` and confirm its allowlist tuple names exactly the coding agents your
+    version ships — that tuple, not this lesson, is what decides.</p>
   </li>
 </ol>
 
 ## Check yourself
 
 <Quiz
-  question="An agent has `skill_engineering: [tdd/SKILL.md]` but `coding_agent: pi`. What happens?"
-  choices={["The skill composes onto the prompt as usual", "agents.validate() blocks the run entirely", "It is ignored at compose time; validate() only warns", "pi translates it into its own skill format"]}
+  question="An agent has `skill_engineering: [tdd/SKILL.md]` and `coding_agent: agy`. What happens?"
+  choices={["It is silently ignored — only claude_code receives skill text", "agents.validate() blocks the run entirely", "The skill composes and is delivered folded into the user turn, because agy has no --system-prompt flag", "agy translates it into its own skill format"]}
   answerIndex={2}
-  correctFeedback="skill_engineering_applies() checks coding_agent == 'claude_code' only. Under pi it's silently ignored at compose time — validate() warns, but does not block the run."
-  wrongFeedback="Check skill_engineering_applies(): it is exactly coding_agent == 'claude_code'. Under any other coding_agent the field is set but has no effect — validate() only warns about it."
+  correctFeedback="skill_engineering_applies() covers all four shipped coding agents. claude_code and pi get the composed text as a --system-prompt flag; agy and opencode fold it into the user turn — weaker channel, same text, same cost."
+  wrongFeedback="Check skill_engineering_applies() in agents.py: its allowlist names all four coding agents. The difference between them is the delivery channel (--system-prompt vs. the user turn), not whether the skill applies."
 />
 
 <Quiz
@@ -170,7 +176,8 @@ gate that watched something fail, then pass.</p>
 <p><strong>Primary source:</strong> `adw_modules/skill_engineering.py` — the whole mechanism is
 under 150 lines, and its module docstring states the composition-order rule directly. Then
 `scripts/vendor_skill.py` for the provenance header, and `skill_engineering_applies()` in
-`adw_modules/agents.py` for the `claude_code`-only rule.</p>
+`adw_modules/agents.py` for the allowlist of coding agents that receive it, and its docstring
+for which ones take it as `--system-prompt` versus folded into the user turn.</p>
 
 <Callout kind="trap" label="Check which repo you're standing in">
 <p>Every other lesson's primary source lives in the Python playground repo. This one does
