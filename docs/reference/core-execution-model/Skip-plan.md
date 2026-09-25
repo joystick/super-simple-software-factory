@@ -82,9 +82,9 @@ fresh (`core-execution-model/Chains.md`).
 
 ## See also
 
-- `core-execution-model/Chains.md` — which chains take the flag and which do
+- [Chains](Chains.md) — which chains take the flag and which do
   not.
-- `quality-gates-and-permissions/Gate.md` — `artifacts_exist` and
+- [Gate](../quality-gates-and-permissions/Gate.md) — `artifacts_exist` and
   `files_non_empty`, the gates a loaded plan still has to pass.
 - `.claude/skills/sssf/references/handoff.md#envelope-schema` — the
   `PlanOutput` / `EnvelopeBase` fields the loader fills in.

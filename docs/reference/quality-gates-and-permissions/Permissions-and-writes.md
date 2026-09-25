@@ -49,7 +49,7 @@ Gitignored paths never appear at all, which is why the session runtime under
 
 `enforce(run, phase, agent, before)` re-snapshots afterward, diffs the two,
 and checks every changed path against `permitted()`. Anything not permitted
-is a breach. (`permissions.py:163-186`)
+is a breach. (`permissions.py:163-185`)
 
 Comparing change-**sets**, rather than watching writes happen live, is what
 catches the `git checkout` case from the module docstring: a path that was
@@ -72,12 +72,12 @@ the agent's own `writes` list, then `protected_files`, then falls back to
 
 `PermissionBreach(RuntimeError)` — raised by `enforce()`, never caught and
 retried. This is the key difference from a Gate
-(`quality-gates-and-permissions/Gate.md`): a gate failure is a claim that
+([Gate](Gate.md)): a gate failure is a claim that
 didn't check out, recoverable by re-prompting the same session. A breach
 already happened on disk — the write occurred — so re-prompting can't undo
 it. `enforce()` rolls back what it can (`_roll_back`, `permissions.py:138-160`)
 and aborts the phase, naming every offending path in the exception message.
-(`permissions.py:41-42, 163-186`)
+(`permissions.py:41-42, 163-185`)
 
 One subtlety worth internalizing: `_roll_back` only touches paths the agent
 itself introduced. A path that was already dirty before the agent ran and
@@ -89,9 +89,9 @@ committed by the cleanup step instead of the agent. (`permissions.py:138-151`)
 
 ## See also
 
-- `quality-gates-and-permissions/Gate.md` — the companion mechanism for
+- [Gate](Gate.md) — the companion mechanism for
   verifying *what an agent claims it did*, as opposed to *what it touched*.
-- `quality-gates-and-permissions/Console.md`
+- [Console](Console.md)
 - `.claude/skills/sssf/references/config.md#write-permissions--writes-and-protected_files` —
   the config-shape side of `writes`/`protected_files` (field syntax,
   defaults merging); this page covers the enforcement code that reads them.

@@ -41,7 +41,7 @@ Three consequences define the concept:
   `disable-model-invocation: true` is load-bearing: vendoring it risks it
   firing headless, "exactly the failure this split exists to prevent"
   (lines 533–536). It is one of the two interactive-only skills
-  `the-queue/Dark-factory.md` lists alongside `triage`.
+  [Dark factory](Dark-factory.md) lists alongside `triage`.
 
 The grill → `/triage` handoff is deliberately manual (lines 569–585): nothing
 bridges a settled `CONTEXT.md` into the queue, so a bootstrapped feature that
@@ -50,13 +50,13 @@ never reaches `/triage` is invisible to `just watch`. The checklist line
 
 ## See also
 
-- `the-queue/Dark-factory.md` — the goal state this step makes possible, and
+- [Dark factory](Dark-factory.md) — the goal state this step makes possible, and
   the five vendored vs. two interactive-only skills.
-- `the-queue/The-queue-watcher.md` — what consumes the ticket once it is
+- [The queue watcher (just watch)](The-queue-watcher.md) — what consumes the ticket once it is
   `ready-for-agent`.
-- `the-queue/The-four-jobs.md` — the architecture job, where the interview
+- [The four jobs](The-four-jobs.md) — the architecture job, where the interview
   normally sits in a supervised adoption.
 - `docs/playbook-adopting-sssf.md` — Part C in full, including Problem 2
   (scout's glossary → knowledge source → structural search order).
-- `../../training/site-starlight/src/content/docs/06-going-dark/lessons/0001-bootstrap-vocabulary.mdx`
+- [Bootstrap Vocabulary](../../training/site-starlight/src/content/docs/06-going-dark/lessons/0001-bootstrap-vocabulary.mdx)
   — the full lesson this entry summarises.

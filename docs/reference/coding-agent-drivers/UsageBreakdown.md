@@ -80,15 +80,15 @@ fabricated parts" (`agent_cc.py:211-214`) — so `input_cost` etc. are `0.0`
 there while `total_cost` is real. agy reports no dollars at all
 (`agent_agy.py:35-38`). A zero in any cost field means "not reported", never
 "free". For the operator's-eye walkthrough of these numbers on a real run,
-see the training lesson `04-coding-agents-and-cost/lessons/0002-reading-real-cost`
+see the training lesson [Reading Real Cost](../../training/site-starlight/src/content/docs/04-coding-agents-and-cost/lessons/0002-reading-real-cost.mdx)
 — this page is the type-level reference it points back to.
 
 ## See also
 
-- `coding-agent-drivers/PiRequest-and-PiResult.md` — `PiResult.usage` is
+- [PiRequest and PiResult](PiRequest-and-PiResult.md) — `PiResult.usage` is
   this type; that page explains why `tokens`/`cost` are sums while
   `context_tokens` is a snapshot.
-- `observability/Visualizer.md` — where `agent_end`'s `usage` payload is
+- [Visualizer](../observability/Visualizer.md) — where `agent_end`'s `usage` payload is
   rendered.
 - `.claude/skills/sssf/references/observability.md` — the `events` table the
   `agent_end` row is written to.

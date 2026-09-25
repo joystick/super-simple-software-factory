@@ -22,7 +22,7 @@ use to pass typed output to each other (see
 `.claude/skills/sssf/references/handoff.md#the-typed-output-rule`).
 
 This is the layout that makes `always_writable`
-(`quality-gates-and-permissions/Permissions-and-writes.md`) meaningful — a
+([Permissions and writes](../quality-gates-and-permissions/Permissions-and-writes.md)) meaningful — a
 read-only agent still needs to write *somewhere*, and this session directory
 under `data_dir` is that somewhere, granted unconditionally regardless of
 the agent's own `writes` list. If you're trying to find where a specific
@@ -33,5 +33,5 @@ this page just orients you to why the layout exists before you go read it.
 
 - `.claude/skills/sssf/references/handoff.md#agent_mapjson-and-resuming` —
   how a later run resumes against files this layout produced.
-- `quality-gates-and-permissions/Permissions-and-writes.md` — why this
+- [Permissions and writes](../quality-gates-and-permissions/Permissions-and-writes.md) — why this
   directory is always writable regardless of an agent's `writes` config.

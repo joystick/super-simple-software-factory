@@ -19,20 +19,20 @@ the review/revision loop a supervised manual run could otherwise skip." A
 human running `plan_build_test` interactively can eyeball the plan before it
 ships; nothing eyeballs a `just watch` dispatch, so the queue always takes
 the slower, more-checked chain. See
-`the-queue/Dark-factory.md#the-chain-named-once` for how this is framed at
+[Dark factory § The chain named once](Dark-factory.md#the-chain-named-once) for how this is framed at
 the playbook level.
 
 ## The scan-claim-dispatch-resolve cycle
 
-`run_once()` (`adw_watch.py:328-351`):
+`run_once()` (`adw_watch.py:335-356`):
 
 1. **Refuse on a dirty tree.** Claiming commits (see below), so a dirty
    working tree would sweep unrelated in-progress work into that commit —
    `run_once` refuses outright rather than risk it.
 2. **Scan** — `discover_issues()` reads every `.scratch/<feature>/issues/*.md`
    file carrying a canonical `Status:` line.
-3. **Pick the frontier** — see `the-queue/Frontier.md`.
-4. **Dispatch** — `dispatch()` (`adw_watch.py:271-313`):
+3. **Pick the frontier** — see [Frontier](Frontier.md).
+4. **Dispatch** — `dispatch()` (`adw_watch.py:278-318`):
    - `set_status(issue, CLAIMED)`, then commits that write immediately
      (`commit_watcher_state`) — the ADW's own commit phase fires mid-run,
      *before* dispatch's final status write, so without this immediate
@@ -56,7 +56,7 @@ the playbook level.
 cron/launchd: `0` if work was dispatched (check the ticket's new `Status:` to
 know the outcome), `1` if the queue was empty, `2` if the tracker isn't
 local-markdown (GitHub/GitLab trackers are detected and explicitly refused,
-not silently mishandled — `detect_tracker`, `adw_watch.py:314-327`). Without
+not silently mishandled — `detect_tracker`, `adw_watch.py:321-332`). Without
 `--once`, it loops on `--interval` seconds (default 300).
 Source: `adw_watch.py:352-384` (`main()`).
 
@@ -69,12 +69,12 @@ template) — via `STATUS_RE`/`BLOCKED_BY_RE`
 (underscores, missing colon, wrong casing); a near-miss line instead prints a
 loud stderr warning that the ticket is invisible to the frontier scan, rather
 than silently vanishing from the queue the way four real `to-tickets`-authored
-tickets once did undetected. (`_check_format`, `adw_watch.py:157-176`)
+tickets once did undetected. (`_check_format`, `adw_watch.py:164-181`)
 
 ## See also
 
-- `the-queue/Frontier.md` — the selection rule step 3 uses.
-- `the-queue/Dark-factory.md` — where the watcher sits in the larger
+- [Frontier](Frontier.md) — the selection rule step 3 uses.
+- [Dark factory](Dark-factory.md) — where the watcher sits in the larger
   unattended-operation picture.
 - `.claude/skills/sssf/templates/justfile` — the `watch` recipe that runs
   this script.

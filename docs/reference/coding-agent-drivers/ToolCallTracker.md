@@ -51,8 +51,8 @@ just a uniform shape:
 | `tool` | tool name (`bash`, `read`, `edit`, …) |
 | `tool_call_id` | the CLI's own id for the call |
 | `args` | the call's arguments, string values clipped to `ARG_VALUE_CHARS` |
-| `ok` | `agent_cc`/`agent_pi`/`agent_agy`: `False` only when the CLI reported an error (agy: `state == "ERROR"`, `agent_agy.py:279`). **`agent_opencode`: always `True`** — its tracker hardcodes `"ok": True` (`agent_opencode.py:213`) because opencode's event stream never surfaces a failed-tool-call signal this tracker can read; opencode can never report a failed tool call through this path. |
-| `label` | `agent_cc`/`agent_pi`/`agent_agy`: a short human line built from tool + args, e.g. `bash: ls -la src`. **`agent_opencode`: just the bare tool name** (`record["label"] = tool`, `agent_opencode.py:213`) — no argument summary. |
+| `ok` | `agent_cc`/`agent_pi`/`agent_agy`: `False` only when the CLI reported an error (agy: `state == "ERROR"`, `agent_agy.py:284`). **`agent_opencode`: always `True`** — its tracker hardcodes `"ok": True` (`agent_opencode.py:214`) because opencode's event stream never surfaces a failed-tool-call signal this tracker can read; opencode can never report a failed tool call through this path. |
+| `label` | `agent_cc`/`agent_pi`/`agent_agy`: a short human line built from tool + args, e.g. `bash: ls -la src`. **`agent_opencode`: just the bare tool name** (`record["label"] = tool`, `agent_opencode.py:215`) — no argument summary. |
 | `result_snippet` | first `RESULT_SNIPPET_CHARS` of the result, if any |
 | `started_at` / `ended_at` / `duration_ms` | the call's real span, when the CLI exposes it |
 
@@ -87,9 +87,9 @@ on every streamed event, and turns each non-`None` record into an
 
 ## See also
 
-- `coding-agent-drivers/PiRequest-and-PiResult.md` — the other two members
+- [PiRequest and PiResult](PiRequest-and-PiResult.md) — the other two members
   of the shared driver surface (`run(request, …) -> PiResult`).
-- `observability/Visualizer.md` — the UI that lays `tool_call` events on a
+- [Visualizer](../observability/Visualizer.md) — the UI that lays `tool_call` events on a
   time axis from the columns this tracker fills.
 - `.claude/skills/sssf/references/observability.md` — the `tool_call` event
   definition and the `events` table schema the record is written to.

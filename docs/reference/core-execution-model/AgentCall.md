@@ -70,7 +70,7 @@ variables = {
 `previous` being an envelope — not a path, not a string — is what makes a
 chain a chain: the builder receives the planner's `PlanOutput` verbatim, the
 documenter receives a `ChangesOutput` that *code* produced
-(`handoff-and-output/ChangeSet-and-BaseRef.md`), and both arrive through the
+([ChangeSet and BaseRef](../handoff-and-output/ChangeSet-and-BaseRef.md)), and both arrive through the
 same door.
 
 ## In an ADW
@@ -85,9 +85,9 @@ with run.phase(PhaseParams(name="build", kind="agent", owner="builder",
 
 ## See also
 
-- `core-execution-model/Four-param-rule.md` — the rule `AgentCall` is the
+- [Four-param rule](Four-param-rule.md) — the rule `AgentCall` is the
   named example of.
-- `quality-gates-and-permissions/Gate.md` — what goes in `gates`, and the
+- [Gate](../quality-gates-and-permissions/Gate.md) — what goes in `gates`, and the
   `GateReport` shape they actually return.
 - `.claude/skills/sssf/references/handoff.md#injecting-the-previous-envelope` —
   how `previous` reaches the agent's prompt.

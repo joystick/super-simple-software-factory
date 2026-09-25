@@ -85,9 +85,9 @@ DOCUMENT_NOTES)` (`:165-167`).
 
 ## See also
 
-- `core-execution-model/AgentCall.md` — how a `ChangesOutput` reaches the
+- [AgentCall](../core-execution-model/AgentCall.md) — how a `ChangesOutput` reaches the
   documenter through `previous=`.
-- `core-execution-model/Four-param-rule.md` — why `capture()` takes a single
+- [Four-param rule](../core-execution-model/Four-param-rule.md) — why `capture()` takes a single
   `ChangeCapture` object.
-- `handoff-and-output/Session-layout.md` — where `context_handoff/changes.diff`
+- [Session directory layout](Session-layout.md) — where `context_handoff/changes.diff`
   lands inside the session directory.

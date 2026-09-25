@@ -18,7 +18,7 @@ documenter → commit sequence — never the lighter `plan_build_test`. The
 watcher module's own docstring states why explicitly: an unattended dispatch
 gets no other independent check besides the test gate, so it needs the
 review/revision loop a supervised, interactively-run chain could otherwise
-skip. See `the-queue/The-queue-watcher.md` for the full mechanics. Naming the
+skip. See [The queue watcher (just watch)](The-queue-watcher.md) for the full mechanics. Naming the
 chain once, here, matters pedagogically: a reader should never wonder "which
 chain does the queue use" — it's always this one, on purpose, not a per-ticket
 choice.
@@ -59,21 +59,21 @@ Tickets move through five canonical states (`needs-triage`, `needs-info`,
 `triage` skill. `just watch` never makes this judgment call itself — it
 trusts that a ticket reaching `ready-for-agent` already passed a human's
 feasibility/compatibility/compliance/security check, and only ever consumes
-that state, never re-derives it (`adw_watch.py:30-36`, module docstring). The
+that state, never re-derives it (`adw_watch.py:22-28`, module docstring). The
 ticket body itself, verbatim, becomes the "agent brief" — the literal prompt
 handed to the dispatched chain (`utils.resolve_prompt(str(issue.path))`,
-`adw_watch.py:279`).
+`adw_watch.py:286`).
 
 ## Issue tracker and ticket files
 
 The queue currently supports one tracker: local markdown, detected via
 `docs/agents/issue-tracker.md`'s first line (`detect_tracker`,
-`adw_watch.py:314-327`) — GitHub/GitLab are explicitly detected and refused
+`adw_watch.py:321-332`) — GitHub/GitLab are explicitly detected and refused
 with a clear error, not silently mishandled. Tickets are files at
 `.scratch/<feature>/issues/NN-slug.md`, parsed into an `Issue` dataclass
 (path, number, feature, status, blocked_by) by `discover_issues()`
-(status constants at `adw_watch.py:95-98`, the function itself at
-`adw_watch.py:177-201`).
+(status constants at `adw_watch.py:100-103`, the function itself at
+`adw_watch.py:184-207`).
 
 ## Mandatory checkpoints
 
@@ -81,13 +81,13 @@ Even in dark-factory mode, the system is designed around checkpoints a human
 still owns: triage (promoting a ticket to `ready-for-agent`) is the sole
 promoter into the queue, and a failed dispatch always flips back to
 `ready-for-human` rather than looping or sitting silently `claimed` forever —
-see `the-queue/The-queue-watcher.md`'s crash-handling section. "Dark" means
+see [The queue watcher (just watch)](The-queue-watcher.md)'s crash-handling section. "Dark" means
 unattended between checkpoints, not unsupervised entirely.
 
 ## See also
 
-- `the-queue/The-queue-watcher.md` — the scan-claim-dispatch-resolve
+- [The queue watcher (just watch)](The-queue-watcher.md) — the scan-claim-dispatch-resolve
   mechanics `just watch` runs.
-- `the-queue/Frontier.md` — how the next ticket is chosen.
+- [Frontier](Frontier.md) — how the next ticket is chosen.
 - `.claude/skills/sssf/references/config.md#skill-engineering` — how a skill
   gets vendored onto a role.

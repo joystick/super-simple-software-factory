@@ -88,10 +88,10 @@ mechanism. This page is that definition.
 
 ## See also
 
-- `Defaults-merging.md` — the merge step that runs *before* validation;
+- [Defaults merging](Defaults-merging.md) — the merge step that runs *before* validation;
   a field inherited from `defaults` triggers this warning exactly as a
   per-agent field does (`load_config`, `agents.py:52-62`).
-- `../observability/Audit-skills.md` — `just skills` applies the same
+- [Audit skills](../observability/Audit-skills.md) — `just skills` applies the same
   `skill_engineering_applies()` predicate to report agents that name a
   skill their `coding_agent` will never receive, as `[ignored by: ...]`.
 - `.claude/skills/sssf/references/config.md#harness-engineering` and

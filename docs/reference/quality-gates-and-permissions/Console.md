@@ -42,8 +42,8 @@ words, not two independently-worded reports of the same event.
 
 ## See also
 
-- `quality-gates-and-permissions/Gate.md` and
-  `quality-gates-and-permissions/Permissions-and-writes.md` — the checks
+- [Gate](Gate.md) and
+  [Permissions and writes](Permissions-and-writes.md) — the checks
   whose pass/fail narration flows through `Console`.
 - `.claude/skills/sssf/references/observability.md#event-schema` — the
   `EventRecord` shape `Console`'s `log` events populate.

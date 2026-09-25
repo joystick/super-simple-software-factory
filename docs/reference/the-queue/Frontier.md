@@ -8,7 +8,7 @@ The frontier is the single next ticket `just watch` is allowed to claim: it
 must be `Status: ready-for-agent`, every ticket it's blocked by must already
 be `resolved`, and among everything qualifying, the lowest `(feature,
 number)` pair wins. Source:
-`.claude/skills/sssf/templates/adws/adw_watch.py:221-230`:
+`.claude/skills/sssf/templates/adws/adw_watch.py:228-237`:
 
 ```python
 def frontier(issues: list[Issue]) -> Issue | None:
@@ -38,9 +38,9 @@ other.
 `Blocked by:` numbers (e.g. `Blocked by: 03`) are only unique **within one
 feature directory** — `.scratch/<feature>/issues/NN-slug.md`. `frontier()`
 groups issues by feature before resolving blockers
-(`group_by_feature`, `adw_watch.py:203-210`) specifically so a `03` in one
+(`group_by_feature`, `adw_watch.py:210-217`) specifically so a `03` in one
 feature never accidentally blocks against an unrelated feature's `03`.
-`is_unblocked()` (`adw_watch.py:213-219`) then requires every named blocker
+`is_unblocked()` (`adw_watch.py:220-225`) then requires every named blocker
 to already be `resolved` — a missing blocker (typo, wrong number) counts as
 still-blocked rather than silently ignored, the safe default.
 
@@ -52,7 +52,7 @@ claim/dispatch/resolve cycle that acts on whatever `frontier()` returns.
 
 ## See also
 
-- `the-queue/The-queue-watcher.md` — the full scan-claim-dispatch-resolve
+- [The queue watcher (just watch)](The-queue-watcher.md) — the full scan-claim-dispatch-resolve
   cycle `frontier()` is one step of.
-- `the-queue/Dark-factory.md` — where the frontier concept sits in the
+- [Dark factory](Dark-factory.md) — where the frontier concept sits in the
   larger unattended-queue picture.

@@ -42,9 +42,9 @@ Rule zero is about the **quality blocks** an ADW chain runs between phases —
 the operator-authored checks in `adw_modules/quality.py`, typically wired to
 project-specific commands (lint, typecheck, test suite). This is distinct
 from, but complementary to, the built-in mechanical `Gate`s
-(`quality-gates-and-permissions/Gate.md`) that check envelope claims against
+([Gate](Gate.md)) that check envelope claims against
 disk, and from write-permission enforcement
-(`quality-gates-and-permissions/Permissions-and-writes.md`). All three answer
+([Permissions and writes](Permissions-and-writes.md)). All three answer
 "how do we know an agent's work is real" from a different angle: quality
 blocks check the code externally (does it lint/build/test), gates check the
 agent's own claims about its artifacts, permissions check the agent didn't
@@ -52,9 +52,9 @@ touch what it wasn't supposed to.
 
 ## See also
 
-- `quality-gates-and-permissions/Quality-blocks.md` — what a quality block
+- [Quality blocks](Quality-blocks.md) — what a quality block
   is and how `quality.py` runs one.
-- `quality-gates-and-permissions/Gate.md`
-- `quality-gates-and-permissions/Permissions-and-writes.md`
+- [Gate](Gate.md)
+- [Permissions and writes](Permissions-and-writes.md)
 - `docs/playbook-adopting-sssf.md` — full Rule Zero walkthrough with the
   Mermaid diagram showing it as the first step after install+recon.
