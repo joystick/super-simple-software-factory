@@ -15,7 +15,7 @@ sources:
     resource: downloads/skills/skills/
     title: Fresh clone skill catalog (37 SKILL.md files, parsed 2026-09-12)
   - id: local-install
-    resource: /Users/alexei/.claude/skills/
+    resource: ~/.claude/skills/
     title: Locally installed skill set
 ---
 

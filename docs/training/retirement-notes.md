@@ -20,18 +20,20 @@ of 4 objectives, single commit (2026-08-27) — never merged into anything.
 
 **Confirmed fully disposable before removal**, not assumed: a fable review
 pass ran a normalized-text diff of all 3 `learn/reference/*.html` pages
-against `sssf-learn`'s (now `docs/training/site-starlight`'s)
+against the standalone course repo's (now `docs/training/site-starlight`'s)
 `01-sssf-fundamentals/reference/000{1,2,3}-*.mdx` counterparts. Body prose,
 examples, and code blocks were identical; the only differences were HTML-only
 chrome (nav links, `<title>`, one tagline/subtitle per page) and MDX-only
 frontmatter. `learn/learning-records/*.md` were likewise identical modulo
 Starlight frontmatter. No unique content was lost.
 
-## `sssf-learn` (formerly its own repo) — moved into `docs/training/site-starlight/`, 2026-09-24
+## The standalone course repo — moved into `docs/training/site-starlight/`, 2026-09-24
 
-Was `github.com/joystick/sssf-learn` — a live, actively-maintained Astro
-Starlight course (24 commits, quizzes, a Piper TTS narration pipeline)
-consolidating `sssf-play/learn/` (Chapter 1) and `pricing-ts/*` (Chapter 2).
+Was its own separate GitHub repo (name withheld from this doc on purpose — this
+fork's documentation does not name or path to other repos) — a live,
+actively-maintained Astro Starlight course (24 commits, quizzes, a Piper TTS
+narration pipeline) consolidating the Python playground repo's `learn/`
+(Chapter 1) and the TypeScript rebuild repo's contents (Chapter 2).
 Relocated wholesale — kept fully functional, not flattened to plain markdown
 (an earlier direction for this consolidation, reversed before any execution) —
 via an ignore-aware copy (excluding `node_modules/`, `dist/`, `.astro/`,
@@ -48,8 +50,8 @@ honest stubs (a real page, a one-paragraph summary drawn from the gap
 analysis, and a `<!-- TODO -->` marker), tracked as explicit follow-up work,
 not silently claimed complete.
 
-The GitHub repo itself (`github.com/joystick/sssf-learn`) was **not**
-deleted — only the local clone was removed, after its last commit
+The GitHub repo itself was **not** deleted — only the local clone was
+removed, after its last commit
 (`ff8d696`) was confirmed pushed. Deleting the GitHub repo is a separate,
 more irreversible decision, out of scope for this consolidation.
 

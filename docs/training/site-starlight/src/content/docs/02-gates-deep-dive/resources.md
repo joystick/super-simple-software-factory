@@ -43,7 +43,7 @@ you get from practitioners are the part I cannot supply.
 
 ## Reference in this workspace
 
-- The Python original: `~/Projects/training/sssf-play/app/pricing.py` and its 51 tests.
+- The Python original: `the Python playground repo/app/pricing.py` and its 51 tests.
   **Consult it after attempting a slice, never before.**
 
 ## Version history

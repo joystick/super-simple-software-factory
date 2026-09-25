@@ -114,7 +114,7 @@ gate that watched something fail, then pass.</p>
 
 <ol class="steps">
   <li>
-    <p><strong>[read]</strong> <strong>Find the gap.</strong> In `~/Projects/training/sssf-play`,
+    <p><strong>[read]</strong> <strong>Find the gap.</strong> In the Python playground repo,
     grep `adw_modules/` for `setting-sources`. Confirm for yourself that a headless agent starts
     with no view of your installed skills — this is the fact `skill_engineering` exists to work
     around, on purpose, one skill at a time.</p>
@@ -173,10 +173,10 @@ under 150 lines, and its module docstring states the composition-order rule dire
 `adw_modules/agents.py` for the `claude_code`-only rule.</p>
 
 <Callout kind="trap" label="Check which repo you're standing in">
-<p>Every other lesson's primary source lives in `~/Projects/training/sssf-play`. This one does
+<p>Every other lesson's primary source lives in the Python playground repo. This one does
 not — `skill_engineering` shipped in `joystick/super-simple-software-factory` (the skill
-source fork), and had not yet been ported into `sssf-play`'s stamped copy as of this writing.
-If `adw_modules/skill_engineering.py` is missing from your `sssf-play`, that is why: read the
+source fork), and had not yet been ported into the Python playground repo's stamped copy as of this writing.
+If `adw_modules/skill_engineering.py` is missing from your Python playground repo, that is why: read the
 source in the fork, at `.claude/skills/sssf/templates/adws/adw_modules/`, and check whether it
 has landed in your stamped repo before running any `[run]` rep above against it.</p>
 </Callout>

@@ -13,7 +13,7 @@ you are describing. **Never describe a command you have not read the source of.*
 
 ## The repo you are documenting
 
-`/Users/alexei/Projects/training/sssf-play` — a real, working SSSF install with
+`the Python playground repo` — a real, working SSSF install with
 a real target app. Everything in the series must be demonstrable here.
 
 - `.claude/skills/sssf/` — the skill itself (installer, templates, cookbooks)

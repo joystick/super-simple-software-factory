@@ -22,7 +22,7 @@ plan:
   have an answer.
 
 The prior plan's Phase 1 mechanics (site move, `.gitignore`, hash verification, the
-21-file grep checklist) still apply unchanged to relocating `sssf-learn`'s Astro
+21-file grep checklist) still apply unchanged to relocating the standalone course repo's Astro
 site; only the destination path and surrounding scope changed. Do not re-derive
 those mechanics — reference them.
 
@@ -41,7 +41,7 @@ Two deliverables, not one:
      `.pdf`) — this plan relocates/frames it, does not rewrite it.
    - b) **The guide**, in Astro/Starlight format, navigating an agentic engineer
      from a basic prompt all the way to running an unattended dark-factory queue.
-     This is `sssf-learn`'s site, relocated (per the superseded plan's mechanics)
+     This is the standalone course repo's site, relocated (per the superseded plan's mechanics)
      **and substantially expanded** — its current two chapters only reach "gates
      deep-dive," not "dark factory." A gap analysis (below) found ~20 net-new
      lessons needed across 5 new chapters.
@@ -114,7 +114,7 @@ makes this link-vs-own-page split explicit per category so a reader always knows
 whether "what is X" resolves locally or via a link, never a dead end.
 
 **Fork glossary vs. course-internal reference — the other duplication risk.**
-`sssf-learn`'s own `01-sssf-fundamentals/reference/` and
+the standalone course repo's own `01-sssf-fundamentals/reference/` and
 `02-gates-deep-dive/reference/` MDX pages (Verifying a Gate, Gate Cookbook, Deno
 Gates, Types and Contracts, etc.) are lab-specific how-to material, not glossary
 entries — they stay inside `docs/training/site-starlight/` unchanged. Rule: the
@@ -126,7 +126,7 @@ independently. This rule must be written into `docs/reference/README.md` and
 
 ## Gap analysis (docs/training/'s content backbone)
 
-Extracted 2026-09-24 by a fable research pass reading `sssf-learn`'s 17 existing
+Extracted 2026-09-24 by a fable research pass reading the standalone course repo's 17 existing
 lessons' titles/gists, the playbook's section headings, and `training/`'s 10
 episode scripts' learning objectives.
 
@@ -139,7 +139,7 @@ episode scripts' learning objectives.
   Deepens Rule Zero; doesn't extend the operating arc.
 
 **Confirmed gaps** (checked directly, not inferred):
-- `harness_engineering` — **zero mentions** in sssf-learn (grep-confirmed). Only
+- `harness_engineering` — **zero mentions** in the standalone course repo (grep-confirmed). Only
   the playbook's "two layers" framing covers it.
 - Bootstrap/AFK split (Part C) — **zero mentions** of bootstrap, AFK, grill,
   or the headless-interview problem.
@@ -224,7 +224,7 @@ definition of done, explicitly NOT claimed done by this pass.
 periodically reaps untouched `/private/tmp` entries after ~3 days, and this pass
 involves an `npm install` (Astro 7 + Starlight 0.41, several minutes) plus
 hand-authored content that must survive across however many turns this takes.
-Use `/Users/alexei/Projects/training/_scratch/docs-training-test/` instead —
+Use `~/Projects/training (a sibling working directory)/_scratch/docs-training-test/` instead —
 outside both real repos (so nothing here is mistaken for the real thing or
 accidentally committed to either), but on durable local disk. `git init` it
 immediately after scaffolding so in-progress edits have real history and nothing
@@ -252,7 +252,7 @@ docs-training-test/
 └── training/
     ├── playbook-adopting-sssf.md   # copied verbatim, path-adjusted links checked
     ├── playbook-adopting-sssf.pdf  # copied verbatim
-    └── site-starlight/             # sssf-learn moved here per the superseded
+    └── site-starlight/             # the standalone course repo moved here per the superseded
                                      #   plan's Phase 1 mechanics, PLUS chapters
                                      #   3-7 scaffolded (full + stub per the
                                      #   scoping decision above)
@@ -281,7 +281,7 @@ docs-training-test/
    any get added) resolve.
 7. **Publish-ready delivery** — once 3-6 pass, apply the SAME changes for real
    to `super-simple-software-factory` (not the throwaway workspace) and to
-   `sssf-learn` (deleted, per the original consolidation plan, only after the
+   the standalone course repo (deleted, per the original consolidation plan, only after the
    real fork copy is verified working).
 
 ## Definition of done
@@ -289,8 +289,8 @@ docs-training-test/
 ### This pass (plan + critique + isolated test implementation)
 - [x] Plan critiqued by fable (`a9afe766faa44234c`), findings folded in (v0.2)
 - [x] Isolated test implementation built at
-      `/Users/alexei/Projects/training/_scratch/docs-training-test/`
-      (git-init'd, not `/private/tmp`), not touching the real fork or `sssf-learn`
+      `~/Projects/training (a sibling working directory)/_scratch/docs-training-test/`
+      (git-init'd, not `/private/tmp`), not touching the real fork or the standalone course repo
 - [x] `docs/reference/concept-manifest.md` written: 80 concepts, each marked
       link-vs-own-page with a source citation (37 link / 43 own-page after
       review-driven reclassification)
@@ -300,7 +300,7 @@ docs-training-test/
 - [x] `docs/training/playbook-adopting-sssf.md`+`.pdf` present, hash-verified
       against the fork originals
 - [x] `docs/training/site-starlight/`: chapters 1-2 unchanged (byte-diff clean
-      against `sssf-learn`), chapters 3-7 scaffolded (2 full new lessons + 16
+      against the standalone course repo), chapters 3-7 scaffolded (2 full new lessons + 16
       honest stubs, all with the TODO marker) + 10 full reference pages
 - [x] `npm run build` succeeds on the test workspace's Astro site, zero errors
       (58 pages) — verified twice: once as the site-move baseline, once again
@@ -348,7 +348,7 @@ docs-training-test/
       58 pages, 0 errors
 - [x] `just docs-check` run for real from the fork after commit: both checks pass
 - [x] Pushed to `origin/main` (`4cac036`)
-- [x] `sssf-learn`'s local clone removed -- GitHub (`ff8d696`) re-confirmed reachable
+- [x] the standalone course repo's local clone removed -- GitHub (`ff8d696`) re-confirmed reachable
       and matching local before deletion; GitHub repo itself untouched
 - [x] Isolated test workspace (`_scratch/docs-training-test/`) removed, its job done
 
@@ -386,17 +386,17 @@ docs-training-test/
       is untouched)
 - [ ] The `docs/training/`-internal course pages (11 files: MISSION/NOTES/
       CONTRIBUTING/README/justfile/plans/site's own mission-notes-index) that still
-      say "sssf-learn" in historical prose -- left as-is per the plan's own
+      say "the standalone course repo" in historical prose -- left as-is per the plan's own
       "leave as historical narrative" allowance, not a functional break
 
 ## Version history
 
 | Version | Date | Changes |
 |---|---|---|
-| 2.0 | 2026-09-25 | Status: done. Step 8: all 18 net-new lessons and all 13 genuinely-missing reference pages authored (9 parallel fable agents), opus-reviewed (6 findings fixed), citation-cleaned (16 drifted citations fixed, SKILL.md's stale gate signature fixed, ~40 cross-references turned into real clickable links). Corrected the lesson-count arithmetic again (18, not 17) and the reference-gap arithmetic (13 genuine gaps, not 34 -- most "unauthored" rows were already covered inside a sibling page). Only genuinely remaining items: the deferred `training/`-screencast conversion and 11 files with historical "sssf-learn" prose, both explicitly out of scope by design, not oversights. |
+| 2.0 | 2026-09-25 | Status: done. Step 8: all 18 net-new lessons and all 13 genuinely-missing reference pages authored (9 parallel fable agents), opus-reviewed (6 findings fixed), citation-cleaned (16 drifted citations fixed, SKILL.md's stale gate signature fixed, ~40 cross-references turned into real clickable links). Corrected the lesson-count arithmetic again (18, not 17) and the reference-gap arithmetic (13 genuine gaps, not 34 -- most "unauthored" rows were already covered inside a sibling page). Only genuinely remaining items: the deferred `training/`-screencast conversion and 11 files with historical "the standalone course repo" prose, both explicitly out of scope by design, not oversights. |
 | 1.1 | 2026-09-24 | Fixed the `read_blocked_by()` comma-inside-parenthetical bug tracked as an open follow-up in v1.0 (commit `aae7aa8`): stripped the parenthetical from the whole matched value before splitting on commas, added 2 regression tests, full 49-test suite passes. |
-| 1.0 | 2026-09-24 | Step 7 (real-fork application) done: wrote and ran the standing test scripts for real (`scripts/docs-check/`, wired to `just docs-check`), found and fixed a fresh batch of real bugs running them (a regex over-match, a genuine citation-shape error, 4 anchor typos); applied `docs/reference/` and `docs/training/` to the real fork in two coherent commits, added the root `justfile` (`training-*` recipes) and `.gitignore` rules, removed `learn/`; `npm install`/`npm run build` run for real from the fork (58 pages, 0 errors); pushed to `origin/main`; removed `sssf-learn`'s local clone only after re-confirming GitHub still has the full history; removed the now-done isolated test workspace. Marked `in-progress` rather than `done` -- the explicit follow-ups (remaining lesson/reference authoring, the `read_blocked_by()` bug, the screencast conversion) are real, tracked, and none of them were silently claimed complete. |
-| 0.3 | 2026-09-24 | Isolated test implementation built (3 builder passes: site move + baseline build, reference glossary, chapters 3-7 scaffold) and reviewed by a fable pass (`a6173d4265a575410`), which found several real issues — most notably a stale claim in the bootstrap lesson directly contradicting this session's own earlier `adw_watch.py` fix, and a genuinely new follow-up bug in `read_blocked_by()` discovered while verifying one of the review's findings (a comma inside a "none (explanation)" parenthetical still breaks resolution). All findings fixed except the new bug, which is tracked as an explicit follow-up. `npm run build` clean (58 pages) after fixes. Not yet: automated test scripts (link-checker, concept-completeness check) as standing scripts, and step 7 (real-fork application + `sssf-learn` deletion) — both still open, pending go-ahead. |
+| 1.0 | 2026-09-24 | Step 7 (real-fork application) done: wrote and ran the standing test scripts for real (`scripts/docs-check/`, wired to `just docs-check`), found and fixed a fresh batch of real bugs running them (a regex over-match, a genuine citation-shape error, 4 anchor typos); applied `docs/reference/` and `docs/training/` to the real fork in two coherent commits, added the root `justfile` (`training-*` recipes) and `.gitignore` rules, removed `learn/`; `npm install`/`npm run build` run for real from the fork (58 pages, 0 errors); pushed to `origin/main`; removed the standalone course repo's local clone only after re-confirming GitHub still has the full history; removed the now-done isolated test workspace. Marked `in-progress` rather than `done` -- the explicit follow-ups (remaining lesson/reference authoring, the `read_blocked_by()` bug, the screencast conversion) are real, tracked, and none of them were silently claimed complete. |
+| 0.3 | 2026-09-24 | Isolated test implementation built (3 builder passes: site move + baseline build, reference glossary, chapters 3-7 scaffold) and reviewed by a fable pass (`a6173d4265a575410`), which found several real issues — most notably a stale claim in the bootstrap lesson directly contradicting this session's own earlier `adw_watch.py` fix, and a genuinely new follow-up bug in `read_blocked_by()` discovered while verifying one of the review's findings (a comma inside a "none (explanation)" parenthetical still breaks resolution). All findings fixed except the new bug, which is tracked as an explicit follow-up. `npm run build` clean (58 pages) after fixes. Not yet: automated test scripts (link-checker, concept-completeness check) as standing scripts, and step 7 (real-fork application + the standalone course repo deletion) — both still open, pending go-ahead. |
 | 0.2 | 2026-09-24 | Revised per fable critique (`a9afe766faa44234c`): fixed 2 citation errors (sssf.config.yaml's real path; Visualizer is an app, not a module class) and a category-count label error (7, not 6); marked categories 5 (gates/permissions) and 7 (the queue) as NET-NEW rather than "reorganize existing" (confirmed near-zero coverage in references/*.md); resolved the references/*.md fate as LINK-not-move (moving breaks SKILL.md's citations, copying creates divergence — the exact problem this project exists to fix); added an explicit fork-glossary-vs-course-reference rule to prevent a second duplication; swapped the Ch4 "reading real cost" sample lesson (found to mostly duplicate existing lesson 0008) for a Ch6 "bootstrap vocabulary" pick that exercises the prose->lesson conversion for real; added the 75-row concept-manifest as a required pre-build artifact so "every concept has a page" is actually checkable; moved the isolated workspace off /private/tmp (macOS periodic cleanup risk) to a git-init'd _scratch/ directory. |
 | 0.1 | 2026-09-24 | Initial plan, superseding `2026-09-24-consolidate-learning-content.md`'s target layout (docs/handbook -> docs/training, thin-pointer reference -> full concept glossary). Grounded in two fable research passes: a ~75-concept inventory and a gap analysis finding ~20 net-new lessons needed across 5 new chapters. Not yet critiqued or executed. |
 </content>

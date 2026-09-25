@@ -86,7 +86,7 @@ Three defects in my own adapter, each surfaced by running rather than reading:
 1. `agy -p "text"` silently mis-parses — the prompt must be `-p=text`.
 2. **`--add-dir` is required.** Without it the file tools are not rooted at cwd. A probe
    for a file sitting *in* cwd instead searched `~/Downloads`, then ran
-   `find /Users/alexei -name note.txt`, burned 120k tokens over 41 tool calls, and timed
+   `find ~ -name note.txt`, burned 120k tokens over 41 tool calls, and timed
    out having written nothing. With `--add-dir`: one turn, 2.3 seconds.
 3. **`--effort` conflicts with the model id.** Caught on the first real run:
    `--model gemini-3.7-flash-medium conflicts with --effort=high`.

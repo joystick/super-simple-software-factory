@@ -146,7 +146,7 @@ def test_estimate_tokens_is_monotonic_in_the_number_of_skills(tmp_path):
 
 VENDORED_FIXTURE = """\
 <!-- sssf:vendored
-source: /Users/alexei/.claude/skills/tdd/SKILL.md
+source: ~/.claude/skills/tdd/SKILL.md
 date: 2026-08-31
 sha256: 9f3a1b2c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6e7f8
 -->

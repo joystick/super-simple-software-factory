@@ -6,13 +6,13 @@ factory offers rests on the guarantee that an agent's *claims* are replaced by a
 weakest gate, and a gate's trustworthiness cannot be read, only demonstrated.
 
 This course has two chapters. Chapter 1 builds the general operating picture in the
-Python playground (`sssf-play`). Chapter 2 takes gates deep — same cornerstone, harder
+Python playground (the Python playground repo). Chapter 2 takes gates deep — same cornerstone, harder
 material, a second language (TypeScript/Deno) as the vehicle so the lesson is proven
 independent of any one toolchain.
 
 ## Chapter 1 — SSSF fundamentals (`chapters/01-sssf-fundamentals/`)
 
-Source repo: `~/Projects/training/sssf-play`.
+Source repo: the Python playground repo.
 
 ### 1. Gates — ✅ DONE (lessons 0001, 0002)
 
@@ -59,7 +59,7 @@ bug before wiring it for real.
 
 ## Chapter 2 — Gates, deep dive (`chapters/02-gates-deep-dive/`)
 
-Source repo: `~/Projects/training/pricing-ts`. Rebuilds the playground's cart pricing
+Source repo: the TypeScript rebuild repo. Rebuilds the playground's cart pricing
 engine — 220 lines of Python behind 51 tests — from scratch in TypeScript on Deno, and
 uses the rebuild as the vehicle for four objectives, taken in order. The point is not
 TypeScript for its own sake: it is proof that the gate discipline from Chapter 1 survives
@@ -111,4 +111,4 @@ place with the correction visible.
 
 | Version | Date | Changes |
 |---|---|---|
-| 2.0 | 2026-08-27 | Merged the `sssf-play` and `pricing-ts` courses into this single course under `~/Projects/training/sssf-learn/`, as Chapter 1 (fundamentals) and Chapter 2 (gates deep dive). Superseded `sssf-play/learn/MISSION.md` (was v1.0) and `pricing-ts/MISSION.md` (was v1.2). |
+| 2.0 | 2026-08-27 | Merged the Python playground repo's and the TypeScript rebuild repo's courses into this single course, as Chapter 1 (fundamentals) and Chapter 2 (gates deep dive). Superseded the Python playground repo's `learn/MISSION.md` (was v1.0) and the TypeScript rebuild repo's `MISSION.md` (was v1.2). |

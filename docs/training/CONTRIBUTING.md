@@ -1,4 +1,4 @@
-# Contributing to sssf-learn
+# Contributing to the standalone course repo
 
 ## Golden rule: preserve training material verbatim
 
