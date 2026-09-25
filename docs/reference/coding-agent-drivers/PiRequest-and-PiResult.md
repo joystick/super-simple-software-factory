@@ -103,3 +103,6 @@ real per-step `cost` (`agent_opencode.py:50-52`). A `0.0` here is therefore
 - `.claude/skills/sssf/references/config.md#coding-agents` — the
   `coding_agent:`/`model:` roster keys that choose which driver receives the
   request.
+- [`docs/head-to-head-agy-vs-claude.md`](../../head-to-head-agy-vs-claude.md) — a
+  controlled same-task, same-gates comparison of `agy` vs. `claude_code` as the
+  driver behind one roster entry.
