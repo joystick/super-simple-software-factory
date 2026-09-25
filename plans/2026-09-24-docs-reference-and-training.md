@@ -384,15 +384,25 @@ docs-training-test/
 - [ ] `training/`'s screencast scripts -> `03-screencasts` conversion (Phase 2 of
       the site-move mechanics, Open Question 2 -- deliberately deferred, `training/`
       is untouched)
-- [ ] The `docs/training/`-internal course pages (11 files: MISSION/NOTES/
-      CONTRIBUTING/README/justfile/plans/site's own mission-notes-index) that still
-      say "the standalone course repo" in historical prose -- left as-is per the plan's own
-      "leave as historical narrative" allowance, not a functional break
+
+### Resolved since v1.0 (was listed above as deliberately left alone; superseded)
+- [x] The "11 files reference the other-project name in historical prose, left as-is"
+      item above is now stale and has been removed. The user later overruled that
+      "historical narrative is fine" allowance entirely: this repo's docs must not
+      leak any other project's name or path, historical or not. A dedicated pass
+      (`docs-scrub-project-leaks`, merged `938fc1a`) scrubbed every occurrence of
+      `sssf-play`/`pricing-ts`/`sssf-learn`/`opencode-expo`/`weather-report` and
+      every literal `/Users/<user>/...` path across 43 files, replacing them with
+      consistent generic descriptions ("the Python playground repo", "the
+      TypeScript rebuild repo", "the standalone course repo", "a downstream
+      project"). `npm run build` and both `docs-check` scripts verified clean
+      after the scrub. See that commit's message for the full file list.
 
 ## Version history
 
 | Version | Date | Changes |
 |---|---|---|
+| 2.1 | 2026-09-25 | Removed the stale "11 files reference the other-project name in historical prose, left as-is" item from v2.0's remaining-work list. That allowance was explicitly overruled: this repo's docs must not leak other project names/paths anywhere, including historical prose. A dedicated scrub pass (`938fc1a`) already closed this across 43 files -- the plan just hadn't been updated to say so until now. Only genuinely remaining item: the deferred `training/`-screencast conversion. |
 | 2.0 | 2026-09-25 | Status: done. Step 8: all 18 net-new lessons and all 13 genuinely-missing reference pages authored (9 parallel fable agents), opus-reviewed (6 findings fixed), citation-cleaned (16 drifted citations fixed, SKILL.md's stale gate signature fixed, ~40 cross-references turned into real clickable links). Corrected the lesson-count arithmetic again (18, not 17) and the reference-gap arithmetic (13 genuine gaps, not 34 -- most "unauthored" rows were already covered inside a sibling page). Only genuinely remaining items: the deferred `training/`-screencast conversion and 11 files with historical "the standalone course repo" prose, both explicitly out of scope by design, not oversights. |
 | 1.1 | 2026-09-24 | Fixed the `read_blocked_by()` comma-inside-parenthetical bug tracked as an open follow-up in v1.0 (commit `aae7aa8`): stripped the parenthetical from the whole matched value before splitting on commas, added 2 regression tests, full 49-test suite passes. |
 | 1.0 | 2026-09-24 | Step 7 (real-fork application) done: wrote and ran the standing test scripts for real (`scripts/docs-check/`, wired to `just docs-check`), found and fixed a fresh batch of real bugs running them (a regex over-match, a genuine citation-shape error, 4 anchor typos); applied `docs/reference/` and `docs/training/` to the real fork in two coherent commits, added the root `justfile` (`training-*` recipes) and `.gitignore` rules, removed `learn/`; `npm install`/`npm run build` run for real from the fork (58 pages, 0 errors); pushed to `origin/main`; removed the standalone course repo's local clone only after re-confirming GitHub still has the full history; removed the now-done isolated test workspace. Marked `in-progress` rather than `done` -- the explicit follow-ups (remaining lesson/reference authoring, the `read_blocked_by()` bug, the screencast conversion) are real, tracked, and none of them were silently claimed complete. |
