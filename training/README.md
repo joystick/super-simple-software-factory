@@ -1,7 +1,7 @@
 ---
 title: SSSF Training Series — index and producer notes
-version: 1.0
-updated: 2026-08-25
+version: 1.1
+updated: 2026-09-25
 status: draft
 ---
 
@@ -26,6 +26,30 @@ else.
 
 [`BRIEF.md`](BRIEF.md) is the writer's brief: the ground truth, the required
 script format, and the rule that no terminal output may be invented.
+
+## Related: the written course (`docs/training/`)
+
+There is a second, separate body of SSSF training material at `docs/training/` — an
+Astro Starlight course, read rather than watched. The two stay independent on purpose
+(see `docs/training/README.md`'s "Related: video screencast scripts" section for the
+full reasoning): these scripts teach the same ground by narration, at a narrator's
+pace, over a companion playground's real numbers; the course teaches it by reading and
+doing, at a reader's own pace, with `[run]` steps against a repo you stamp yourself.
+Neither duplicates the other's actual prose — treat this table as "if you'd rather
+watch this episode's topic than read it":
+
+| Episode | Closest written-course chapter/lesson |
+|---|---|
+| 1 — Why a software factory? | `01-sssf-fundamentals/lessons/0000-agent-proposes-code-disposes` |
+| 2 — Installing the factory | `03-adopting-a-factory/lessons/0003-new-project-walking-skeleton-and-install`, the playbook's install steps |
+| 3 — Your first run | `01-sssf-fundamentals/lessons/0010-stamp-and-run-for-real` |
+| 4 — The roster | `03-adopting-a-factory/lessons/0004-tuning-the-roster` |
+| 5 — Gates | `01-sssf-fundamentals/lessons/0001-a-gate-you-have-not-watched-fail`, `0002-wiring-and-writing-gates`, and all of Chapter 2 |
+| 6 — The SDLC chain | `01-sssf-fundamentals/lessons/0009-composing-a-chain`, `07-the-queue/lessons/0000-the-chain-named-once` |
+| 7 — The fix loop | `01-sssf-fundamentals/lessons/0005-the-fix-loop` |
+| 8 — Observability | `01-sssf-fundamentals/lessons/0008-reading-the-trace`, `docs/reference/observability/` |
+| 9 — Coding agents, cost, and control | all three lessons of `04-coding-agents-and-cost/` |
+| 10 — Writing your own ADW | `01-sssf-fundamentals/lessons/0009-composing-a-chain`, `0012-from-scratch-skeleton-new-envelope-and-gate` |
 
 ## READ THIS BEFORE RECORDING — where the numbers come from
 
@@ -105,4 +129,5 @@ sonnet planner.
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.1 | 2026-09-25 | Added the "Related: the written course" section and episode-to-chapter mapping table, resolving `docs/reference-and-training`'s deferred "Open Question 2" (this stays a separate artifact from the written course, not folded into it — see `docs/training/README.md`'s matching section for the reasoning). |
 | 1.0 | 2026-08-25 | Initial index, provenance warning, and cast inventory. |

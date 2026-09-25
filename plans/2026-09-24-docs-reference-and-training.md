@@ -380,10 +380,28 @@ docs-training-test/
 - [x] Merged to `origin/main` across 2 commits (`f7ce5ec`, `a272ec8`),
       each on its own branch, reviewed and spot-verified before merging.
 
-### Explicitly NOT done (genuinely remaining, unrelated to content completeness)
-- [ ] `training/`'s screencast scripts -> `03-screencasts` conversion (Phase 2 of
-      the site-move mechanics, Open Question 2 -- deliberately deferred, `training/`
-      is untouched)
+### Explicitly NOT done
+(none remaining -- see the two "Resolved" sections below)
+
+### Open Question 2, resolved (2026-09-25): training/ stays a separate artifact
+- [x] Checked the actual topical overlap before deciding, rather than converting on
+      assumption: `training/`'s ten screencast scripts (`ep01`-`ep10`) cover largely
+      the same ground `docs/training/site-starlight/` now does, in places almost
+      one-for-one -- Episode 9 ("Coding agents, cost, and control") maps onto all
+      three lessons of Chapter 4, citing many of the same source lines. Converting
+      the episodes into a duplicate `03-screencasts` MDX chapter would have violated
+      the same link-don't-duplicate principle this whole project enforces everywhere
+      else (skill-internal reference docs, the fork glossary vs. course reference
+      pages).
+- [x] Decision: `training/` stays exactly where it is, as a separate artifact --
+      timed narration scripts for producing video, not lessons for reading. Added a
+      "Related" cross-reference section to both `docs/training/README.md` (pointing
+      at `training/`, explaining why they're not merged) and `training/README.md`
+      (an episode-to-written-course mapping table, for a reader who'd rather watch a
+      topic than read it). Both files' version histories bumped
+      (`docs/training/README.md` 2.0->2.1, `training/README.md` 1.0->1.1).
+- [x] `training/` itself untouched beyond its `README.md` -- no scripts rewritten,
+      no chapter added, no files moved. This closes the plan's last open item.
 
 ### Resolved since v1.0 (was listed above as deliberately left alone; superseded)
 - [x] The "11 files reference the other-project name in historical prose, left as-is"
@@ -402,6 +420,7 @@ docs-training-test/
 
 | Version | Date | Changes |
 |---|---|---|
+| 2.2 | 2026-09-25 | Resolved Open Question 2 (the last genuinely open item): checked the real topical overlap between `training/`'s screencast scripts and the written course first (heavy, e.g. Episode 9 maps onto all of Chapter 4), then decided against converting to a duplicate `03-screencasts` MDX chapter -- kept `training/` as a separate artifact, added cross-reference sections to both READMEs instead. Nothing left open in this plan. |
 | 2.1 | 2026-09-25 | Removed the stale "11 files reference the other-project name in historical prose, left as-is" item from v2.0's remaining-work list. That allowance was explicitly overruled: this repo's docs must not leak other project names/paths anywhere, including historical prose. A dedicated scrub pass (`938fc1a`) already closed this across 43 files -- the plan just hadn't been updated to say so until now. Only genuinely remaining item: the deferred `training/`-screencast conversion. |
 | 2.0 | 2026-09-25 | Status: done. Step 8: all 18 net-new lessons and all 13 genuinely-missing reference pages authored (9 parallel fable agents), opus-reviewed (6 findings fixed), citation-cleaned (16 drifted citations fixed, SKILL.md's stale gate signature fixed, ~40 cross-references turned into real clickable links). Corrected the lesson-count arithmetic again (18, not 17) and the reference-gap arithmetic (13 genuine gaps, not 34 -- most "unauthored" rows were already covered inside a sibling page). Only genuinely remaining items: the deferred `training/`-screencast conversion and 11 files with historical "the standalone course repo" prose, both explicitly out of scope by design, not oversights. |
 | 1.1 | 2026-09-24 | Fixed the `read_blocked_by()` comma-inside-parenthetical bug tracked as an open follow-up in v1.0 (commit `aae7aa8`): stripped the parenthetical from the whole matched value before splitting on commas, added 2 regression tests, full 49-test suite passes. |
