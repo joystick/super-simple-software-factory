@@ -61,9 +61,9 @@ the argument — add a field to the object, or make a new one.
 
 ## See also
 
-- `core-execution-model/AgentCall.md` — the second of the two named pattern
+- [AgentCall](AgentCall.md) — the second of the two named pattern
   objects, and what `ph.call()` does with it.
-- `handoff-and-output/ChangeSet-and-BaseRef.md` — `ChangeCapture` in use, the
+- [ChangeSet and BaseRef](../handoff-and-output/ChangeSet-and-BaseRef.md) — `ChangeCapture` in use, the
   third object built on the same rule.
 - `.claude/skills/sssf/references/handoff.md#the-typed-output-rule` — the
   companion rule for the *output* side: every agent call declares a concrete

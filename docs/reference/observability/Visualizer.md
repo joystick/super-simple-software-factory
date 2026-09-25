@@ -43,7 +43,7 @@ The same two-store trace data described in
 `.claude/skills/sssf/references/observability.md#two-stores-one-truth` and
 `#event-schema` — every phase, log line, and process record an ADW run
 writes. The swim-lane layout groups events by `adw_id`/phase the same way
-`Console` (`quality-gates-and-permissions/Console.md`) narrates them to the
+[Console](../quality-gates-and-permissions/Console.md) narrates them to the
 terminal — the Visualizer is the same story, viewed after the fact, in a
 browser instead of scrollback.
 
@@ -51,5 +51,5 @@ browser instead of scrollback.
 
 - `.claude/skills/sssf/references/observability.md` — the schema and tables
   the Visualizer reads.
-- `quality-gates-and-permissions/Console.md` — the terminal-side narrator of
+- [Console](../quality-gates-and-permissions/Console.md) — the terminal-side narrator of
   the same events, live.

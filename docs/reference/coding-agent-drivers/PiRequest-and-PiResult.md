@@ -94,11 +94,11 @@ real per-step `cost` (`agent_opencode.py:50-52`). A `0.0` here is therefore
 
 ## See also
 
-- `coding-agent-drivers/UsageBreakdown.md` — the type behind
+- [UsageBreakdown](UsageBreakdown.md) — the type behind
   `PiResult.usage`, and why `tokens`/`cost` are duplicated there per component.
-- `coding-agent-drivers/ToolCallTracker.md` — the third member of the shared
+- [ToolCallTracker](ToolCallTracker.md) — the third member of the shared
   driver surface; it consumes the events `run()` streams via `on_event`.
-- `handoff-and-output/Session-layout.md` — where `session_dir` and
+- [Session directory layout](../handoff-and-output/Session-layout.md) — where `session_dir` and
   `raw_output_path` land on disk.
 - `.claude/skills/sssf/references/config.md#coding-agents` — the
   `coding_agent:`/`model:` roster keys that choose which driver receives the

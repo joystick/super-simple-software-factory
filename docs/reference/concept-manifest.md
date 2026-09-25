@@ -109,7 +109,7 @@ other unauthored own-page row.
 | Quality blocks | quality-gates-and-permissions | own-page | `docs/playbook-adopting-sssf.md` (Rule Zero section) + `adws/adw_modules/quality.py` (per-repo, stamped) |
 | Rule zero | quality-gates-and-permissions | own-page | `docs/playbook-adopting-sssf.md:33-48` |
 | `snapshot()` | quality-gates-and-permissions | own-page | `.claude/skills/sssf/templates/adws/adw_modules/permissions.py:50-68` |
-| `enforce()` | quality-gates-and-permissions | own-page | `.claude/skills/sssf/templates/adws/adw_modules/permissions.py:163-186` |
+| `enforce()` | quality-gates-and-permissions | own-page | `.claude/skills/sssf/templates/adws/adw_modules/permissions.py:163-185` |
 | PermissionBreach | quality-gates-and-permissions | own-page | `.claude/skills/sssf/templates/adws/adw_modules/permissions.py:41-42` |
 | `always_writable` | quality-gates-and-permissions | own-page | `.claude/skills/sssf/templates/adws/adw_modules/permissions.py:110-124` |
 
@@ -138,11 +138,11 @@ enforcement and permission concepts: `quality-gates-and-permissions/Permissions-
 | The chain named once | the-queue | own-page | `.claude/skills/sssf/templates/adws/adw_watch.py:1-9` |
 | Triage states | the-queue | own-page | `.claude/skills/sssf/templates/prompt_engineering/planner/system.md` + `adw_watch.py:22-24` |
 | Agent brief | the-queue | own-page | `.claude/skills/sssf/templates/prompt_engineering/planner/system.md` |
-| Issue tracker | the-queue | own-page | `.claude/skills/sssf/templates/adws/adw_watch.py:279-289` (`detect_tracker`) |
-| Ticket file | the-queue | own-page | `.claude/skills/sssf/templates/adws/adw_watch.py:91-99` (`Issue` dataclass) |
-| Frontier | the-queue | own-page | `.claude/skills/sssf/templates/adws/adw_watch.py:216-225` (`frontier()`) |
-| Claim / resolve | the-queue | own-page | `.claude/skills/sssf/templates/adws/adw_watch.py:88-91,247-277` |
-| Scan-claim-dispatch-resolve cycle | the-queue | own-page | `.claude/skills/sssf/templates/adws/adw_watch.py:291-311` (`run_once()`) |
+| Issue tracker | the-queue | own-page | `.claude/skills/sssf/templates/adws/adw_watch.py:321-332` (`detect_tracker`) |
+| Ticket file | the-queue | own-page | `.claude/skills/sssf/templates/adws/adw_watch.py:106-112` (`Issue` dataclass) |
+| Frontier | the-queue | own-page | `.claude/skills/sssf/templates/adws/adw_watch.py:228-237` (`frontier()`) |
+| Claim / resolve | the-queue | own-page | `.claude/skills/sssf/templates/adws/adw_watch.py:100-103,278-318` |
+| Scan-claim-dispatch-resolve cycle | the-queue | own-page | `.claude/skills/sssf/templates/adws/adw_watch.py:335-356` (`run_once()`) |
 | Mandatory checkpoints | the-queue | own-page | `.claude/skills/sssf/templates/justfile` + `docs/playbook-adopting-sssf.md` (Part D) |
 | Bootstrap vocabulary | the-queue | own-page | `docs/playbook-adopting-sssf.md` (bootstrap/AFK split, Part C) |
 

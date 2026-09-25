@@ -94,12 +94,12 @@ it, which is why this is an own page.
 
 ## See also
 
-- `Visualizer.md` — the other read-only observability surface, over trace
+- [Visualizer](Visualizer.md) — the other read-only observability surface, over trace
   data rather than roster data.
-- `../agent-configuration/Ignored-field-warnings.md` — the validate-time
+- [Ignored-field warnings](../agent-configuration/Ignored-field-warnings.md) — the validate-time
   warning that uses the same `skill_engineering_applies()` predicate to flag
   a `skill_engineering` field the agent will never receive.
-- `../agent-configuration/Defaults-merging.md` — how a skill named once in
+- [Defaults merging](../agent-configuration/Defaults-merging.md) — how a skill named once in
   `defaults` becomes every agent's `skill_engineering`, and so shows up
   against every agent in this audit.
 - `.claude/skills/sssf/references/config.md#skill-engineering` — vendoring,

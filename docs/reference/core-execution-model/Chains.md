@@ -48,7 +48,7 @@ against `plan.md` — and neither can answer the other's" (`adw_simple_sdlc.py:2
 
 - `just watch` (the queue) always dispatches `adw_simple_sdlc.py` — never a
   per-ticket choice, for the reason quoted above. See
-  `the-queue/The-queue-watcher.md` and `the-queue/Dark-factory.md`'s "The
+  [The queue watcher (just watch)](../the-queue/The-queue-watcher.md) and [Dark factory](../the-queue/Dark-factory.md)'s "The
   chain named once".
 - `adw_plan_build_test.py` (and its siblings `adw_plan_build.py`,
   `adw_build_test.py`, `adw_plan_build_test_quality.py` under
@@ -57,7 +57,7 @@ against `plan.md` — and neither can answer the other's" (`adw_simple_sdlc.py:2
 ## How a chain threads state
 
 Every agent phase is a `ph.call(AgentCall(...))` whose `previous=` is the
-envelope from the step before (`core-execution-model/AgentCall.md`). Code
+envelope from the step before ([AgentCall](AgentCall.md)). Code
 phases feed back in through the same door via adapters —
 `quality.as_envelope(test, "tests")` for a red suite
 (`adw_simple_sdlc.py:111`), `changes.as_envelope(changeset, ...)` for the
@@ -65,8 +65,8 @@ documenter (`:166`). Nothing is passed between agents outside an envelope.
 
 ## See also
 
-- `the-queue/The-queue-watcher.md` — the caller that runs the heavier chain
+- [The queue watcher (just watch)](../the-queue/The-queue-watcher.md) — the caller that runs the heavier chain
   unattended.
-- `the-queue/Dark-factory.md` — why the queue names exactly one chain.
-- `core-execution-model/Skip-plan.md` — the flag only the lighter chains
+- [Dark factory](../the-queue/Dark-factory.md) — why the queue names exactly one chain.
+- [--skip-plan](Skip-plan.md) — the flag only the lighter chains
   accept.

@@ -48,7 +48,7 @@ announces it is fake (`_placeholder()`, `quality.py:49-52`; banner at
 runner, and a wrong-but-plausible command that silently passes is worse than
 one that says so out loud. But `run_quality()` reports an `echo` block as
 *passed*, so an unwired factory produces green traces that prove nothing.
-That is what `quality-gates-and-permissions/Rule-zero.md` exists to prevent:
+That is what [Rule zero](Rule-zero.md) exists to prevent:
 run `just quality "baseline"`, and if the output says `PLACEHOLDER`, wire the
 blocks before any agent writes a line — then break one thing and confirm
 exactly one block goes red (`docs/playbook-adopting-sssf.md`, "Rule zero"
@@ -74,12 +74,12 @@ project's toolchain, which is why it is the one that ships blank.
 
 ## See also
 
-- `quality-gates-and-permissions/Rule-zero.md` — the adoption step that
+- [Rule zero](Rule-zero.md) — the adoption step that
   wires the blocks and proves each one can fail.
-- `quality-gates-and-permissions/Gate.md` — the mechanical check on
+- [Gate](Gate.md) — the mechanical check on
   envelope claims.
-- `quality-gates-and-permissions/Permissions-and-writes.md` — write-boundary
+- [Permissions and writes](Permissions-and-writes.md) — write-boundary
   enforcement.
 - `docs/playbook-adopting-sssf.md` — "Rule zero" and "A2. Wire the gates".
-- `../../training/site-starlight/src/content/docs/02-gates-deep-dive/lessons/0001-three-gates-you-have-watched-fail.mdx`
+- [Three Gates You Have Watched Fail](../../training/site-starlight/src/content/docs/02-gates-deep-dive/lessons/0001-three-gates-you-have-watched-fail.mdx)
   — the hands-on lesson on watching each check fail.

@@ -42,11 +42,11 @@ in particular are only meaningful when the test block in
 
 ## See also
 
-- `quality-gates-and-permissions/Rule-zero.md` — the gates every job relies on.
-- `quality-gates-and-permissions/Quality-blocks.md` — the test/lint blocks
+- [Rule zero](../quality-gates-and-permissions/Rule-zero.md) — the gates every job relies on.
+- [Quality blocks](../quality-gates-and-permissions/Quality-blocks.md) — the test/lint blocks
   that grade each job's output.
-- `the-queue/Bootstrap-vocabulary.md` — the interview step the architecture
+- [Bootstrap vocabulary](Bootstrap-vocabulary.md) — the interview step the architecture
   job starts from, and how it moves out of the loop when going dark.
 - `docs/playbook-adopting-sssf.md` — "A5. The four jobs".
-- `../../training/site-starlight/src/content/docs/03-adopting-a-factory/lessons/0002-the-four-jobs.mdx`
+- [The Four Jobs](../../training/site-starlight/src/content/docs/03-adopting-a-factory/lessons/0002-the-four-jobs.mdx)
   — the full lesson.
