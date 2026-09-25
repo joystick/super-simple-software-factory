@@ -130,6 +130,21 @@ product, and they are the first evidence you have that the roster and the gates 
 repo. Read the diff, run `just sessions` for the cost, and if a gate has not gone red across
 several runs, suspect the gate — the standing checklist's after-run items apply from slice one.</p>
 
+## Your turn
+
+<ol class="steps">
+  <li>
+    <p><strong>[run]</strong> <strong>Watch placeholder-green, then make it real.</strong>
+    `mkdir project && cd project && git init`, build the three-item skeleton in your stack of
+    choice, and commit it. Run `uv run /path/to/sssf/.claude/skills/sssf/scripts/install.py`,
+    then `just quality "baseline"` and read the output — every block prints `PLACEHOLDER`.
+    Wire `quality.py` to the skeleton's real commands, break the one function, run
+    `just quality "gates wired"` and confirm exactly one block goes red; restore it. Before the
+    "Install SSSF and wire the gates" commit, `grep -n "adw_data\|\.env" .gitignore` and confirm
+    the three lines `install.py` appends are there.</p>
+  </li>
+</ol>
+
 ## Check yourself
 
 <Quiz

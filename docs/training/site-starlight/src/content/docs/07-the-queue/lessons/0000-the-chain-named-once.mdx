@@ -85,8 +85,39 @@ just watch: session 8f2c1a9e succeeded -- .scratch/portfinder/issues/01-list-por
 
 <p>The shape of those lines is what the rest of this chapter teaches you to read: a claim commit
 before any work, the full chain in the middle, a resolve (or fail) commit after. The `justfile`'s
-`watch` recipe is one line — `uv run adws/adw_watch.py --config <config> "$@"` — so every flag
-the script accepts (`--once`, `--interval`, `--scratch-dir`) passes straight through.</p>
+`watch` recipe is one line, so every flag the script accepts passes straight through:</p>
+
+```makefile
+# dark-factory queue: claim the next ready-for-agent issue and run sdlc on it.
+# Only ever claims work already triaged to ready-for-agent -- see the
+# adoption playbook's Part D. --once for cron/launchd; omit for a standing
+# loop: just watch --interval 300
+watch *ARGS:
+    uv run adws/adw_watch.py --config {{config}} "$@"
+```
+
+<p>And the flags the script itself declares, from its `argparse` block: `--config` (default
+`adws/adw_sssf_config/sssf.config.yaml`), `--scratch-dir` (default `.scratch`), `--once` ("one
+scan-claim-dispatch-resolve cycle, then exit (0 dispatched, 1 empty queue, 2 unsupported tracker)
+— the right mode for cron/launchd"), and `--interval` (seconds between scans when not `--once`,
+default `300`).</p>
+
+## Your turn
+
+<p><em>Reps are tagged <strong>[read]</strong> (inspect a real file, no setup) or <strong>[run]</strong> (drive the <a href="/01-sssf-fundamentals/reference/0004-wiring-your-factory/">wired factory</a>).</em></p>
+
+<ol class="steps">
+  <li>
+    <p><strong>[run]</strong> <strong>Run the seam on an empty queue.</strong> In the Python
+    playground repo, with a clean tree and no `.scratch/*/issues/` directory yet, run
+    `just watch --once; echo "exit=$?"`. Expect one line — `just watch: queue empty -- nothing
+    ready-for-agent and unblocked` — and `exit=1`. Now `touch scratch-test.txt` (any untracked file) and run it again: expect `just watch: working tree is
+    dirty -- refusing to claim anything until it's clean ...` and still `exit=1`, before any scan
+    happens. Remove the file. You have now seen both ways step 6 declines to act, and confirmed
+    the exit code alone cannot tell them apart — which is why the capstone reads the printed line,
+    not `$?`.</p>
+  </li>
+</ol>
 
 ## The one manual hand-off in the chain
 

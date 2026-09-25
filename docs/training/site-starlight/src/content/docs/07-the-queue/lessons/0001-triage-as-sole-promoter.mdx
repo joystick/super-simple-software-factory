@@ -29,8 +29,16 @@ security/compliance judgment calls has no one to catch it when it's wrong, eithe
 <p>The code agrees with the prose. `adw_watch.py`'s module docstring: "The judgment call — is this
 issue feasible, compatible with what's already live, compliant, secure — is NOT this script's job.
 It only ever claims issues already carrying `Status: ready-for-agent` ... This script trusts that
-gate; it does not re-check it." `frontier()` filters on `i.status == READY` and nothing else about
-the ticket's content. Scout and planner's Part C wiring (glossary/OKF/ast-grep discovery,
+gate; it does not re-check it." `frontier()` filters on the status string and nothing else about
+the ticket's content — the whole candidate filter is one line:</p>
+
+```python
+READY = "ready-for-agent"
+...
+candidates = [i for i in issues if i.status == READY and is_unblocked(i, groups[i.feature])]
+```
+
+<p>Scout and planner's Part C wiring (glossary/OKF/ast-grep discovery,
 delta-scoping) still runs inside every dispatched chain underneath — the playbook calls that
 "defense-in-depth, not a substitute for the triage gate."</p>
 
@@ -82,9 +90,11 @@ that goes wrong, per the playbook:</p>
   <li><p><strong>Bold lines, invisible ticket.</strong> `/to-tickets`' local-ticket-template writes
   `**Status:**`/`**Blocked by:**` in bold. The playbook (written against an earlier
   `STATUS_RE`) describes such a ticket as silently invisible to the queue — "a stall, not an
-  error." The current `adw_watch.py` regex tolerates exactly that bold form (`\*{0,2}` on both sides
-  of the key, with a comment dating the fix to four real tickets found live), so this specific
-  stall is closed; the next lesson covers what the regex still rejects.</p></li>
+  error." The current `adw_watch.py` regex tolerates exactly that bold form —
+  `STATUS_RE = re.compile(r"^\*{0,2}Status:\*{0,2}[ \t]*(\S+)", re.MULTILINE)`, `\*{0,2}` on both
+  sides of the key, with a comment dating the fix to "four portfinder tickets" found live on
+  2026-09-14 — so this specific stall is closed; the next lesson covers what the regex still
+  rejects.</p></li>
   <li><p><strong>Plain lines, untriaged ticket.</strong> If you (or the model) write plain
   `Status: ready-for-agent` instead, you get exactly what the gate exists to prevent: "`just watch`
   will build it without anyone having judged feasibility, redundancy, or compliance first." The
@@ -110,6 +120,36 @@ non-local. Triage can flip a PR to `ready-for-agent`; nothing will ever claim it
 GitHub/GitLab support the watcher's own docstring flags as unbuilt actually lands. Sole promoter
 means the gate is upstream of the queue — it does not mean everything it promotes has a queue
 behind it yet.</p>
+
+## Your turn
+
+<p><em>Reps are tagged <strong>[read]</strong> (inspect a real file, no setup) or <strong>[run]</strong> (drive the <a href="/01-sssf-fundamentals/reference/0004-wiring-your-factory/">wired factory</a>).</em></p>
+
+<ol class="steps">
+  <li>
+    <p><strong>[run]</strong> <strong>Prove the string is the gate.</strong> In the Python
+    playground repo, on a clean tree, write one ticket by hand at the not-yet-promoted state and
+    commit it:</p>
+
+```bash
+mkdir -p .scratch/gate-demo/issues
+printf 'Status: needs-triage\n\n# Gate demo\n\nDo nothing; this ticket exists to show the frontier filter.\n' \
+  > .scratch/gate-demo/issues/01-gate-demo.md
+git add .scratch/gate-demo && git commit -m "gate-demo: filed at needs-triage"
+just watch --once; echo "exit=$?"     # expect: queue empty, exit=1
+```
+
+    <p>Nothing was claimed: `needs-triage` is well-formed and invisible. Now do the thing the
+    lesson says not to do in real work — edit the one word to `Status: ready-for-agent`, commit,
+    and run `just watch --once` again. The watcher claims it immediately and dispatches the full
+    chain on a body nobody triaged. That is the sharp edge, reproduced: the watcher cannot tell
+    your hand edit from a `/triage` promotion. Afterward, read the ticket's new `Status:` line
+    (`resolved` or `ready-for-human`) and `git log --oneline -5` to see the claim and resolve
+    commits, then delete `.scratch/gate-demo/` and commit the removal so the capstone starts clean.
+    (If you'd rather not spend a full chain on a do-nothing ticket, stop after the first run — the
+    `queue empty` at `needs-triage` is the half of the proof that costs nothing.)</p>
+  </li>
+</ol>
 
 ## Check yourself
 

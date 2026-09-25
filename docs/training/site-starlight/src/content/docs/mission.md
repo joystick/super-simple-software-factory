@@ -8,8 +8,12 @@ factory offers rests on the guarantee that an agent's *claims* are replaced by a
 *deterministic verdict* before work proceeds. A factory is exactly as trustworthy as its
 weakest gate, and a gate's trustworthiness cannot be read, only demonstrated.
 
-This course has two chapters. Chapter 1 builds the general operating picture in the
-Python playground (the Python playground repo). Chapter 2 takes gates deep — same cornerstone, harder
+This course has six chapters — see the site's [chapter list](/) for the full arc and its
+dependency map. Chapters 1–2 (below) are documented at per-lesson objective granularity, since
+they were this course's original scope; Chapters 3, 4, 6, and 7 each have their own overview
+page (linked from the [chapter list](/)) covering what they add and assume, at chapter rather
+than per-lesson granularity. Chapter 1 builds the general operating picture in the Python
+playground (the Python playground repo). Chapter 2 takes gates deep — same cornerstone, harder
 material, a second language (TypeScript/Deno) as the vehicle so the lesson is proven
 independent of any one toolchain.
 
@@ -108,5 +112,6 @@ place with the correction visible.
 
 | Version | Date | Changes |
 |---|---|---|
+| 2.2 | 2026-09-25 | Fixed "this course has two chapters" (it now has six) — pointed at the site's chapter list for the full arc instead of duplicating per-lesson objectives that only ever existed for Chapters 1–2. Closes part of GitHub issue #13. |
 | 2.1 | 2026-09-07 | Marked Chapter 1 objectives 2–4 done (lessons 0006, 0008, 0010 now exist) and renumbered them 2–6 to add a new objective 3: carrying a workflow protocol into a headless run via `skill_engineering` (lesson 0007). |
 | 2.0 | 2026-08-27 | Merged the Python playground repo's and the TypeScript rebuild repo's courses into this single course, as Chapter 1 (fundamentals) and Chapter 2 (gates deep dive). Superseded the Python playground repo's `learn/MISSION.md` (was v1.0) and the TypeScript rebuild repo's `MISSION.md` (was v1.2). |

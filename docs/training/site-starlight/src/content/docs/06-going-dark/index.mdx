@@ -1,0 +1,45 @@
+---
+title: "Going Dark"
+description: "Four lessons: which of two layers a behavior lives in, the bootstrap/AFK split for the headless interview, the two headless problems and their scout/planner fixes, and the extended definition of done."
+sidebar:
+  order: 0
+---
+import Callout from '@components/Callout.astro'
+
+<p>Chapters 3 and 4 get a factory to the point where one `just sdlc` run is safe. This chapter is
+the adoption playbook's Part C — "going dark: bootstrap vocabulary once, then let the loop run
+headless" — and adds what running <em>many</em> features unattended needs on top: knowing which
+layer of an agent's behavior you are allowed to edit (`prompt_engineering` vs.
+`skill_engineering`), relocating `wayfinder`'s headless interview to a human-run bootstrap phase
+that commits `CONTEXT.md`/`docs/adr/` before the loop starts, wiring scout (glossary → OKF →
+ast-grep) and the planner (delta-only scoping) so a plan cannot silently rebuild what exists, and
+four checklist lines for the failures none of those changes turn red.</p>
+
+<p><strong>What it assumes.</strong> Chapter 3's <a href="/03-adopting-a-factory/lessons/0002-the-four-jobs/">The
+Four Jobs</a> — the adoption vocabulary (recon, gates, boundaries, interrogate, then the four jobs
+with their cheap checkpoints, including reading `specs/&lt;adw_id&gt;_*.md` before trusting a plan) is
+used here without re-explanation. Chapter 4's <a href="/04-coding-agents-and-cost/lessons/0000-the-driver-contract/">The
+Driver Contract</a> and <a href="/04-coding-agents-and-cost/lessons/0001-sessions-resume-and-hermetic-flags/">Sessions,
+Resume, and Hermetic Flags</a> — why `--system-prompt` replaces rather than appends and why
+`--setting-sources ''` makes installed skills invisible to a headless node — are the mechanism
+the "Two Layers" lesson builds on. Chapter 1's <a href="/01-sssf-fundamentals/lessons/0007-vendoring-a-skill/">Vendoring
+a Skill</a> is where `vendor_skill.py` and the provenance header were introduced.</p>
+
+<Callout kind="trap" label="Check which repo you're standing in">
+<p>This chapter's primary sources all live in the skill source fork,
+`joystick/super-simple-software-factory`: `docs/playbook-adopting-sssf.md` (Part C) and the
+shipped agent templates under `.claude/skills/sssf/templates/prompt_engineering/` —
+`scout/system.md`, `planner/system.md`, `documenter/system.md`. The `[run]` steps, by contrast,
+act on an <em>adopted</em> repo — one where `/sssf install` has stamped those templates into
+`adws/adw_data/prompt_engineering/&lt;agent&gt;/` and `just sdlc` works. Keep both open. Your stamped
+copies may lag the fork: as of this writing the fork's `adws/adw_watch.py` (line 73) tolerates
+bold `**Status:**` lines while an older stamped copy may still match plain `^Status:` only —
+`diff` the two before you trust anything a lesson says about "the shipped template".</p>
+</Callout>
+
+<ul>
+  <li><a href="/06-going-dark/lessons/0000-two-layers/">Two Layers</a> — `prompt_engineering` and `skill_engineering` are two distinct layers an agent's behavior is shaped by, one baked into the roster's system prompts and one vendored in per agent; going dark depends on knowing which layer to edit.</li>
+  <li><a href="/06-going-dark/lessons/0001-bootstrap-vocabulary/">Bootstrap Vocabulary</a> — `wayfinder`'s headless interview has no one to answer it; relocate the interview instead of deleting it and bootstrap it once, interactively, before the dark loop starts.</li>
+  <li><a href="/06-going-dark/lessons/0002-the-two-headless-problems/">The Two Headless Problems</a> — running dark surfaces two problems no interactive session ever hits: an interview with no one to answer it, and nothing stopping a plan from re-implementing what already exists.</li>
+  <li><a href="/06-going-dark/lessons/0003-definition-of-done-extended/">Definition of Done, Extended</a> — going dark adds checklist items on top of the standing definition of done: committed vocabulary, delta-only plans, an updated knowledge source, and a filed triage outcome.</li>
+</ul>

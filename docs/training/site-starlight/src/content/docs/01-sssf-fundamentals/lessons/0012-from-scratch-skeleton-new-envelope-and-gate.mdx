@@ -2,7 +2,7 @@
 title: "From-Scratch Skeleton, New Envelope Type, and Its Gate"
 description: "Beyond copy-the-closest-chain: building an ADW from a blank skeleton, defining a new EnvelopeBase subclass for output no existing type carries, and writing the gate that checks it."
 sidebar:
-  order: 1
+  order: 12
 ---
 import Callout from '@components/Callout.astro'
 import Quiz from '@components/Quiz.astro'
@@ -14,7 +14,7 @@ import Quiz from '@components/Quiz.astro'
   `agents.execute()` your gate runs, how many times, and what the agent sees when it fails.</p>
 </Callout>
 
-<p>Chapter 1's "Composing a Chain" lesson teaches copy-the-closest-and-edit — the fast, correct default for most new workflows. This lesson covers what that approach doesn't: starting from a genuinely blank skeleton when no existing chain is close enough, defining a new `EnvelopeBase` subclass when a phase's output doesn't fit any shipped output type, and writing the gate that checks that new envelope's claims the same way `gates.diff_matches_claims` checks a build's — because a new envelope type with no gate behind it is exactly the ungated-phase trap Chapter 1 already warned against, just with novel output instead of a shipped one.</p>
+<p><a href="/01-sssf-fundamentals/lessons/0009-composing-a-chain/">L9, "Composing a Chain"</a>, teaches copy-the-closest-and-edit — the fast, correct default for most new workflows. This lesson covers what that approach doesn't: starting from a genuinely blank skeleton when no existing chain is close enough, defining a new `EnvelopeBase` subclass when a phase's output doesn't fit any shipped output type, and writing the gate that checks that new envelope's claims the same way `gates.diff_matches_claims` checks a build's — because a new envelope type with no gate behind it is exactly the ungated-phase trap L1 already warned against, just with novel output instead of a shipped one.</p>
 
 ## When copying the closest chain is the wrong move
 
@@ -29,7 +29,7 @@ thing you actually cared about.</p>
 
 <p>The signal to start blank is simple: <strong>if you cannot name a shipped output type whose
 fields are the claims you want checked, you need a new one</strong> — and a new output type
-without its own gate is the ungated-phase trap from Chapter 1, wearing a new name.</p>
+without its own gate is the ungated-phase trap from L1, wearing a new name.</p>
 
 ## The blank skeleton is adw_prompt.py
 
@@ -192,8 +192,7 @@ re-emit its Report JSON. With `retries=0`, the default, one violation is termina
 
 <p>Note the last line: the gate proves the envelope is internally honest, but `improved=false`
 with correct numbers is a <em>truthful</em> failed benchmark, so every phase goes green. Whether
-the run is accepted is a separate question — Chapter 1's "green phase does not make a green run"
-— and `run.finish(accepted=..., reason=...)` is where you answer it.</p>
+the run is accepted is a separate question — L9's "a green phase does not make a green run" — and `run.finish(accepted=..., reason=...)` is where you answer it.</p>
 
 <Callout kind="trap" label="AgentCall's inline comment says list[str]; gates.py says GateReport">
 <p>`AgentCall.gates` is annotated `list[Callable]` with the comment `gate(envelope, run) ->
@@ -240,10 +239,12 @@ reference glossary has a compact entry for the concept: `docs/reference/quality-
 
 ## Where this goes next
 
-<p>You can now own a workflow end to end: skeleton, envelope, gate, acceptance. The remaining
-chapters assume that. Chapter 6 takes a chain like this one headless, where nobody is reading the
-console when a gate fails; Chapter 7 puts it behind a queue so `just watch` dispatches it on your
-behalf — and the gate you just wrote is the only thing standing between an unattended run and a
+<p>You can now own a workflow end to end: skeleton, envelope, gate, acceptance. That closes the
+fundamentals. <strong>Chapter 2</strong> takes the cornerstone — gates — deep, rebuilding the
+pricing engine in TypeScript to prove the discipline survives a change of language and toolchain.
+Later, Chapter 6 takes a chain like this one headless, where nobody is reading the console when a
+gate fails, and Chapter 7 puts it behind a queue so `just watch` dispatches it on your behalf —
+and the gate you just wrote is the only thing standing between an unattended run and a
 plausible-sounding envelope nobody checked.</p>
 
 <p><strong>Ask me things.</strong> Bring me a phase whose output fits none of the shipped types,

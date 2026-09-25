@@ -17,6 +17,11 @@ import Quiz from '@components/Quiz.astro'
   you measured on your own repo.</p>
 </Callout>
 
+<p><em>Have open:</em> `.claude/skills/sssf/references/observability.md` (the `sessions`,
+`events`, and `agent_sessions` table definitions) and the `justfile` template's `sessions` and
+`phases` recipes. Every query below is quoted from them verbatim; `{{db}}` in the justfile is
+`adws/adw_data/sssf.db`.</p>
+
 ## Where the two numbers come from
 
 <p>`just sessions` is a one-line SQL query against the trace database:</p>
@@ -75,8 +80,10 @@ at when one phase is eating the budget — `just sessions` only tells you the ru
 
 <Callout kind="trap" label="total_tokens only ever grows; the context window does not">
 <p>`sessions.total_tokens` and `events.tokens` bill every turn, so they accumulate. `context_tokens`
-  on the `agent_sessions` row is a different quantity: "how full the window actually was when the
-  agent stopped," measured against `context_window`. The observability reference's own example:
+  on the `agent_sessions` row is a different quantity — the schema comment in the observability
+  reference reads `context_tokens INTEGER, -- window occupancy after the agent's last turn` and
+  `context_window INTEGER, -- the model's ceiling, from the pi registry` — "how full the window
+  actually was when the agent stopped." The observability reference's own example:
   "an agent that burned 100k tokens may be sitting in a 15k window." `agent_cc.py` learned this the
   hard way — reading the cumulative `result` usage as occupancy "reports 298k against a 200k
   window," which is why occupancy is read from the per-message assistant usage instead. When you
@@ -132,15 +139,41 @@ will.</p>
   dominates cost.</li>
   <li>Run a representative prompt through `just sdlc` two or three times. Repeated runs matter:
   a single figure hides retry variance.</li>
-  <li>Read `just sessions` for the run totals, then `just phases <adw_id>` and the `agent_end`
-  payloads to see which phase and which component (input vs cache-read vs output) carries the
-  spend.</li>
+  <li>Read `just sessions` for the run totals, then `just phases <adw_id>` (`select seq, name,
+  kind, owner, status, attempt from phases where adw_id='<adw_id>' order by seq;`) and the
+  `agent_end` payloads to see which phase and which component (input vs cache-read vs output)
+  carries the spend.</li>
   <li>If `skill_engineering` is set on any agent, remember the config reference's note that skill
   text "is billed on every internal turn of a phase." Set `skill_token_budget` so you are warned —
   never failed — when a composed prompt exceeds what you expected to pay for it.</li>
   <li>If one agent dominates, change its `model:` and re-run the same prompt. Compare the two
   `total_cost` figures <em>and</em> the two outputs before deciding.</li>
   <li>Budget against what you measured. Throw the branch away.</li>
+</ol>
+
+## Your turn
+
+<p><em>Reps are tagged <strong>[read]</strong> (inspect a real file, no setup) or <strong>[run]</strong> (drive the <a href="/01-sssf-fundamentals/reference/0004-wiring-your-factory/">wired factory</a>).</em></p>
+
+<ol class="steps">
+  <li>
+    <p><strong>[run]</strong> <strong>See spend and occupancy diverge on your own trace.</strong>
+    In the Python playground repo, after at least one completed run, read both quantities for the
+    same agent in one query:</p>
+
+```
+sqlite3 adws/adw_data/sssf.db "select s.adw_id, a.agent, s.total_tokens,
+  a.context_tokens, a.context_window
+from sessions s join agent_sessions a using (adw_id)
+order by s.started_at desc limit 10;"
+```
+
+    <p>(`just sessions` gives you the `total_tokens` half on its own; this joins in the
+    `agent_sessions` half.) Find one row where `total_tokens` is several times `context_tokens` —
+    on any run with a retry or a fix-loop iteration it will be — and say out loud which column is
+    the bill and which is the window. If `context_tokens` is NULL, the row predates the column;
+    run once more and re-query.</p>
+  </li>
 </ol>
 
 ## Check yourself

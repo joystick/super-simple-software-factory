@@ -127,6 +127,20 @@ covered?</em> — no → characterisation tests first → ask again.</p>
   always the cheap one.</p>
 </Callout>
 
+## Your turn
+
+<ol class="steps">
+  <li>
+    <p><strong>[run]</strong> <strong>Run the bug path end to end.</strong> In your adoption
+    target, pick one small real bug (or plant one). Write a test that fails on it, run the suite
+    by hand to watch it go red, and commit the red test on its own. Then run
+    `just sdlc "make the failing test in tests/&lt;file&gt; pass; do not modify the test"`. When it
+    finishes, do the two things the playbook asks: `just phases &lt;adw_id&gt;` to see which phase
+    did what, and `git diff HEAD~1 -- tests/` to confirm the test file is byte-for-byte
+    unchanged. Read the diff, not the banner.</p>
+  </li>
+</ol>
+
 ## Check yourself
 
 <Quiz
