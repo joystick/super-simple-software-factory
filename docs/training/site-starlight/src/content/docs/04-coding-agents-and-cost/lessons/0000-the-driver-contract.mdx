@@ -17,6 +17,10 @@ import Quiz from '@components/Quiz.astro'
   quietly stop doing anything.</p>
 </Callout>
 
+<p><em>Have open:</em> `.claude/skills/sssf/templates/adws/adw_modules/agents.py` (`INTERFACES`,
+`interface()`, `validate()`, `ignored_field_warnings()`, `execute()`), and `agent_cc.py` /
+`agent_pi.py` side by side. Every function name below is quoted from those three files.</p>
+
 ## Where the seam is
 
 <p>The whole seam is one dictionary and one lookup at the top of
@@ -157,6 +161,25 @@ which ones go inert:</p>
 <p>The rule of thumb: a driver swap is safe to make and safe to validate, but read the
 `validate()` warnings on stderr before trusting the run — they are the only signal that a field
 you configured has stopped doing anything.</p>
+
+## Your turn
+
+<p><em>Reps are tagged <strong>[read]</strong> (inspect a real file, no setup) or <strong>[run]</strong> (drive the <a href="/01-sssf-fundamentals/reference/0004-wiring-your-factory/">wired factory</a>).</em></p>
+
+<ol class="steps">
+  <li>
+    <p><strong>[run]</strong> <strong>Watch a field go inert.</strong> In the Python playground
+    repo, pick one agent in `sssf.config.yaml` and give it a `harness_engineering:` entry (any
+    path under `.pi/extensions/` will do) while its `coding_agent:` is `claude_code`. Run the
+    cheapest chain you have (`just plan "…"` is enough — you only need `validate()` to fire) and
+    read stderr before the first phase starts: you should see the warning from
+    `ignored_field_warnings()` naming that agent. Then flip the same agent to `coding_agent: pi`
+    and re-run; the warning goes away and nothing else in the roster changed. Afterwards, read the
+    two runs' `agent_sessions` rows (`sqlite3 adws/adw_data/sssf.db "select adw_id, agent,
+    coding_agent, model from agent_sessions order by created_at desc limit 4;"`) and confirm the
+    only column that differs is `coding_agent`.</p>
+  </li>
+</ol>
 
 ## Check yourself
 

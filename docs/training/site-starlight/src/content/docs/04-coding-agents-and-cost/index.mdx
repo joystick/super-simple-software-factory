@@ -1,0 +1,56 @@
+---
+title: "Coding Agents and Cost"
+description: "Three lessons: the driver contract behind coding_agent, the session and hermetic flags of one claude_code turn, and how to read total_tokens and total_cost honestly."
+sidebar:
+  order: 0
+---
+import Callout from '@components/Callout.astro'
+
+<p>Chapter 1 treated the coding agent as a black box: a phase builds an `AgentCall`, `execute()` runs
+it, an envelope comes back, gates judge it. This chapter opens that box one layer. It does not add a
+new mechanism to the chain — it explains what the `coding_agent:` value in the roster actually
+selects, what one headless turn of that agent is allowed to see and remember, and where the
+two numbers `just sessions` prints for every run come from.</p>
+
+## What this chapter assumes
+
+<p>You should be fluent in the Chapter 1 vocabulary before starting: the `AgentCall` a phase makes
+(the four parameters — `output_type`, `prompt`, `previous`, `gates` — from
+<a href="/01-sssf-fundamentals/lessons/0004-phases-and-the-run/">Phases and the Run</a>), the
+<a href="/01-sssf-fundamentals/lessons/0003-the-envelope/">envelope</a> that comes back, the
+<a href="/01-sssf-fundamentals/lessons/0005-the-fix-loop/">fix loop</a> that re-prompts on a bad
+one, and the <a href="/01-sssf-fundamentals/lessons/0008-reading-the-trace/">trace database</a>
+those calls are recorded in. Every lesson here sits underneath `agents.execute()`; nothing above
+it changes.</p>
+
+<Callout kind="trap" label="Check which repo you're standing in">
+<p>Each lesson's <strong>primary source</strong> is the skill-source fork,
+`joystick/super-simple-software-factory`, at `.claude/skills/sssf/templates/adws/adw_modules/`
+(`agents.py`, `agent_cc.py`, `agent_pi.py`, `data_types.py`) plus
+`.claude/skills/sssf/references/config.md` and `observability.md`. Each lesson's
+<strong>`[run]` step</strong> instead assumes a <em>stamped</em> repo with a trace on disk — the
+Python playground repo from Chapter 1's
+<a href="/01-sssf-fundamentals/reference/0004-wiring-your-factory/">Wiring Your Factory</a>,
+run from its root, where the stamped copy lives at `adws/adw_modules/` and the trace at
+`adws/adw_data/sssf.db`. If the two copies differ (the fork is ahead of the playground more often
+than not), the fork is what the lessons quote; grep your stamped copy before trusting a line number.</p>
+</Callout>
+
+## Lessons
+
+<ul>
+  <li><a href="/04-coding-agents-and-cost/lessons/0000-the-driver-contract/">The Driver Contract</a>
+  — `agent_cc` and `agent_pi` are two different drivers behind the same `coding_agent` seam; what
+  contract every driver must honor so a chain can swap one for another without changing its
+  phases.</li>
+  <li><a href="/04-coding-agents-and-cost/lessons/0001-sessions-resume-and-hermetic-flags/">Sessions,
+  Resume, and Hermetic Flags</a> — a session can be continued with `--resume` or run hermetically
+  with none of your local skill directory visible; the flags that decide which, and why the
+  difference matters for a headless run.</li>
+  <li><a href="/04-coding-agents-and-cost/lessons/0002-reading-real-cost/">Reading Real Cost</a> —
+  `total_tokens` and `total_cost` are already visible per session; reading them honestly,
+  including what they do and don't tell you about whether a run was worth it.</li>
+</ul>
+
+<p>Read them in order: the contract names the fields (`PiResult.tokens`, `.cost`,
+`.context_tokens`) that the second lesson's flags populate and the third lesson's queries read.</p>

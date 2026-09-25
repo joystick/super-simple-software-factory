@@ -9,9 +9,13 @@ import Quiz from '@components/Quiz.astro'
 
 <Callout kind="win" label="The win">
 <p>You can name both problems going dark surfaces, say why they have the same shape, and point
-  at the exact lines in scout's and the planner's `system.md` that close the second one — the
-  glossary → OKF → ast-grep lookup order and the delta-only scoping rule — including why those
-  fixes live in `prompt_engineering` and not in a new vendored skill.</p>
+  at the instructions in scout's and the planner's `system.md` that close the second one — the
+  three lookup bullets that open scout's `## Instructions` list (**Glossary first.** / **OKF
+  second.** / **ast-grep third.**) and the planner's first bullet ("Scope your plan to the delta
+  only") — including why those fixes live in `prompt_engineering` and not in a new vendored
+  skill. Both are quoted below.</p>
+<p><em>Have open:</em> `.claude/skills/sssf/templates/prompt_engineering/scout/system.md` and
+  `.claude/skills/sssf/templates/prompt_engineering/planner/system.md` in the skill source fork.</p>
 </Callout>
 
 <p>Going fully headless — many features, unattended, across days — surfaces two problems an interactive session never has to face. The first, covered in this chapter's bootstrap-vocabulary lesson, is that a vendored planning skill's "ask the user" fallback has no one there to answer. The second is scope: nothing in `prompt_engineering` or any shipped `skill_engineering` skill tells scout or the planner to check what's already built before scoping new work, so left unfixed every feature costs a full plan-and-build cycle even when most of it already exists. This lesson covers both problems and the fixes the playbook prescribes — glossary-then-knowledge-source-then-code-search lookups added to scout's own instructions, and delta-only scoping added to the planner's.</p>
@@ -140,6 +144,24 @@ discovery, delta-scoping" wiring "still runs inside every `just sdlc` call under
 defense-in-depth, not a substitute for the triage gate." Delta-scoping stops the planner rebuilding what exists; it does not decide
 whether the feature should be built at all. That judgment — feasibility, compliance, redundancy
 against `.out-of-scope/` — stays with `/triage`, interactively, and Chapter 7 covers why.</p>
+
+## Your turn
+
+<p><em>Reps are tagged <strong>[read]</strong> (inspect a real file, no setup) or <strong>[run]</strong> (drive an adopted repo where `just sdlc` works).</em></p>
+
+<ol class="steps">
+  <li>
+    <p><strong>[run]</strong> <strong>Watch delta-scoping fire — or fail to.</strong> In an adopted
+    repo with a committed `CONTEXT.md`, run `just sdlc "&lt;request that overlaps a module you
+    already have&gt;"` and stop at the playbook's cheap checkpoint, before the builder. Open
+    `&lt;context_handoff_dir&gt;/scout_findings.md`: it must report the existing module as
+    <em>already implemented</em>, cited by OKF concept path (or, without an `.okf/`, by
+    `file:line` from the ast-grep step). Then open `specs/&lt;adw_id&gt;_*.md` and find the sentence
+    that names that module as out of scope. If scout's findings say "implemented" and the spec
+    never mentions it, the planner ignored the first bullet of its own `system.md` — that is the
+    silent failure the next lesson's checklist item 2 exists for.</p>
+  </li>
+</ol>
 
 ## Check yourself
 

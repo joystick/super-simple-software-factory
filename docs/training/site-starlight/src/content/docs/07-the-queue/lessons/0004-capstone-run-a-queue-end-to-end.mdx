@@ -20,8 +20,9 @@ import Quiz from '@components/Quiz.astro'
 
 <p>Everything below assumes the factory is wired the way earlier chapters left it: gates proven to
 fail (rule zero), a roster in `sssf.config.yaml`, `docs/agents/issue-tracker.md` whose first line
-says `Local Markdown` (that is what `detect_tracker()` reads — a GitHub or GitLab first line makes
-`main()` return `2` and refuse), and a clean working tree. Pick a piece of work that is genuinely
+says `Local Markdown` (that is all `detect_tracker()` reads — `if "GitHub" in first_line` /
+`"GitLab"` / `"Local Markdown"`, quoted in full in the previous lesson — and a GitHub or GitLab
+first line makes `main()` return `2` and refuse), and a clean working tree. Pick a piece of work that is genuinely
 small — one phase, one ticket — and that introduces at least one term your `CONTEXT.md` does not
 yet name, so step 1 has something to do.</p>
 
@@ -118,7 +119,7 @@ re-triage.</p>
   <tr><td>a ticket whose `ready-for-agent` came from `/triage`, not a hand-run skill</td><td>sole promoter; the string is the gate</td><td>"Triage as Sole Promoter"</td></tr>
   <tr><td>six empty-where-expected checkpoint outputs</td><td>claim vs. filesystem boundary</td><td>"Filing Checkpoints"</td></tr>
   <tr><td>a claim commit before any work</td><td>`set_status(CLAIMED)` + `commit_watcher_state()`</td><td>"just watch, Concretely"</td></tr>
-  <tr><td>a full planner → reviewer → documenter run with gates</td><td>`adw_simple_sdlc.py`, never the lighter chain</td><td>"The Chain Named Once"; Chapters 1–5 for the gates and roles</td></tr>
+  <tr><td>a full planner → reviewer → documenter run with gates</td><td>`adw_simple_sdlc.py`, never the lighter chain</td><td>"The Chain Named Once"; Chapters 1–4 for the gates and roles</td></tr>
   <tr><td>a resolve or fail commit with a session id in the ticket</td><td>`dispatch()`'s three outcomes</td><td>"just watch, Concretely"</td></tr>
 </table>
 
@@ -126,6 +127,68 @@ re-triage.</p>
 of the dark factory: not that nobody looks, but that each thing a human decided — vocabulary,
 feasibility, filing — was written down once in a place a headless process reads, and each thing the
 process did left a commit a human can read back.</p>
+
+## Your turn
+
+<p><em>Reps are tagged <strong>[read]</strong> (inspect a real file, no setup) or <strong>[run]</strong> (drive the <a href="/01-sssf-fundamentals/reference/0004-wiring-your-factory/">wired factory</a>).</em></p>
+
+<ol class="steps">
+  <li>
+    <p><strong>[run]</strong> <strong>The whole chain, once, for real.</strong> Everything above,
+    as a checklist you tick in order in the Python playground repo. Substitute your feature slug
+    for `<slug>`; every expected output is quoted from the scripts that print it.</p>
+
+```bash
+# 0. Preconditions -- all three must hold before step 1
+head -1 docs/agents/issue-tracker.md      # expect: a line containing "Local Markdown"
+git status --short                         # expect: empty
+just watch --once; echo "exit=$?"          # expect: "queue empty", exit=1 -- nothing stale is waiting
+
+# 1. /grill-with-docs   (interactive, your harness) -> CONTEXT.md / docs/adr/ updated
+git add CONTEXT.md docs/adr && git commit -m "<slug>: settle vocabulary"
+
+# 2. /to-spec           (interactive)                -> .scratch/<slug>/spec.md      -- do NOT commit yet
+# 3. /to-tickets        (interactive)                -> .scratch/<slug>/issues/NN-*.md
+grep -h "^\**Status:\**" .scratch/<slug>/issues/*.md | sort -u
+#    if any line says ready-for-agent here, it was self-promoted: reset it to needs-triage
+#    before step 4 (sed -i '' 's/ready-for-agent/needs-triage/' <file>), or let /triage re-judge it
+
+# 4. /triage            (interactive; THE gate)      -> one ticket at Status: ready-for-agent + agent brief
+
+# 5. Commit, then the six checkpoints (Filing Checkpoints lesson)
+git add .scratch/<slug> && git commit -m "<slug>: spec, tickets, triage"
+ls .scratch/<slug>/                                          # 1: spec.md, issues/
+test -f .scratch/<slug>/spec.md && echo "spec.md: present"   # 2
+grep -L "^\**Status:\**" .scratch/<slug>/issues/*.md         # 3: expect empty
+grep -h "^\**Status:\**" .scratch/<slug>/issues/*.md | sort -u   # 4: exactly one ready-for-agent
+git status --short .scratch/<slug>/                          # 5: expect empty
+grep -h "^\**Blocked by:\**" .scratch/<slug>/issues/*.md     # 6: bare numbers or nothing
+
+# 6. Dispatch
+just watch --once; echo "exit=$?"
+#    expect, in order:
+#      just watch: claiming .scratch/<slug>/issues/01-<...>.md
+#      just watch: committed watcher state (<sha>): just watch: claim .scratch/<slug>/issues/01-<...>.md
+#      ... the chain's own output ...
+#      just watch: committed watcher state (<sha>): just watch: resolve ... (session <adw_id>)
+#      just watch: session <adw_id> succeeded -- .scratch/<slug>/issues/01-<...>.md
+#      exit=0
+
+# 7. Read the trail, not the summary line
+grep -h "^\**Status:\**" .scratch/<slug>/issues/01-*.md      # resolved  (or ready-for-human)
+tail -3 .scratch/<slug>/issues/01-*.md                       # > *just watch: resolved by session `<adw_id>`.*
+git log --oneline -6                                         # resolve commit, chain commit(s), claim commit, your filing commit
+just phases <adw_id>                                         # every phase, in sequence, with its status
+```
+
+    <p>Tick each numbered block only when its expected output matched. If step 6 printed
+    `FAILED` and step 7 shows `ready-for-human`, that is the design working: the ticket's last
+    comment names the session, `just phases <adw_id>` names the phase, and nothing was retried —
+    fix the cause, re-run `/triage`, and go again from step 5. If step 6 printed `queue empty`,
+    go back to step 5's six lines; the watcher will not tell you which one excluded the
+    ticket.</p>
+  </li>
+</ol>
 
 ## Check yourself
 
@@ -164,7 +227,7 @@ glossary entries this chapter leaned on: `docs/reference/the-queue/Dark-factory.
 ## Where this goes next
 
 <p>There is no next lesson. You have now seen every layer of the factory do its job on one ticket
-you filed: the gates from Chapter 1 ran inside a chain from Chapter 5, on a prompt written by a
+you filed: the gates from Chapter 1 ran inside a chain composed the way Chapter 1's last lessons taught, on a prompt written by a
 human at a gate from this chapter, dispatched by a script you can read in one sitting. What
 remains is your own repo — its real gates, its real vocabulary, its real queue — and the playbook's
 standing checklists for keeping each of those honest as the work grows.</p>

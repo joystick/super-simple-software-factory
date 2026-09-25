@@ -62,31 +62,28 @@ export default defineConfig({
 				{
 					label: 'Chapter 3 — Adopting a Factory',
 					items: [
+						{ label: 'Overview', slug: '03-adopting-a-factory' },
 						{ label: 'Lessons', items: [{ autogenerate: { directory: '03-adopting-a-factory/lessons' } }] },
 					],
 				},
 				{
 					label: 'Chapter 4 — Coding Agents and Cost',
 					items: [
+						{ label: 'Overview', slug: '04-coding-agents-and-cost' },
 						{ label: 'Lessons', items: [{ autogenerate: { directory: '04-coding-agents-and-cost/lessons' } }] },
-					],
-				},
-				{
-					label: 'Chapter 5 — Owning Your Workflow',
-					items: [
-						{ label: 'Overview', slug: '05-owning-your-workflow' },
-						{ label: 'Lessons', items: [{ autogenerate: { directory: '05-owning-your-workflow/lessons' } }] },
 					],
 				},
 				{
 					label: 'Chapter 6 — Going Dark',
 					items: [
+						{ label: 'Overview', slug: '06-going-dark' },
 						{ label: 'Lessons', items: [{ autogenerate: { directory: '06-going-dark/lessons' } }] },
 					],
 				},
 				{
 					label: 'Chapter 7 — The Queue',
 					items: [
+						{ label: 'Overview', slug: '07-the-queue' },
 						{ label: 'Lessons', items: [{ autogenerate: { directory: '07-the-queue/lessons' } }] },
 					],
 				},

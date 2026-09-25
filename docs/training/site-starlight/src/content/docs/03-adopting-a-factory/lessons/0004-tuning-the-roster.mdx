@@ -131,6 +131,21 @@ config validation failed:
 trivial prompt, or `just quality "roster check"`, which runs zero agents. Do it after every roster
 edit, before the run you actually care about.</p>
 
+## Your turn
+
+<ol class="steps">
+  <li>
+    <p><strong>[run]</strong> <strong>Make one real override, then break one on purpose.</strong>
+    In your adoption target's `adws/adw_sssf_config/sssf.config.yaml`, add your CI path (for
+    example `.github/workflows/`) to `defaults.protected_files` and run
+    `just quality "roster check"` — zero agents, but `validate()` runs; it should pass, with the
+    `harness_engineering ... will be ignored` warning on stderr for planner and scout. Now set the
+    reviewer's `model` to `openai/gpt-5`, run the same command, and read the
+    `config validation failed:` line naming the agent and the rejected pattern. Revert the model,
+    re-run until clean, and commit the `protected_files` change on its own.</p>
+  </li>
+</ol>
+
 <Callout kind="why" label="Why validate before spawn, not on first use">
 <p>A roster with one bad agent could in principle run every phase until it reaches that agent.
   The playbook's whole posture argues against it: three phases in, you have spent planner and

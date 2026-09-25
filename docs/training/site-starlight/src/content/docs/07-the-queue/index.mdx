@@ -1,0 +1,63 @@
+---
+title: "The Queue"
+description: "The capstone chapter: from a ticket at ready-for-agent to a fully unattended just watch dispatch — the chain named once, the triage gate, the filing checkpoints, the watcher read line by line, and one real end-to-end run."
+sidebar:
+  order: 0
+---
+import Callout from '@components/Callout.astro'
+
+<p>This is the capstone chapter. Chapter 6 got a single headless run to complete without anyone
+present; this chapter adds the queue in front of it — the dark-factory chain that takes a piece of
+work from an interactive interview, through a spec and tickets, past the one human gate
+(`/triage` writing `Status: ready-for-agent`), and into `just watch`, the scan-claim-dispatch-resolve
+loop that picks the next unblocked ticket and runs the full SDLC chain on it with nobody watching.
+The five lessons walk that chain in order and end with you running it yourself, once, on a ticket you
+filed.</p>
+
+## What this chapter assumes
+
+<p>It builds directly on Chapter 6's going-dark vocabulary and does not re-explain it:</p>
+
+<ul>
+  <li><strong>Bootstrap vocabulary</strong> (<a href="/06-going-dark/lessons/0001-bootstrap-vocabulary/">Chapter 6</a>) —
+  the interview runs once, interactively, and only its <em>result</em> (`CONTEXT.md`, `docs/adr/`) is
+  read headless. The triage gate in this chapter is the same shape applied to feasibility and
+  compliance: judge once, by a human; consume only the written result.</li>
+  <li><strong>The two headless problems</strong> (<a href="/06-going-dark/lessons/0002-the-two-headless-problems/">Chapter 6</a>) —
+  an interview with no one to answer it, and a plan re-implementing what already exists. "The judgment
+  call stays interactive" is Part D's refusal to recreate the first of those inside the loop.</li>
+  <li>A wired factory from Chapters 1–4: gates proven to fail, a roster in `sssf.config.yaml`,
+  `adw_simple_sdlc.py` runnable by hand via `just simple-sdlc`.</li>
+</ul>
+
+<Callout kind="trap" label="Check which repo you're standing in">
+<p>The `[run]` steps in this chapter drive `just watch`, which needs a <em>stamped</em> factory: a
+working tree with a `justfile`, `adws/adw_watch.py`, `adws/adw_sssf_config/sssf.config.yaml`, a
+`docs/agents/issue-tracker.md` whose first line says `Local Markdown`, and a `.scratch/` directory —
+i.e. the Python playground repo from <a href="/01-sssf-fundamentals/reference/0004-wiring-your-factory/">Wiring Your Factory</a>,
+not the skill-source fork. The source the lessons quote lives in the fork,
+`joystick/super-simple-software-factory`, at `.claude/skills/sssf/templates/adws/adw_watch.py`; the
+copy `just watch` actually runs is your stamped `adws/adw_watch.py`. If the two differ, the stamped
+one wins for anything you observe, and every `[run]` step below assumes a <strong>clean working
+tree</strong> — `run_once()` refuses to claim on a dirty one.</p>
+</Callout>
+
+## Lessons
+
+<ol>
+  <li><a href="/07-the-queue/lessons/0000-the-chain-named-once/">The Chain Named Once</a> — grill-with-docs,
+  to-spec, to-tickets, triage, and watch: the whole dark-factory chain, named once in order, so each
+  later lesson can point back to a single reference instead of re-deriving it.</li>
+  <li><a href="/07-the-queue/lessons/0001-triage-as-sole-promoter/">Triage as Sole Promoter</a> — only
+  `/triage` may promote a ticket to `ready-for-agent`; why that judgment stays interactive on purpose,
+  and the sharp edge where a hand-run `/to-spec` or `/to-tickets` self-promotes past it.</li>
+  <li><a href="/07-the-queue/lessons/0002-filing-checkpoints/">Filing Checkpoints</a> — a skill
+  claiming to have written a ticket is not the same as the queue seeing it; the six mandatory
+  checkpoints that catch a filing that silently didn't take.</li>
+  <li><a href="/07-the-queue/lessons/0003-just-watch-concretely/">just watch, Concretely</a> — the
+  scan-claim-dispatch-resolve cycle read from `adw_watch.py` itself: the frontier rule,
+  `Status:`/`Blocked by:` parsing, and what happens on success versus failure.</li>
+  <li><a href="/07-the-queue/lessons/0004-capstone-run-a-queue-end-to-end/">Capstone — Run a Queue End to End</a> —
+  grill, spec, ticket, triage, file, checkpoint, then `just watch --once`, and read the resolved
+  ticket's trail back to a commit.</li>
+</ol>

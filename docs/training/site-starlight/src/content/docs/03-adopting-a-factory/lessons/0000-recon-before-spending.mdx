@@ -116,6 +116,21 @@ anything."</p>
 fails when you break something. That is the part only running the command yourself establishes,
 and it is the part rule zero depends on. Treat scout output as a map of where to look, then look.</p>
 
+## Your turn
+
+<ol class="steps">
+  <li>
+    <p><strong>[run]</strong> <strong>Recon a repo you did not write.</strong> In a freshly
+    stamped adoption target, run
+    `just scout "map this codebase: entry points, layers, test setup, build commands"` and read
+    `adws/adw_data/sessions/&lt;adw_id&gt;/context_handoff/scout_findings.md`. Paste the four
+    commands it surfaces — test, lint, typecheck, build — into a scratch note, then run each one
+    by hand from the repo root. Cross out any that do not exist, and note which block you will
+    delete. Finish with `just quality "baseline"` and confirm every block still prints
+    `PLACEHOLDER`: you have the material for A2, and nothing is wired yet.</p>
+  </li>
+</ol>
+
 ## Check yourself
 
 <Quiz

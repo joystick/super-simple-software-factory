@@ -78,7 +78,8 @@ later run will ever read). Approve what it produces, then:</p>
 
 <p>If the request only composes concepts `CONTEXT.md` already names, skip bootstrap entirely —
 there is nothing left to interview about. `to-spec` already does not interview by design: "no
-interview, just synthesis," per its own frontmatter. It runs **unmodified** — you do not edit the
+interview, just synthesis," per its own frontmatter (as the playbook's Part C quotes it — the
+`to-spec` skill is not shipped in the fork, so open your own installed copy to confirm). It runs **unmodified** — you do not edit the
 vendored copy of `to-spec` itself. What changes is the agent's own `system.md` (the layer this
 belongs to — see this chapter's "Two Layers" lesson), which needs to tell the agent what to do
 when the skill text underneath it says "ask the user":</p>
@@ -104,14 +105,18 @@ sole promoter):</p>
   say to apply. Skipping triage here would let a spec bypass feasibility, compliance, and
   redundancy judgment altogether.</li>
   <li>`to-tickets` files every ticket at `Status: needs-triage` too. Its own local-ticket-template
-  uses bold `**Status:**`/`**Blocked by:**` — either form is fine, `adw_watch.py`'s frontier scan
-  tolerates both (Chapter 7 covers the regex). `Blocked by:` values still must be bare, comma-
-  separated ticket numbers — no explanatory parenthetical, never prose like "none": omit the line
+  uses bold `**Status:**`/`**Blocked by:**` — either form is fine, because the fork's
+  `adws/adw_watch.py` frontier scan matches
+  `STATUS_RE = re.compile(r"^\*{0,2}Status:\*{0,2}[ \t]*(\S+)", re.MULTILINE)` — up to two
+  leading and trailing `*` (an older stamped copy may still have the plain `^Status:\s*(\S+)`
+  form; check yours, Chapter 7 walks the whole file). `Blocked by:` values still must be bare,
+  comma-separated ticket numbers — no explanatory parenthetical, never prose like "none": omit the line
   entirely when a ticket has no real blocker.</li>
 </ul>
 
 <Callout kind="trap" label="grill-with-docs stays out of skill_engineering">
-<p>`grill-with-docs`'s `disable-model-invocation: true` is load-bearing, not an oversight.
+<p>`grill-with-docs`'s frontmatter line `disable-model-invocation: true` (line 4 of its
+  `SKILL.md`, installed under your own `~/.claude/skills/grill-with-docs/`) is load-bearing, not an oversight.
   Vendoring it into an agent's `skill_engineering` list risks it landing in a composed prompt and
   firing headless despite that flag — exactly the failure this whole split exists to prevent.
   Bootstrap stays something <em>you</em> run, on purpose, never something a chain reaches for on
@@ -129,6 +134,25 @@ sole promoter):</p>
   job stays what it already was: turning agreed vocabulary into a scoped plan, never inventing the
   vocabulary itself.</p>
 </Callout>
+
+## Your turn
+
+<p><em>The decision chain above is a walkthrough. This rep is the bootstrap step itself, run for real.</em></p>
+
+<ol class="steps">
+  <li>
+    <p><strong>[run]</strong> <strong>Bootstrap one ambiguous request, then prove the pipeline can
+    see it.</strong> In an adopted repo, pick a small feature request that uses a term
+    `CONTEXT.md` does not name (or write one: "let users cancel a subscription" works if
+    "cancel" is unsettled). Run `/grill-with-docs` yourself, interactively, answer it until it
+    stops asking, and approve what it writes. Then, before anything else, run
+    `git status -- CONTEXT.md docs/adr/` — if either shows as modified or untracked, the
+    bootstrap is invisible to scout. Commit, then run
+    `git log --oneline -1 -- CONTEXT.md docs/adr/` and keep that hash: checklist item 1 in the
+    "Definition of Done, Extended" lesson asks whether it predates the `just sdlc` run you start
+    next. Only after that hash exists is the request allowed to go AFK.</p>
+  </li>
+</ol>
 
 ## Check yourself
 

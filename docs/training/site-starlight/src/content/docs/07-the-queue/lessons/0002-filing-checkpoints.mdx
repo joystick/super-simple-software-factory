@@ -124,7 +124,39 @@ the only place you will catch it.</p>
 `none`/`n/a`, and keeps every remaining token as a blocker — printing a warning if a kept token
 isn't a bare ticket number, because "never silently unblocks something that might genuinely be
 blocked" is the safe default. `is_unblocked()` then requires each kept token to match a sibling
-whose status is `resolved`. One real consequence to know, and one near-miss that's already fixed:</p>
+whose status is `resolved`. The two functions, minus their comments and the warning text:</p>
+
+```python
+_NONE_RE = re.compile(r"^none\b|^n/a\b", re.IGNORECASE)
+_TICKET_NUMBER_RE = re.compile(r"^\d+$")
+
+def read_blocked_by(text: str, path: Path | None = None) -> list[str]:
+    m = BLOCKED_BY_RE.search(text)
+    if not m:
+        return []
+    value = re.sub(r"\s*\([^)]*\)", "", m.group(1))   # parentheticals stripped FIRST
+    tokens = (b.strip() for b in value.split(","))
+    result = []
+    for raw in tokens:
+        if not raw:
+            continue
+        cleaned = raw.rstrip(".;:,").strip()
+        if not cleaned or _NONE_RE.match(cleaned):
+            continue
+        if not _TICKET_NUMBER_RE.match(cleaned) and path is not None:
+            print(f"just watch: WARNING -- {path} has a Blocked by: value ...", file=sys.stderr)
+        result.append(cleaned)
+    return result
+
+def is_unblocked(issue: Issue, siblings: dict[str, Issue]) -> bool:
+    for b in issue.blocked_by:
+        blocker = siblings.get(b)
+        if blocker is None or blocker.status != RESOLVED:
+            return False
+    return True
+```
+
+<p>One real consequence to know, and one near-miss that's already fixed:</p>
 
 <ul>
   <li>A blocker number with no matching `issues/NN-*.md` in the <em>same</em> feature counts as
@@ -140,6 +172,44 @@ whose status is `resolved`. One real consequence to know, and one near-miss that
   is still the simpler, more foolproof habit: no parenthetical to comma-split means nothing to
   ever get wrong, on this parser or a future one.</li>
 </ul>
+
+## Your turn
+
+<p><em>Reps are tagged <strong>[read]</strong> (inspect a real file, no setup) or <strong>[run]</strong> (drive the <a href="/01-sssf-fundamentals/reference/0004-wiring-your-factory/">wired factory</a>).</em></p>
+
+<ol class="steps">
+  <li>
+    <p><strong>[run]</strong> <strong>Run checkpoint 6 against the shape that used to stall.</strong>
+    In the Python playground repo, on a clean tree, file two tickets in one feature — one with a
+    comma inside a `Blocked by:` parenthetical, one with a near-miss `Status:` line — then run the
+    six checkpoints and `just watch --once` and read what each catches:</p>
+
+```bash
+mkdir -p .scratch/ckpt-demo/issues
+printf 'Status: needs-triage\nBlocked by: none (API exists, see spec.md)\n\n# Demo 01\n' \
+  > .scratch/ckpt-demo/issues/01-comma-in-parens.md
+printf '_Status_: needs-triage\n\n# Demo 02\n' \
+  > .scratch/ckpt-demo/issues/02-underscore-status.md
+
+grep -L "^Status: " .scratch/ckpt-demo/issues/*.md     # checkpoint 3: names 02, not 01
+grep -h "^Status: " .scratch/ckpt-demo/issues/*.md | sort -u   # checkpoint 4: one line, needs-triage
+git status --short .scratch/ckpt-demo/                  # checkpoint 5: NOT empty yet -- commit first
+git add .scratch/ckpt-demo && git commit -m "ckpt-demo: two deliberately shaped tickets"
+grep -h "^Blocked by: " .scratch/ckpt-demo/issues/*.md  # checkpoint 6: the comma line
+just watch --once; echo "exit=$?"
+```
+
+    <p>Expect: one stderr line — `just watch: WARNING -- .scratch/ckpt-demo/issues/02-underscore-status.md
+    has a Status:-like line that doesn't match the canonical 'Status: X' or '**Status:** X' form.
+    This ticket is INVISIBLE to the frontier scan until fixed.` — then `queue empty`, `exit=1`.
+    <strong>No</strong> warning for ticket 01: the parenthetical is stripped before the comma-split,
+    the leftover `none` matches `_NONE_RE`, and the ticket parses as unblocked. That exact
+    `none (…, …)` shape used to leave two unmatched tokens and stall the ticket forever; it is
+    fixed and has a regression test, and you have just confirmed it against the copy you run. Both
+    tickets stay at `needs-triage`, so nothing is claimed. Delete `.scratch/ckpt-demo/` and commit
+    the removal before moving on.</p>
+  </li>
+</ol>
 
 ## Check yourself
 

@@ -17,6 +17,11 @@ import Quiz from '@components/Quiz.astro'
   important reason they are there.</p>
 </Callout>
 
+<p><em>Have open:</em> `.claude/skills/sssf/templates/adws/adw_modules/agent_cc.py`
+(`SESSION_NAMESPACE`, `claude_session_id()`, `_session_marker()`, `build_command()`, `run()`).
+Every flag, constant, and code line below is quoted from it verbatim, so the quizzes are
+answerable from this page alone.</p>
+
 ## The exact invocation
 
 <p>One `claude_code` turn is one non-interactive CLI call. `agent_cc.build_command()` is split out
@@ -58,26 +63,45 @@ session with a correction — context intact, bounded retries."</p>
 <p>Two details make this work across separate ADW processes, not just within one:</p>
 
 <ul>
-  <li><strong>The id is deterministic.</strong> `--session-id` wants a UUID and SSSF session ids
+  <li><p><strong>The id is deterministic.</strong> `--session-id` wants a UUID and SSSF session ids
   (`sssf-<adw_id>-<agent>-<4 chars>`) are not, so `claude_session_id()` folds the SSSF id into a
-  UUIDv5 under a fixed `SESSION_NAMESPACE`. The same SSSF id always yields the same Claude
-  session, "which is what makes a rejoined run land in the context window it left." The
-  namespace constant is marked fixed forever: change it and every existing session becomes
-  unreachable.</li>
-  <li><strong>A marker file remembers that the session exists.</strong> Resuming a session that
-  was never minted fails; minting one that already exists fails too. `_session_marker()` writes
-  `<uuid>.opened` under `request.session_dir` after a successful turn, and `run()` checks
-  `marker.exists()` to pick `resume=True` or `False`. An in-memory flag "would forget between
-  runs, which is exactly when a rejoined session needs to resume."</li>
+  UUIDv5 under a fixed `SESSION_NAMESPACE`. The whole mechanism is three lines of `agent_cc.py`,
+  shown below. The same SSSF id always yields the same Claude session, "which is what makes a
+  rejoined run land in the context window it left." The namespace constant is marked fixed
+  forever: change it and every existing session becomes unreachable.</p></li>
+</ul>
+
+```python
+SESSION_NAMESPACE = uuid.UUID("6ba7b812-9dad-11d1-80b4-00c04fd430c8")
+
+def claude_session_id(sssf_session_id: str) -> str:
+    """Fold an SSSF session id into the UUID `--session-id` insists on."""
+    return str(uuid.uuid5(SESSION_NAMESPACE, sssf_session_id))
+```
+
+<ul>
+  <li><p><strong>A marker file remembers that the session exists.</strong> Resuming a session that
+  was never minted fails; minting one that already exists fails too. `_session_marker()` returns
+  `Path(request.session_dir) / f"{session_uuid}.opened"`; `run()` writes it after a successful
+  turn and checks `marker.exists()` to pick `resume=True` or `False`. An in-memory flag "would
+  forget between runs, which is exactly when a rejoined session needs to resume."</p></li>
 </ul>
 
 <Callout kind="trap" label="A lost marker is recovered from Claude's own error, not guessed">
 <p>A minted session exists on Claude's side the moment it is created, even if that turn then
-  crashed before the marker was written. So `run()` has one retry: if the first attempt was a mint
-  (`not resuming`), exited non-zero, and stderr contains `"already in use"`, it writes the marker
-  and re-attempts with `resume=True`. It takes Claude's word for it rather than trying to infer
-  session state from the filesystem — without this, a wiped `session_dir` would strand the agent
-  forever on the same "Session ID ... is already in use" error.</p>
+  crashed before the marker was written. So `run()` has one retry — in full:</p>
+
+```python
+if result.returncode != 0 and not resuming and "already in use" in stderr:
+    marker.write_text(now_iso())
+    result, stderr = attempt(resume=True)
+```
+
+<p>If the first attempt was a mint (`not resuming`), exited non-zero, and stderr contains
+  `"already in use"`, it writes the marker and re-attempts with `resume=True`. It takes Claude's
+  word for it rather than trying to infer session state from the filesystem — without this, a
+  wiped `session_dir` would strand the agent forever on the same "Session ID ... is already in
+  use" error.</p>
 </Callout>
 
 <p>Under `pi` the same idea needs no marker at all: `pi --session-id` "creates-or-continues, so
@@ -150,6 +174,27 @@ agent produces a child that "cannot authenticate ('Not logged in')." Sessions do
 isolation anyway — every id is a UUIDv5 derived from the SSSF id, so two agents can never collide
 in the shared store. Hermetic means "sees nothing of the operator's configuration," not
 "runs in a separate account."</p>
+
+## Your turn
+
+<p><em>Reps are tagged <strong>[read]</strong> (inspect a real file, no setup) or <strong>[run]</strong> (drive the <a href="/01-sssf-fundamentals/reference/0004-wiring-your-factory/">wired factory</a>).</em></p>
+
+<ol class="steps">
+  <li>
+    <p><strong>[run]</strong> <strong>Catch a resume in the act.</strong> In the Python playground
+    repo, run one chain under a `claude_code` agent (`just sdlc "…"` on a throwaway branch), then
+    find that agent's session id on its `agent_sessions` row: `sqlite3 adws/adw_data/sssf.db
+    "select agent, session_id from agent_sessions order by created_at desc limit 3;"`. Fold it
+    yourself — `python3 -c 'import uuid; print(uuid.uuid5(uuid.UUID("6ba7b812-9dad-11d1-80b4-00c04fd430c8"), "<session_id>"))'`
+    — and confirm a file named `<that uuid>.opened` exists under the run's `session_dir`. Then
+    read the spawned commands the tracer's `processes` table kept for that run (`sqlite3
+    adws/adw_data/sssf.db "select name, command from processes where adw_id='<adw_id>' order by
+    id;"`): turn one carries `--session-id <uuid>`, and any retry or gate correction in that
+    phase carries `--resume` with the identical uuid, alongside `--setting-sources ''
+    --strict-mcp-config` on every line. If the phase never retried, provoke one — tighten a gate
+    until it fails once — and re-check.</p>
+  </li>
+</ol>
 
 ## Check yourself
 

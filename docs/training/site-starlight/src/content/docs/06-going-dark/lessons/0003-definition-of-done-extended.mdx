@@ -11,6 +11,9 @@ import Quiz from '@components/Quiz.astro'
 <p>You can run the four going-dark checklist items after any headless feature and say, for each
   one, which silent failure it catches, what "pass" concretely looks like on disk, and why the
   playbook chose a checklist line over a mechanism for the last of them.</p>
+<p><em>Have open:</em> `docs/playbook-adopting-sssf.md` Part C, "Definition of done, extended",
+  and `.claude/skills/sssf/templates/prompt_engineering/documenter/system.md` — item 3 quotes its
+  lines 10–11 and 15.</p>
 </Callout>
 
 <p>Every capability this chapter adds comes with its own new way to fail silently, so the playbook extends the standing definition of done with checks specific to going dark: that `CONTEXT.md`/`docs/adr/` are committed and predate the headless run that used them, that a plan explicitly names what it's excluding as already-implemented rather than silently re-touching it, that your knowledge source got updated by the documenter stage if the feature changed anything it describes, and that a fresh grilling session's outcome actually reached `/triage` before the session ended — since nothing bridges that handoff automatically. This lesson walks each item and the silent failure it exists to catch.</p>
@@ -148,6 +151,27 @@ after the headless run      → [2] specs/<adw_id>_*.md names its exclusions
 <p>Part D extends this list once more — "Definition of done, extended again" adds queue-specific
 items on top, starting with: every dispatched ticket was `ready-for-agent` when `just watch`
 claimed it, "never a raw or `needs-triage` issue." That is where the next chapter picks up.</p>
+
+## Your turn
+
+<p><em>Reps are tagged <strong>[read]</strong> (inspect a real file, no setup) or <strong>[run]</strong> (drive an adopted repo where `just sdlc` works).</em></p>
+
+<ol class="steps">
+  <li>
+    <p><strong>[run]</strong> <strong>Walk all four items against one real feature.</strong> Take
+    the feature you bootstrapped in the "Bootstrap Vocabulary" rep and let it run to a commit.
+    Then, in order: <strong>[1]</strong> run the two `git log` lines above and confirm the
+    `CONTEXT.md`/`docs/adr/` commit is an ancestor of the spec's commit
+    (`git merge-base --is-ancestor &lt;bootstrap-hash&gt; &lt;run-hash&gt; && echo predates`);
+    <strong>[2]</strong> open `specs/&lt;adw_id&gt;_*.md` next to `scout_findings.md` and find the
+    exclusion sentence; <strong>[3]</strong> `git diff &lt;run-hash&gt;~1 -- .okf/` (or your knowledge
+    source's path) — if the feature changed a described concept and this diff is empty, the
+    shipped documenter template did what it says and nothing more, and the update is yours to
+    make; <strong>[4]</strong> if the session started with `/grill-with-docs`, run `/triage` and
+    confirm a `.scratch/&lt;feature-slug&gt;/issues/NN-*.md` exists with a `Status:` line before
+    you close the terminal. Write down which item you would have skipped without the list.</p>
+  </li>
+</ol>
 
 ## Check yourself
 

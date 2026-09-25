@@ -134,6 +134,24 @@ not a guarantee it was followed — and "Token cost of the vendored text is repo
   specific to your repo's `.okf/` layout is the second kind.</p>
 </Callout>
 
+## Your turn
+
+<p><em>Reps are tagged <strong>[read]</strong> (inspect a real file, no setup) or <strong>[run]</strong> (drive an adopted repo where `just sdlc` works).</em></p>
+
+<ol class="steps">
+  <li>
+    <p><strong>[run]</strong> <strong>Prove which layer has a drift check.</strong> In an adopted
+    repo, vendor one short skill with `uv run &lt;sssf&gt;/scripts/vendor_skill.py &lt;source&gt;`, then
+    append a one-line comment to the vendored copy under `adws/adw_data/skill_engineering/` and
+    run `vendor_skill.py --check &lt;vendored-file&gt;` — it reports drift. Revert that, then append
+    the same line to `adws/adw_data/prompt_engineering/planner/system.md` and look for any
+    tool that notices: there is none. Finish with
+    `diff adws/adw_data/prompt_engineering/planner/system.md &lt;fork&gt;/.claude/skills/sssf/templates/prompt_engineering/planner/system.md`
+    — the manual diff the config reference tells you to run periodically is the only drift
+    check layer one has.</p>
+  </li>
+</ol>
+
 ## Check yourself
 
 <Quiz

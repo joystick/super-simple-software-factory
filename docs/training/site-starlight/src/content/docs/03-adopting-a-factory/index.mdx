@@ -1,0 +1,60 @@
+---
+title: "Adopting a Factory"
+description: "Five lessons on bringing SSSF into a codebase — recon, boundaries, the four jobs, the new-project path, and tuning the roster — driven by the adoption playbook."
+sidebar:
+  order: 0
+---
+import Callout from '@components/Callout.astro'
+
+<p>Chapters 1 and 2 taught the factory's guarantee on a codebase that was built for it. This chapter
+is about the other situation, the one you will actually be in: a repo that already exists and was
+not written with a factory in mind, or a repo that does not exist yet. It follows the adoption
+playbook, <code>docs/playbook-adopting-sssf.md</code>, in its own order — Part A for an existing
+codebase, Part B for a new project — and adds nothing the playbook does not say. Rule zero (wire
+the gates before an agent writes a line) runs through every lesson; what each one adds is the
+step that comes before or after it.</p>
+
+## What this chapter assumes
+
+<p>Chapter 1's vocabulary — gate, envelope, <code>quality.py</code>, "watched failing" — is used
+without re-explanation, and so is Chapter 2's point that the guarantee survives a change of
+toolchain. In particular you should already know why a gate that has not been watched failing is a
+placeholder, because this chapter's first lesson is entirely about not wiring one by accident.</p>
+
+<Callout kind="trap" label="Check which repo you're standing in">
+<p>Chapters 1 and 2 run against two fixed repos — the Python playground and the TypeScript rebuild.
+This chapter deliberately does not: its <strong>[run]</strong> steps are meant to be done against
+<em>a codebase you are adopting</em> — any existing repo you did not write (lessons 0–2 and 4), or
+an empty directory you <code>git init</code> yourself (lesson 3). Bring one; the Python playground
+is already wired, so it cannot show you what recon or placeholder-green look like. The lessons'
+primary sources — the playbook, <code>.claude/skills/sssf/templates/</code>, and
+<code>.claude/skills/sssf/references/config.md</code> — live in the skill source fork,
+<code>joystick/super-simple-software-factory</code>, so keep that open in a second window; the
+stamped copies in your adoption target are what those templates become after
+<code>install.py</code> runs.</p>
+</Callout>
+
+## Lessons
+
+<ul>
+  <li><a href="/03-adopting-a-factory/lessons/0000-recon-before-spending/">Recon Before Spending</a> —
+  before wiring a single gate, spend a short recon pass finding out what a codebase already has —
+  its test runner, its lint config, its build command — so the factory is wired to real tools, not
+  guesses.</li>
+  <li><a href="/03-adopting-a-factory/lessons/0001-interrogate-before-plan/">Interrogate Before You Plan</a> —
+  a planner that has not been interrogated about a codebase's real boundaries will happily plan
+  work that violates them; the questions to force answered before the first plan phase runs.</li>
+  <li><a href="/03-adopting-a-factory/lessons/0002-the-four-jobs/">The Four Jobs</a> — adopting a
+  factory into an existing codebase breaks into four distinct jobs, each with its own cheap
+  checkpoint — reading specs before trusting them, not conflating recon with planning.</li>
+  <li><a href="/03-adopting-a-factory/lessons/0003-new-project-walking-skeleton-and-install/">New-Project Walking Skeleton and Install</a> —
+  starting from zero code is a different path than adopting an existing repo — build a walking
+  skeleton first, then install and wire the factory around it, one slice at a time.</li>
+  <li><a href="/03-adopting-a-factory/lessons/0004-tuning-the-roster/">Tuning the Roster</a> — the
+  default roster a fresh install ships with is a starting point, not a fit; reading its defaults,
+  overriding per-agent fields, and validating the result before it runs unattended.</li>
+</ul>
+
+<p>Read them in order. Lessons 0–2 are Part A of the playbook; lesson 3 is Part B; lesson 4 is
+B4, which applies to both branches. Before any run that writes, the playbook's standing checklist
+is the thing to reread.</p>

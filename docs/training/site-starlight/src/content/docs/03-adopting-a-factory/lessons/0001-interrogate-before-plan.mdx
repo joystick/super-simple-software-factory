@@ -63,6 +63,13 @@ spec-writing before slicing.</p>
   <li>Both (2) and (3) self-apply `ready-for-agent` by default — Part D's Filing sharp edge
   applies before you commit their output (Chapter 7 covers the triage gate that must stay the sole
   promoter).</li>
+  <li><strong>[run]</strong> <strong>Commit the answers, then prove the planner cannot sweep
+  them.</strong> In your adoption target, write A4's three answers — what breaks today, what must
+  not change, what you are assuming — into `CONTEXT.md` (by hand if `/grill-with-docs` is not
+  installed). Commit it as its own commit and confirm `git status` is clean. Then run
+  `just plan "<one narrow slice>"`, open `specs/<adw_id>_*.md`, and check the plan reflects
+  the constraints you wrote. Run `git show --stat HEAD` on the run's commit: `CONTEXT.md` must
+  not appear in it — that is the A3 sharp edge, avoided.</li>
 </ol>
 
 <p>Then, and only then, hand one slice to SSSF. The playbook's closing line for A4 is the one to
