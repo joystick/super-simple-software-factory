@@ -146,7 +146,9 @@ enforcement and permission concepts: `quality-gates-and-permissions/Permissions-
 | Mandatory checkpoints | the-queue | own-page | `.claude/skills/sssf/templates/justfile` + `docs/playbook-adopting-sssf.md` (Part D) |
 | Bootstrap vocabulary | the-queue | own-page | `docs/playbook-adopting-sssf.md` (bootstrap/AFK split, Part C) |
 
-Full pages: `the-queue/Frontier.md`, `the-queue/The-queue-watcher.md`.
+Full pages: `the-queue/Frontier.md`, `the-queue/The-queue-watcher.md`,
+`the-queue/Dark-factory.md`, `the-queue/The-four-jobs.md`,
+`the-queue/Bootstrap-vocabulary.md`.
 
 ## Totals
 
@@ -159,6 +161,11 @@ Full pages: `the-queue/Frontier.md`, `the-queue/The-queue-watcher.md`.
   citations and reclassified — see each row's own note above — plus the
   session-directory-layout and defaults-merging worked link examples, which
   get a short own-page that mostly redirects).
-- This pass fully authors 10 of the 44 own-page rows as real pages (see
-  `README.md` for the list); the rest are tracked as follow-up per the plan's
-  scoping decision — not claimed done by this pass.
+- **23 of the 44 own-page rows have a dedicated page on disk**; the other 21
+  are answered inside a sibling page's prose (e.g. `Gate.md` alone answers 9
+  rows: `Gate`, `GateReport`, `GateCheck`, and all six built-in gate
+  functions; `Permissions-and-writes.md` answers 6:
+  `writes`/`protected_files`/`snapshot()`/`enforce()`/`PermissionBreach`/
+  `always_writable`; `Dark-factory.md` answers 9 more) — verified row by row,
+  not assumed. See `README.md`'s "What this pass built" for the authored-page
+  list. No row is a dead end.

@@ -2,6 +2,14 @@
 
 version: 1.0
 updated: 2026-08-28
+status: historical — describes a one-time 2026-08-28 migration, not live site structure
+
+**This is a historical record, not live documentation.** It describes the site as it
+was the day of the Astro-to-Starlight migration (two chapters, an `astro.config.mjs`
+sidebar snippet that is now stale, unchecked verification boxes referencing
+long-deleted Docsify files). For the site's current structure, read
+`src/content/docs/index.mdx` (the real chapter list) or the real `astro.config.mjs`
+directly — not this file.
 
 ## Scaffold
 

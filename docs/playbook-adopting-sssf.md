@@ -415,7 +415,7 @@ flowchart TB
 
     subgraph DELIB["DELIBERATE — skill_engineering, shipped"]
         direction TB
-        L1["Vendor a SKILL.md into the repo<br/>adws/adw_data/skill_engineering/"] -->|"skill_engineering: key on a<br/>coding_agent: claude_code agent"| L2[That node runs<br/>WITH the protocol in its prompt]
+        L1["Vendor a SKILL.md into the repo<br/>adws/adw_data/skill_engineering/"] -->|"skill_engineering: key,<br/>any coding_agent (--system-prompt<br/>or folded into the user turn)"| L2[That node runs<br/>WITH the protocol in its prompt]
         L2 --> L3[["Outcome gates judge the result.<br/>No gate claims to verify process"]]
         L2 --> L4[Token cost of the vendored text<br/>is reported per run]
     end
@@ -474,8 +474,8 @@ flowchart TD
 
 `wayfinder`'s "ask the user how to proceed" fallback is written for an
 interactive session — a human on the other end who answers
-back. Vendored under `skill_engineering:` and run by a headless `claude_code`
-node, there is no one there. Best case the model role-plays both sides and you
+back. Vendored under `skill_engineering:` and run by a headless node — any
+`coding_agent` — there is no one there. Best case the model role-plays both sides and you
 get a low-fidelity spec with none of the interview's real value; worst case it
 tries to prompt and the run hangs waiting for input that never comes.
 
@@ -613,6 +613,11 @@ Part C gets one feature through the headless loop unattended. This part is
 what turns that into a standing queue: an engineer files or triages work
 whenever they want, and something — `just watch`, watching — picks it up and
 ships it without anyone manually running `just sdlc` per item.
+
+**A note on paths in this part.** `docs/agents/issue-tracker.md`,
+`.scratch/`, and `sssf.config.yaml` below all mean paths **in the repo you
+are adopting SSSF into**, once `install.py` has stamped it and you've set up
+the tracker — not paths in this skill-source fork, which has none of them.
 
 ### The whole chain, named once
 

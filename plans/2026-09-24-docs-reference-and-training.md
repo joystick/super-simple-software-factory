@@ -408,9 +408,9 @@ docs-training-test/
       item above is now stale and has been removed. The user later overruled that
       "historical narrative is fine" allowance entirely: this repo's docs must not
       leak any other project's name or path, historical or not. A dedicated pass
-      (`docs-scrub-project-leaks`, merged `938fc1a`) scrubbed every occurrence of
-      `sssf-play`/`pricing-ts`/`sssf-learn`/`opencode-expo`/`weather-report` and
-      every literal `/Users/<user>/...` path across 43 files, replacing them with
+      (`docs-scrub-project-leaks`, merged `938fc1a`) scrubbed every other-project
+      name/path (five distinct projects) and every literal absolute user path
+      across 43 files, replacing them with
       consistent generic descriptions ("the Python playground repo", "the
       TypeScript rebuild repo", "the standalone course repo", "a downstream
       project"). `npm run build` and both `docs-check` scripts verified clean

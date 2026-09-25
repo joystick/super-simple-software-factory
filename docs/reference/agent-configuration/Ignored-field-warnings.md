@@ -96,3 +96,7 @@ mechanism. This page is that definition.
   skill their `coding_agent` will never receive, as `[ignored by: ...]`.
 - `.claude/skills/sssf/references/config.md#harness-engineering` and
   `#skill-engineering` — what the two fields do when they *are* honoured.
+- [`docs/manual-skill-engineering.md`](../../manual-skill-engineering.md) — the full
+  `skill_engineering` feature end to end: vendoring, composition order, the
+  `skill_engineering_applies()` allowlist this warning is built on, and token-cost
+  tracking.
