@@ -50,7 +50,7 @@ over a worked example that lives elsewhere.
 To record them faithfully you need a playground of your own:
 
 ```bash
-mkdir sssf-play && cd sssf-play && git init
+mkdir the Python playground repo && cd the Python playground repo && git init
 uv run /path/to/this/repo/.claude/skills/sssf/scripts/install.py
 # then give it something to build, wire the gates, and make some runs
 ```

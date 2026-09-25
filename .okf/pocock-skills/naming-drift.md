@@ -15,7 +15,7 @@ sources:
     resource: downloads/skills/CHANGELOG.md
     title: mattpocock-skills CHANGELOG
   - id: vendored-files
-    resource: /Users/alexei/Projects/training/opencode-expo/adws/adw_data/skill_engineering/
+    resource: a downstream project/adws/adw_data/skill_engineering/
     title: Vendored skill files in a real SSSF downstream repo (provenance headers read 2026-09-12)
   - id: playbook
     resource: docs/playbook-adopting-sssf.md
@@ -60,7 +60,7 @@ works around by hand today.
 ## `prd-to-plan` is an SSSF-side invention/carry-over
 
 The vendored file `adws/adw_data/skill_engineering/prd-to-plan.md` in the
-downstream repo (opencode-expo) has **no `sssf:vendored` provenance header**
+downstream repo (a downstream project) has **no `sssf:vendored` provenance header**
 — unlike its four siblings — and `prd-to-plan` exists in neither snapshot of
 the upstream collection. It is a hand-authored (or pre-vendoring-era) skill
 text: "Turn a PRD into a multi-phase implementation plan … saved as a local
@@ -92,6 +92,6 @@ analysis and recommendations live in
 `plans/pocock-protocol-sssf-integration.md`.
 
 [^changelog]: `downloads/skills/CHANGELOG.md`, entries 1.0.0-1.2.3.
-[^vendored-files]: Provenance headers read from `/Users/alexei/Projects/training/opencode-expo/adws/adw_data/skill_engineering/*.md`, 2026-09-12.
+[^vendored-files]: Provenance headers read from `a downstream project/adws/adw_data/skill_engineering/*.md`, 2026-09-12.
 [^playbook]: `docs/playbook-adopting-sssf.md` (v4.5), grep verified 2026-09-12.
 [^planner-system]: `.claude/skills/sssf/templates/prompt_engineering/planner/system.md:32-51`.

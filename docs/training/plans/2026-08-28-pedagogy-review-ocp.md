@@ -6,7 +6,7 @@ version: 1.2
 updated: 2026-08-28
 ---
 
-# Reviewing sssf-learn against the Optimal Challenge Point
+# Reviewing the standalone course repo against the Optimal Challenge Point
 
 A review of the whole course (Chapter 1: 9 lessons + 2 learning records; Chapter 2: 5
 lessons + 5 reference + 6 learning records) through four lenses the request named:
@@ -61,7 +61,7 @@ sense of the whole; a straight-through learner risks the too-hard → anxiety sl
 the payoff should feel earned.
 
 ### F2 — Reps depend on a live, paid factory · **[ZPD] · high**
-Many "Your turn" steps (esp. L6–L9) require a wired `sssf-play`, running `just sdlc`, and real
+Many "Your turn" steps (esp. L6–L9) require a wired the Python playground repo, running `just sdlc`, and real
 spend (L9 ≈ $0.60). If the environment isn't set up, the struggle becomes *environmental*, not
 *conceptual* — outside the ZPD, where scaffolding can't help. L3 models the fix well (its first
 rep is "read a real `envelope.json`", zero setup).

@@ -1,5 +1,5 @@
 ---
-title: PRD — Audio-narrated lectures for sssf-learn
+title: PRD — Audio-narrated lectures for the standalone course repo
 created: 2026-08-28
 status: planned
 version: 1.0
@@ -10,7 +10,7 @@ updated: 2026-08-28
 
 ## Problem Statement
 
-The sssf-learn book is text + interactive quizzes. A learner who wants to absorb a lesson
+The the standalone course repo book is text + interactive quizzes. A learner who wants to absorb a lesson
 away from the screen (commuting, walking, resting their eyes) has no way to *listen* to it,
 and no way to follow along with where the narration is in the page.
 

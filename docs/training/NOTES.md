@@ -40,7 +40,7 @@ chapter-specific (toolchain, workspace layout) and some are general.
   language: what to check, what a note must tell the agent, what a gate cannot promise.
   This is also the whole reason Chapter 2 exists — TypeScript is the learner's actual
   language, and gates deserved to be taught there directly, not just translated.
-- Workspace lives in `chapters/01-sssf-fundamentals/` (originally `sssf-play/learn/`)
+- Workspace lives in `chapters/01-sssf-fundamentals/` (originally `the Python playground repo/learn/`)
   rather than the target repo root, so the course does not scatter directories through a
   working project.
 - Assessment before authoring: the dialogue set the zone of proximal development, and the
@@ -53,13 +53,13 @@ chapter-specific (toolchain, workspace layout) and some are general.
 
 - **Toolchain: Deno**, therefore `deno fmt` / `deno lint`. No Biome, ESLint or Prettier —
   standing project rule.
-- Workspace was deliberately a sibling repo (`pricing-ts`, now folded into this course as
-  Chapter 2's source), not nested inside `sssf-play`: pointing a factory at a TS repo
+- Workspace was deliberately a sibling repo (the TypeScript rebuild repo, now folded into this course as
+  Chapter 2's source), not nested inside the Python playground repo: pointing a factory at a TS repo
   needs a separate repo, and nesting a Deno project inside a Python one would confuse both
   toolchains' gates. That reasoning still applies to why *this course* now lives in its
-  own sibling directory (`sssf-learn/`) rather than inside either source repo.
+  own sibling directory (`the standalone course repo/`) rather than inside either source repo.
 - Specs are handed over as failing tests; the learner implements. The Python original
-  (`sssf-play/app/pricing.py`) is reference to consult *after* an attempt, never before.
+  (`the Python playground repo/app/pricing.py`) is reference to consult *after* an attempt, never before.
 - Quiz answers are authored to equal length so formatting leaks no clues.
 - The clamp bug and the binary-representable-percentage bug were handed over as specs
   (failing tests), not as anecdotes — matches the "run it, don't explain it" preference
@@ -71,7 +71,7 @@ chapter-specific (toolchain, workspace layout) and some are general.
   `sssf.db` records cost, phases and tool calls faithfully, and cannot record whether any
   of it meant anything.
 - **Unspent demonstration** (Chapter 1): running a real `just sdlc` with a deliberately
-  dead test gate in a copy of `pricing-ts`, to watch the factory commit a bug and certify
+  dead test gate in a copy of the TypeScript rebuild repo, to watch the factory commit a bug and certify
   it 5/5. Costs roughly $0.60–£1. The most convincing artefact available for objective 1
   and was deliberately left unspent — offer it before objective 2.
 - **Chapter 2** is fully done (all four objectives); nothing outstanding there beyond
@@ -89,4 +89,4 @@ chapter-specific (toolchain, workspace layout) and some are general.
 | Version | Date | Changes |
 |---|---|---|
 | 2.1 | 2026-08-27 | Parked a possible Chapter 3: SSSF on an existing Next.js + Expo Turborepo. |
-| 2.0 | 2026-08-27 | Merged `sssf-play/learn/NOTES.md` and `pricing-ts/NOTES.md` into this file, split into general vs. chapter-specific observations. |
+| 2.0 | 2026-08-27 | Merged `the Python playground repo/learn/NOTES.md` and `the TypeScript rebuild repo/NOTES.md` into this file, split into general vs. chapter-specific observations. |

@@ -17,7 +17,7 @@ sources:
     resource: downloads/skills/
     title: Fresh git clone of mattpocock/skills (audited 2026-09-12)
   - id: local-install
-    resource: /Users/alexei/.claude/skills/
+    resource: ~/.claude/skills/
     title: Locally installed skill set (older, mixed-generation snapshot)
   - id: upstream-changelog
     resource: downloads/skills/CHANGELOG.md

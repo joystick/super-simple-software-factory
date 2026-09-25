@@ -16,7 +16,7 @@ it, rather than confirming what the plan says should be true.
 ## The prompt to send
 
 ```
-Read /Users/alexei/Projects/training/super-simple-software-factory/plans/2026-09-24-consolidate-learning-content.md
+Read ~/Projects/training (a sibling working directory)/super-simple-software-factory/plans/2026-09-24-consolidate-learning-content.md
 in full first — it is the plan for a migration someone just executed. Your job is
 to verify, adversarially, that the migration actually did what the plan says, not
 to re-plan or re-critique the plan itself. Assume something was missed; go find it.
@@ -30,7 +30,7 @@ evidence), or NOT-APPLICABLE-BECAUSE (with the reason) — no vague "looks fine"
 ## A. Nothing was silently dropped
 
 1. Diff the file list under docs/handbook/site-starlight/ against a fresh clone (or
-   the last-known-good commit ff8d696) of https://github.com/joystick/sssf-learn —
+   the last-known-good commit ff8d696) of the standalone course repo's own GitHub repo —
    every tracked file from the source (excluding node_modules/, dist/, .astro/,
    public/audio/, .env.production) must exist at the destination. List anything
    present in source and absent in destination.
@@ -59,7 +59,7 @@ evidence), or NOT-APPLICABLE-BECAUSE (with the reason) — no vague "looks fine"
 
 ## C. Nothing was left stale
 
-9. grep -r "sssf-learn" docs/handbook/ — for every hit, confirm it was a DELIBERATE
+9. grep -r "the standalone course repo" docs/handbook/ — for every hit, confirm it was a DELIBERATE
    choice (either updated to the new identity, or left as historical prose
    describing how the course was originally built) rather than an untouched
    leftover nobody looked at. The plan names 21 files that should have been walked;
@@ -76,7 +76,7 @@ evidence), or NOT-APPLICABLE-BECAUSE (with the reason) — no vague "looks fine"
 
 ## D. Nothing outside Phase 1's scope was touched
 
-12. Confirm /Users/alexei/Projects/training/super-simple-software-factory/training/
+12. Confirm ~/Projects/training (a sibling working directory)/super-simple-software-factory/training/
     is COMPLETELY UNCHANGED — same file count, same content, same git history as
     before this migration. Phase 1 explicitly does not touch it; any change here
     is a scope violation.
@@ -84,14 +84,14 @@ evidence), or NOT-APPLICABLE-BECAUSE (with the reason) — no vague "looks fine"
     removal is backed by the plan's Open Question 1 resolution (re-verify, don't
     just trust the plan's claim: spot-check that at least one of the 3
     learn/reference/*.html pages really was a byte-for-byte prose duplicate of its
-    sssf-learn Ch1 counterpart before trusting the deletion was safe).
+    the standalone course repo Ch1 counterpart before trusting the deletion was safe).
 
 ## E. Nothing was lost irrecoverably
 
-14. Confirm https://github.com/joystick/sssf-learn still exists on GitHub and its
+14. Confirm the standalone course repo's own GitHub repo still exists on GitHub and its
     main branch is at (or ahead of) commit ff8d696 — this is the safety net the
     plan relies on before the local clone gets removed. If the local clone at
-    /Users/alexei/Projects/training/sssf-learn is already gone, confirm this check
+    the standalone course repo is already gone, confirm this check
     BEFORE treating that as fine — if the GitHub repo is missing or behind
     ff8d696, this is a FAIL regardless of what else passed.
 15. Confirm the fork's commits for this migration are a small, coherent set (the

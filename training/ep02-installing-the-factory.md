@@ -32,7 +32,7 @@ In this episode, we run the installer and take a tour of what appeared.
 |------|--------|-----------|
 | 0:00–0:10 | Terminal, fresh directory | Let's install into a clean temp directory so we can see the full output. |
 | 0:10–0:25 | Run: `cd /tmp/sssf-demo && mkdir -p sssf-demo && cd sssf-demo` | First, a fresh working directory. |
-| 0:25–0:35 | Run: `uv run /Users/alexei/Projects/training/sssf-play/.claude/skills/sssf/scripts/install.py` | Now we run the installer. This is the one-liner that stamps the entire factory into the current directory. |
+| 0:25–0:35 | Run: `uv run the Python playground repo/.claude/skills/sssf/scripts/install.py` | Now we run the installer. This is the one-liner that stamps the entire factory into the current directory. |
 | 0:35–1:20 | [CAST: capture full installer output] | The installer reports: stamped 44 files. Let me describe what just landed. |
 | 1:20–2:00 | Show directory structure: `ls -la adws/` and tree view | First, there's the `adws/` directory. This is where the factory lives. Inside: four starter workflow files — `adw_prompt.py`, `adw_scout.py`, `adw_plan.py`, and `adw_quality.py`. The underscore prefix means these are special. We'll use these with the `just` command to run different chains. |
 | 2:00–2:30 | Show: `ls -la adws/adw_modules/` | Inside `adw_modules/` are sixteen Python files. These are the guts: the agent runners, the permission checker, the tracer that writes to the database, the quality gates. You won't edit these. They come from the skill and stay read-only. |
@@ -50,7 +50,7 @@ In this episode, we run the installer and take a tour of what appeared.
 
 ```bash
 # Install the factory into the current directory
-uv run /Users/alexei/Projects/training/sssf-play/.claude/skills/sssf/scripts/install.py
+uv run the Python playground repo/.claude/skills/sssf/scripts/install.py
 
 # Show the workflow files
 ls -la adws/
@@ -90,7 +90,7 @@ uv run /path/to/install.py --force --reset-owned
 
 ## Common mistakes
 
-1. **Running the installer in the project root.** The user runs `uv run .claude/skills/sssf/scripts/install.py` from the `sssf-play` repo root. This overwrites the factory that's already there with the template, which resets the configuration and quality gates. Always install into a *new* directory to see what lands. If you're upgrading, use `--force --reset-owned` intentionally.
+1. **Running the installer in the project root.** The user runs `uv run .claude/skills/sssf/scripts/install.py` from the Python playground repo's root. This overwrites the factory that's already there with the template, which resets the configuration and quality gates. Always install into a *new* directory to see what lands. If you're upgrading, use `--force --reset-owned` intentionally.
 
 2. **Trying to set ANTHROPIC_API_KEY in .env.** The user copies a key into `.env` thinking the factory needs it. But the agent runners strip it before spawning. The factory still works, but now bills against the key instead of the logged-in session — a silent billing surprise.
 

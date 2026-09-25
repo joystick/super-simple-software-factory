@@ -56,7 +56,7 @@ resolves to either a working relative link or a real page.
 
 ## Fork glossary vs. course-internal reference
 
-`sssf-learn`'s own `01-sssf-fundamentals/reference/` and
+the standalone course repo's own `01-sssf-fundamentals/reference/` and
 `02-gates-deep-dive/reference/` pages (Verifying a Gate, Gate Cookbook, Deno
 Gates, Types and Contracts, etc.) are lab-specific how-to material — they stay
 inside `docs/training/site-starlight/` unchanged, and they are **not**

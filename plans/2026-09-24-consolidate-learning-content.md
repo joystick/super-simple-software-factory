@@ -1,11 +1,11 @@
 ---
-title: Consolidate training/, learn/, and sssf-learn into docs/handbook + docs/reference
+title: Consolidate training/, learn/, and the standalone course repo into docs/handbook + docs/reference
 created: 2026-09-24
 status: superseded
 ---
 
 > **SUPERSEDED** by `plans/2026-09-24-docs-reference-and-training.md`. This plan's
-> *mechanics* for moving `sssf-learn`'s Astro site (ignore-aware copy, `.gitignore`
+> *mechanics* for moving the standalone course repo's Astro site (ignore-aware copy, `.gitignore`
 > porting, hash-before-edit verification, the 21-file grep checklist) are still
 > correct and are reused by the new plan. Its *target layout* is not: `docs/handbook/`
 > is renamed `docs/training/`, and `docs/reference/` is no longer a thin pointer page
@@ -20,12 +20,12 @@ cross-linking and, in two cases, no active maintenance:
 
 | Location | What it is | Status (as of 2026-09-24) |
 |---|---|---|
-| `super-simple-software-factory/training/` | 10-episode screencast **scripts** (narration timing, `[CAST:]` markers) + 8 asciinema `.cast` recordings | Frozen, single commit (2026-08-25). Depends on the separate `sssf-play` playground repo for real ids/costs. |
-| `super-simple-software-factory/learn/` | Orphaned one-off interactive HTML course on gates (2 lessons, 3 reference pages, 2 learning-records, raw CSS/JS) | Parked after lesson 1 of 4 objectives, single commit (2026-08-27). Notes say its assets were "copied from a pricing-ts workspace" but it was never actually merged into anything. |
-| `sssf-learn/` (own repo, `github.com/joystick/sssf-learn`) | Real, actively-maintained Astro/Starlight course consolidating `sssf-play/learn/` (Ch1) + `pricing-ts/*` (Ch2) — quizzes, audio (Piper TTS) narration pipeline, 24 commits, latest 2026-09-07 | Alive, but sits in its own repo disconnected from the fork it teaches. |
+| `super-simple-software-factory/training/` | 10-episode screencast **scripts** (narration timing, `[CAST:]` markers) + 8 asciinema `.cast` recordings | Frozen, single commit (2026-08-25). Depends on the separate the Python playground repo playground repo for real ids/costs. |
+| `super-simple-software-factory/learn/` | Orphaned one-off interactive HTML course on gates (2 lessons, 3 reference pages, 2 learning-records, raw CSS/JS) | Parked after lesson 1 of 4 objectives, single commit (2026-08-27). Notes say its assets were "copied from the TypeScript rebuild repo's workspace" but it was never actually merged into anything. |
+| `the standalone course repo/` (its own separate repo) | Real, actively-maintained Astro/Starlight course consolidating `the Python playground repo/learn/` (Ch1) + `the TypeScript rebuild repo/*` (Ch2) — quizzes, audio (Piper TTS) narration pipeline, 24 commits, latest 2026-09-07 | Alive, but sits in its own repo disconnected from the fork it teaches. |
 
 Decision (superseding an earlier "flatten everything to plain markdown" direction):
-**keep `sssf-learn`'s Astro/Starlight site and its TTS pipeline fully functional** —
+**keep the standalone course repo's Astro/Starlight site and its TTS pipeline fully functional** —
 relocate it wholesale into the fork rather than flattening it. `training/` and
 `learn/` fold in as supporting/superseded content.
 
@@ -50,7 +50,7 @@ super-simple-software-factory/
     │   prd-skill-engineering.md, research-local-video-generation.md,
     │   head-to-head-agy-vs-claude.md
 
-sssf-learn/                            # OWN REPO, github.com/joystick/sssf-learn
+the standalone course repo/                            # OWN REPO, its own separate repo
 ├── README.md, MISSION.md, NOTES.md, CONTRIBUTING.md, justfile, CLAUDE.md, .nojekyll
 │                                     # CLAUDE.md is context-mode routing config
 │                                     #   IDENTICAL in shape to the fork's own — do
@@ -100,16 +100,16 @@ sssf-learn/                            # OWN REPO, github.com/joystick/sssf-lear
 ```
 
 Cross-reference facts established (fable research, 2026-09-24):
-- `training/` references neither `learn/` nor `sssf-learn`; its only external
-  dependency is the `sssf-play` playground repo (for real ids/costs).
-- `learn/` references neither `training/` nor `sssf-learn` by name. Its only link is
-  the "assets copied from a pricing-ts workspace" note in NOTES.md.
-- `sssf-learn` explicitly says its Ch1 was extracted from `sssf-play/learn/` — **a
+- `training/` references neither `learn/` nor the standalone course repo; its only external
+  dependency is the Python playground repo (for real ids/costs).
+- `learn/` references neither `training/` nor the standalone course repo by name. Its only link is
+  the "assets copied from the TypeScript rebuild repo's workspace" note in NOTES.md.
+- the standalone course repo explicitly says its Ch1 was extracted from `the Python playground repo/learn/` — **a
   different source than `super-simple-software-factory/learn/`** — and its Ch2 from
-  `pricing-ts/`. It never mentions `super-simple-software-factory/learn/` or
+  `the TypeScript rebuild repo/`. It never mentions `super-simple-software-factory/learn/` or
   `training/` at all.
 - **Open Question 1 RESOLVED by the fable critique pass (2026-09-24):** normalized-text
-  diff of all 3 `learn/reference/*.html` vs. `sssf-learn` Ch1 `reference/000{1,2,3}-*.mdx`
+  diff of all 3 `learn/reference/*.html` vs. the standalone course repo Ch1 `reference/000{1,2,3}-*.mdx`
   pairs confirms body prose, examples, and code blocks are identical. The only
   differences are HTML-only chrome (nav links, `<title>`, one tagline/subtitle per
   page — e.g. "Say it out loud before you trust a green build") and MDX-only
@@ -129,16 +129,16 @@ super-simple-software-factory/
 │                                       #   Migration mechanics step 3
 ├── docs/
 │   ├── handbook/
-│   │   ├── README.md                  # NEW — sssf-learn/README.md, moved (SIBLING
+│   │   ├── README.md                  # NEW — the standalone course repo/README.md, moved (SIBLING
 │   │   │                              #   to site-starlight/, not nested inside it)
 │   │   ├── MISSION.md, NOTES.md, CONTRIBUTING.md, plans/
-│   │   │                              # sssf-learn's own top-level docs, moved
+│   │   │                              # the standalone course repo's own top-level docs, moved
 │   │   │                              #   alongside site-starlight/ below — this is
 │   │   │                              #   the course's own governance doc, not
 │   │   │                              #   merged into the fork's own MISSION/etc.
 │   │   │                              #   (CLAUDE.md and .nojekyll NOT carried — see
 │   │   │                              #   BEFORE layout notes)
-│   │   ├── site-starlight/            # sssf-learn's site-starlight/, copied via
+│   │   ├── site-starlight/            # the standalone course repo's site-starlight/, copied via
 │   │   │   │                          #   rsync --exclude (ignored dirs left behind),
 │   │   │   │                          #   byte-hash-verified BEFORE any edit —
 │   │   │   │                          #   see Migration mechanics steps 2 and 6
@@ -179,7 +179,7 @@ super-simple-software-factory/
                                         #   Phase 2 (03-screencasts) is designed and
                                         #   executed as its own pass
 
-sssf-learn/  (github.com/joystick/sssf-learn)   # LOCAL CLONE removed after
+the standalone course repo/  (its own separate repo)   # LOCAL CLONE removed after
                                                  #   verification (Migration mechanics
                                                  #   step 6). GitHub repo itself
                                                  #   untouched — already pushed
@@ -191,7 +191,7 @@ sssf-learn/  (github.com/joystick/sssf-learn)   # LOCAL CLONE removed after
 
 ## New justfile recipes (fork root)
 
-Mirrors `sssf-learn`'s existing `justfile` one-for-one (confirmed exact match by the
+Mirrors the standalone course repo's existing `justfile` one-for-one (confirmed exact match by the
 fable critique pass, plus the `default`/`dev` conveniences it also has), paths
 rewritten for the new location (`docs/handbook/site-starlight/` instead of
 `site-starlight/`). `handbook-audio` now depends on `handbook-build` as a real `just`
@@ -237,8 +237,8 @@ even starts. Do not mix them in one commit.
    disposable.
 2. **Ignore-aware copy, not `cp -r`.** Use `rsync -a --exclude=node_modules
    --exclude=dist --exclude=.astro --exclude=public/audio --exclude=.env.production
-   sssf-learn/site-starlight/ docs/handbook/site-starlight/` (or `git archive` from a
-   clean `sssf-learn` tree, equivalent effect) — a naive `cp -r` + `git add -A` would
+   the standalone course repo/site-starlight/ docs/handbook/site-starlight/` (or `git archive` from a
+   clean the standalone course repo tree, equivalent effect) — a naive `cp -r` + `git add -A` would
    commit ~484 MB of build output (`node_modules/` 241 MB, `public/audio/` 137 MB,
    `dist/` 106 MB, `.astro/`) into the fork. Also copy the repo-root files listed in
    the BEFORE layout (`README.md`, `MISSION.md`, `NOTES.md`, `CONTRIBUTING.md`,
@@ -254,14 +254,14 @@ even starts. Do not mix them in one commit.
    `site-starlight/.vscode/launch.json` — it will be silently dropped by that rule
    as written; either add a `!launch.json` exception or explicitly accept the drop
    (note the decision in the retirement note either way, don't let it be silent).
-4. **Path/config fixups**, driven by the grep the critique ran (finding 8: "sssf-learn"
+4. **Path/config fixups**, driven by the grep the critique ran (finding 8: "the standalone course repo"
    appears in 21 tracked files, not just `astro.config.mjs`) — re-run
-   `grep -rl "sssf-learn" docs/handbook/` after the copy and walk every hit:
-   - `astro.config.mjs`: `title: 'sssf-learn'` and the GitHub social `href`.
+   `grep -rl "the standalone course repo" docs/handbook/` after the copy and walk every hit:
+   - `astro.config.mjs`: `title: 'the standalone course repo'` and the GitHub social `href`.
    - `package.json`: `name` is still the scaffold default `@example/starlight-basics`
      — fix it (e.g. `sssf-handbook` or similar), no `repository` field to update.
    - README/MISSION/NOTES/CONTRIBUTING/plans/*.md and the 13 content pages that
-     mention "sssf-learn" by name (index.mdx, mission.md, notes.md, 5 Ch1
+     mention "the standalone course repo" by name (index.mdx, mission.md, notes.md, 5 Ch1
      lessons/refs, 3 Ch2 lessons, resources.md) — each needs a human judgment call
      (rename to the new location's identity, or leave as historical prose describing
      how the course was built — do not blanket-find-replace).
@@ -279,15 +279,15 @@ even starts. Do not mix them in one commit.
    step 4's path/config edits touch the destination, not after — otherwise the
    comparison is source-vs-edited-tree and will show spurious diffs on every renamed
    file. Concretely: after step 2's copy, immediately hash every non-ignored file in
-   both `sssf-learn/site-starlight/` and the fresh `docs/handbook/site-starlight/`
+   both `the standalone course repo/site-starlight/` and the fresh `docs/handbook/site-starlight/`
    copy and confirm byte-for-byte equality — THEN apply step 4's edits on top.
-   Nothing under `learn/` or the `sssf-learn` local clone is deleted until: (a) that
+   Nothing under `learn/` or the standalone course repo's local clone is deleted until: (a) that
    pre-edit hash comparison passed, and (b) `just handbook-build` succeeds from the
    new location, and (c) `just handbook-test` is green, and (d)
    `just handbook-audio-image` + `just handbook-audio` produce output on at least one
    spot-checked lesson. **`training/` is untouched by Phase 1** — it is not deleted
    until Phase 2's conversion is designed, executed, and separately verified.
-7. **GitHub repo**: only the local clone of `sssf-learn` is removed by this plan.
+7. **GitHub repo**: only the local clone of the standalone course repo is removed by this plan.
    Deleting the GitHub repo itself is a separate, more irreversible decision, out of
    scope here — the pushed history at `ff8d696` stays as the durable backup regardless.
 
@@ -297,7 +297,7 @@ even starts. Do not mix them in one commit.
 Narration tables, `[CAST:]` markers, 62 markers total across all 10 files) convert
 into a new `03-screencasts` Starlight chapter. **Not started in this plan pass** —
 per the critique (finding 12), this is the largest, least-specified, genuinely
-lossy-risk conversion in the whole migration (episodes cite `sssf-play`-specific
+lossy-risk conversion in the whole migration (episodes cite the Python playground repo-specific
 ids/costs the new site location can't reproduce; no existing spec for how the 62
 `[CAST:]` markers map onto embedded/linked `.cast` playback). Needs its own
 grilling/design pass before conversion starts — see Open Question 2.
@@ -310,13 +310,13 @@ grilling/design pass before conversion starts — see Open Question 2.
    stay as a `resources.md`-style pointer to markdown kept in their original script
    format? **Deferred to Phase 2** — not required to resolve before Phase 1 executes,
    since Phase 1 does not touch `training/` at all.
-3. Does anything in `sssf-learn`'s `plans/` reference paths that break once the site
+3. Does anything in the standalone course repo's `plans/` reference paths that break once the site
    moves? **Not yet checked** — the fable critique pass reported the mentions found
    are prose-only (one mention of `site-starlight/public/audio/`) and nothing
    structurally breaks, but this should get a final look during Phase 1 step 4's
    grep pass, not assumed clean.
 4. `.nojekyll` / CI deploy — **RESOLVED**: `.nojekyll` is a root-level Docsify relic,
-   dropped, not carried. `sssf-learn` has no deploy recipe or CI workflow today and
+   dropped, not carried. the standalone course repo has no deploy recipe or CI workflow today and
    this plan doesn't add one — if a deploy target is wanted later, that's a separate
    follow-up.
 5. `.vscode/launch.json` — **NOT YET DECIDED**: the fork's `.gitignore` `.vscode/*`
@@ -331,11 +331,11 @@ grilling/design pass before conversion starts — see Open Question 2.
 - [ ] `docs/handbook/site-starlight/` copied via ignore-aware `rsync`/`git archive`
       (not `cp -r`) — no `node_modules/`, `dist/`, `.astro/`, `public/audio/`,
       `.env.production` committed
-- [ ] Fresh copy byte-hash-verified against the `sssf-learn` source BEFORE any
+- [ ] Fresh copy byte-hash-verified against the standalone course repo's source BEFORE any
       path/config edit touches it
 - [ ] Fork `.gitignore` updated with the 5 rules anchored to
       `docs/handbook/site-starlight/`
-- [ ] All 21 "sssf-learn"-mentioning files walked (grep-driven, not blanket
+- [ ] All 21 "the standalone course repo"-mentioning files walked (grep-driven, not blanket
       find-replace) — `astro.config.mjs`, `package.json` `name`, and every
       `just <recipe>` mention inside course content pages updated to match the
       `handbook-` prefix
@@ -349,7 +349,7 @@ grilling/design pass before conversion starts — see Open Question 2.
       what `learn/` used to be, confirming it as a verified duplicate, and noting
       that `training/` is intentionally NOT covered by this note yet (Phase 2)
 - [ ] `learn/` deleted from the fork
-- [ ] `sssf-learn`'s local clone removed (GitHub repo itself untouched, already
+- [ ] the standalone course repo's local clone removed (GitHub repo itself untouched, already
       pushed as of `ff8d696`)
 - [ ] Everything committed to the fork in a small number of coherent commits (not
       one giant commit mixing the move, the config edits, and the cleanup)
@@ -361,6 +361,6 @@ grilling/design pass before conversion starts — see Open Question 2.
 
 | Version | Date | Changes |
 |---|---|---|
-| 0.2 | 2026-09-24 | Revised per fable critique pass (`af7fe21c8d6b21184`): added the 8 tracked files the BEFORE layout omitted (`CLAUDE.md`, `.nojekyll`, `MIGRATION_NOTES.md`, `.vscode/*`, `README.md`, `tsconfig.json`, `package.json`, `package-lock.json`); resolved Open Question 1 (`learn/` confirmed a true duplicate, safe to delete); added the ignore-aware-copy requirement (484 MB of git-ignored build output would otherwise get committed) and the 5 `.gitignore` rules it needs; added the 21-file "sssf-learn"-mention grep checklist (was previously just `astro.config.mjs`); fixed the hash-verification step, which compared source against the EDITED destination in v0.1 (spurious diffs on every renamed file) — now compares against the pre-edit copy; split into two phases/PRs (Phase 1: move `site-starlight/`, mechanical and low-risk; Phase 2: `training/` → `03-screencasts` conversion, deferred, not designed) per the critique's finding that mixing them risked the larger lossy conversion blocking the smaller safe move. `training/` is no longer deleted by this plan's Phase 1 scope. |
-| 0.1 | 2026-09-24 | Initial before/after layout plan, superseding an earlier same-day "flatten to plain markdown, delete sssf-learn" direction that the user reversed before any execution happened. Not yet critiqued or executed. |
+| 0.2 | 2026-09-24 | Revised per fable critique pass (`af7fe21c8d6b21184`): added the 8 tracked files the BEFORE layout omitted (`CLAUDE.md`, `.nojekyll`, `MIGRATION_NOTES.md`, `.vscode/*`, `README.md`, `tsconfig.json`, `package.json`, `package-lock.json`); resolved Open Question 1 (`learn/` confirmed a true duplicate, safe to delete); added the ignore-aware-copy requirement (484 MB of git-ignored build output would otherwise get committed) and the 5 `.gitignore` rules it needs; added the 21-file "the standalone course repo"-mention grep checklist (was previously just `astro.config.mjs`); fixed the hash-verification step, which compared source against the EDITED destination in v0.1 (spurious diffs on every renamed file) — now compares against the pre-edit copy; split into two phases/PRs (Phase 1: move `site-starlight/`, mechanical and low-risk; Phase 2: `training/` → `03-screencasts` conversion, deferred, not designed) per the critique's finding that mixing them risked the larger lossy conversion blocking the smaller safe move. `training/` is no longer deleted by this plan's Phase 1 scope. |
+| 0.1 | 2026-09-24 | Initial before/after layout plan, superseding an earlier same-day "flatten to plain markdown, delete the standalone course repo" direction that the user reversed before any execution happened. Not yet critiqued or executed. |
 </content>

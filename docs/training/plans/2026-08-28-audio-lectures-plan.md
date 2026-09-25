@@ -1,5 +1,5 @@
 ---
-title: Plan — Audio-narrated lectures for sssf-learn
+title: Plan — Audio-narrated lectures for the standalone course repo
 created: 2026-08-28
 status: in-progress
 version: 1.0

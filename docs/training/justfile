@@ -4,9 +4,8 @@
 # (`just training-serve`) runnable from anywhere in the repo -- same
 # underlying commands, just namespaced for cross-repo consistency.
 # The book itself is an Astro Starlight site living in site-starlight/.
-# Originally built as the standalone "sssf-learn" repo (github.com/joystick/
-# sssf-learn); moved here 2026-09-24, see plans/2026-09-24-docs-reference-and-training.md
-# in the fork root.
+# Originally built as its own standalone course repo; moved here 2026-09-24,
+# see plans/2026-09-24-docs-reference-and-training.md in the fork root.
 
 # list every recipe
 default:

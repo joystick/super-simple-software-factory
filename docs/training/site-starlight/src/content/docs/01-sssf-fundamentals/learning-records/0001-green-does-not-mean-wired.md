@@ -86,4 +86,4 @@ a **list, never a shell string**: a list means no shell, so no pipe can eat the 
 ## Related
 
 - [Reference: verifying a gate](/01-sssf-fundamentals/reference/0001-verifying-a-gate/)
-- `~/Projects/training/sssf-play/docs/playbook-adopting-sssf.md` — rule zero
+- `the Python playground repo/docs/playbook-adopting-sssf.md` — rule zero
