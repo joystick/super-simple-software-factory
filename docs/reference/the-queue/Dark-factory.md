@@ -64,6 +64,22 @@ ticket body itself, verbatim, becomes the "agent brief" — the literal prompt
 handed to the dispatched chain (`utils.resolve_prompt(str(issue.path))`,
 `adw_watch.py:286`).
 
+## A `ready-for-agent` ticket doesn't require `just watch`
+
+"The chain named once" above describes what `just watch` always does — it is
+not the only way to consume a triaged ticket. `adw_build.py "<ticket-file>"`
+(`REQUIRED_AGENTS = ["builder"]`, phases `request -> build`, no `plan` phase
+of any kind — not even a code-owned `--skip-plan` one) takes the ticket's raw
+markdown as its `prompt` directly and builds it, one shot, planner-free. This
+is the supervised counterpart to the watcher's always-plan-fresh dispatch:
+useful when you want to build one already-triaged ticket by hand — after
+running `/grill-with-docs` → `/to-spec` → `/to-tickets` → `/triage`
+interactively, for instance — without either re-planning it or standing up
+the queue. It is not `--skip-plan` (`core-execution-model/Skip-plan.md`),
+which still runs a `plan` phase (`kind="code"`) that loads a markdown *plan*
+file; `adw_build.py` has no `plan` phase at all, so there is no gate on plan
+artifacts to satisfy — only the builder's own gate (`diff_matches_claims`).
+
 ## Issue tracker and ticket files
 
 The queue currently supports one tracker: local markdown, detected via

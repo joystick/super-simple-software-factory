@@ -84,6 +84,9 @@ fresh (`core-execution-model/Chains.md`).
 
 - [Chains](Chains.md) — which chains take the flag and which do
   not.
+- [Dark factory](../the-queue/Dark-factory.md) — `adw_build.py`, the other
+  planner-free path: no `plan` phase at all, not even the code-owned one
+  `--skip-plan` substitutes in.
 - [Gate](../quality-gates-and-permissions/Gate.md) — `artifacts_exist` and
   `files_non_empty`, the gates a loaded plan still has to pass.
 - `.claude/skills/sssf/references/handoff.md#envelope-schema` — the
