@@ -1,7 +1,7 @@
 ---
 title: "Adoption playbook — putting SSSF to work on real code"
-version: 4.18
-updated: 2026-09-25
+version: 4.19
+updated: 2026-10-02
 status: active
 ---
 
@@ -446,6 +446,69 @@ How it works. Each claim below is documented behaviour you can verify in
 - **Cost is visible.** Vendored skill text is real tokens on every call that
   agent makes, and the run reports it in the session record `just sessions`
   reads. Attach protocols you want, not every protocol you own.
+
+## When a vendored skill's own rule collides with your convention
+
+Vendoring freezes a skill's prose in your tree (`vendor_skill.py`, above), but
+freezing it doesn't make it universally correct for every adopting project.
+A vendored skill can state a hard principle — "always do X," "never
+reference Y" — that directly contradicts a convention your own codebase has
+already, legitimately, settled into. This happens whether the skill is
+`skill_engineering`-attached to a headless agent or run interactively by
+hand via the Skill tool; the collision itself doesn't care which.
+
+**Never silently rewrite the skill's own generic prose to resolve it.** That
+loses upstream diffability — a future re-vendor (or `vendor_skill.py --check`
+drift detection) can no longer tell your project-specific rewrite apart from
+a real upstream change, and the next person to read the file has no signal
+that anything was overridden at all.
+
+**Two different fixes, depending on how the skill is consumed:**
+
+- **`skill_engineering`-attached to a headless agent**: the vendored copy
+  stays untouched; the override goes in the *attached agent's own*
+  `system.md` instead (see Problem 1, below — e.g. "where this skill's text
+  says 'ask the user,' do X instead"). The agent's prompt is the thing
+  actually driving behavior; the vendored skill text is just one input into
+  it.
+- **Run interactively, by a human, never composed into any agent's prompt**
+  (`grill-with-docs`, `triage`, and anything similar) — Problem 1's
+  redirect target doesn't exist; there's no agent `system.md` to put the
+  override in. Instead, add a clearly-labeled, explicitly-scoped subsection
+  directly next to the principle it overrides — named as a project-local
+  addendum, never phrased as if it were an upstream rule. A reader (human or
+  agent) should be able to tell at a glance which part is Matt Pocock's and
+  which part is yours.
+
+**If the resolution is a hard rule, not just judgment a human applies case
+by case, back it with a deterministic checker and wire it into whatever gate
+already consumes that skill's output** — rule zero (A2, above) for this
+layer: verify, don't trust. "Mandatory checkpoints" (Filing, below) is the
+closest existing instance of the same discipline — concrete shell commands
+run right after `/to-spec`/`/to-tickets`/`/triage`, because every one of
+those checks "has failed silently on a real repo this playbook was built
+against." A checker for your own collision belongs at the same kind of
+checkpoint: exits non-zero on violation, invoked at the decision point,
+not skippable by override. A written convention nobody checks decays the
+moment someone's attention moves on.
+
+One real instance, from a downstream project, illustrative only (the
+specific rule doesn't generalize — only the *shape* of the fix does): a
+vendored skill's reference doc said tickets should never cite exact
+`file:line` (they go stale while queued); that project's own docs/commits
+had already, independently, settled into citing `file:line` everywhere.
+Resolved with a labeled "project-local addendum" subsection splitting a
+ticket into zones — evidence sections may cite it, the ticket's actual
+contract never may — backed by a small checker wired into that project's
+`/triage` gate, flagging a contract-zone violation the same way a failing
+`sm-check` does.
+
+This is the same underlying failure mode as "Two owners of one file" below
+— something external (there, a whole-file regen; here, a fresh re-vendor)
+can silently clobber a local addition — just a different artifact shape
+(shared prose vs. a shared file). Both are solved the same way: mark the
+addition clearly enough that a diff, not someone's memory, is what protects
+it.
 
 ## Part C — going dark: bootstrap vocabulary once, then let the loop run headless
 
@@ -973,6 +1036,7 @@ next run and what a human reads afterward.
 
 | Version | Date | Changes |
 |---|---|---|
+| 4.19 | 2026-10-02 | Added "When a vendored skill's own rule collides with your convention," right after "Where the two layers sit": a vendored skill's prose can state a hard principle that contradicts a convention a project has already settled into — a gap, not just different phrasing, confirmed by a full re-read finding zero existing coverage of this specific pattern (the nearest hits, Problem 1 and "Two owners of one file," address different collision shapes). States the resolution contract — never silently rewrite the skill's own prose; override in the attached agent's `system.md` when `skill_engineering`-attached (Problem 1's existing mechanism), or add a clearly-labeled project-local addendum subsection when the skill is run interactively and that redirect target doesn't exist (`grill-with-docs`/`triage` have no agent `system.md` to put it in); back a hard-rule decision with a deterministic checker at the same kind of checkpoint "Mandatory checkpoints" already uses, not a new, playbook-wide idiom. One real instance from a downstream project (a `file:line`-in-tickets convention colliding with `/triage`'s own durability principle) included as a labeled, non-generalizing illustration. |
 | 4.18 | 2026-09-25 | Two corrections surfaced by a teacher/student assessment round against the docs. (1) The Filing section's `Blocked by:` comma-split sharp edge is now described as fixed — `adw_watch.py` strips parentheticals before splitting and has a regression test — matching Chapter 7's filing-checkpoints lesson, which already said so. (2) Part D's "Claim" step no longer says concurrent watchers "never double-pick": claim-then-commit is ordering, not a lock, and a same-instant scan race is an acknowledged gap — matching Chapter 7's `just watch` lesson and `adw_watch.py` itself. |
 | 4.17 | 2026-09-14 | Added a "Cheat sheet" section: three lookup tables for the five vendored skills (role/mode/output per skill), the two interactive-only skills (`grill-with-docs`, `triage`), and the handoff format/location between every conveyor stage (scout→planner→builder→reviewer→documenter, plus the queue's watcher→planner path). Also fixed the frontmatter `version:` field, which had drifted two versions behind the version-history table's own top row (said 4.14 while the table already listed 4.16) — bumping this same edit closes that gap rather than leaving it to compound further. |
 | 4.16 | 2026-09-13 | B1 closed out: `just watch --once` succeeded live end to end after the v4.15 fix (a downstream project, device-management-ui, `adw_id: c1eff7ac` — 10/10 phases, reviewer approved 12/12 plan requirements and 6/6 acceptance criteria, real commits for plan/build/docs, ticket auto-resolved). Updated "What this playbook does not claim" from "not yet run live" to the actual result, including the one real defect the run surfaced and fixed along the way — framed as evidence the chain can work, not a reliability guarantee. |
