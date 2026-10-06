@@ -1,7 +1,7 @@
 ---
 title: "Adoption playbook — putting SSSF to work on real code"
-version: 4.18
-updated: 2026-09-25
+version: 4.19
+updated: 2026-10-06
 status: active
 ---
 
@@ -944,7 +944,19 @@ layers sit" and Parts C/D above; this is the lookup table.
 | `to-spec` | planner | Headless (never interviews, by design) | spec → `specs/<adw_id>_<slug>.md` |
 | `to-tickets` | planner | Headless (quiz skipped; forced `needs-triage`, plain `Status:`/`Blocked by:` lines) | tickets → `.scratch/<feature>/issues/NN-slug.md` (only on a fresh, non-dispatched request — see the planner's dispatch-detection guard) |
 | `tdd` | planner | Headless (pure methodology) | shapes `plan.md`'s phases red→green |
-| `code-review` | reviewer | Headless (spec always supplied via `writes: specs/`) | verdict → `context_handoff/review.md` |
+| `code-review` | reviewer | Headless (the planner's `writes: specs/` grant means `plan.md` always lands in `context_handoff_dir`, which the reviewer's own prompt reads before falling back to `prompt` — see the trap below) | verdict → `context_handoff/review.md` |
+
+> **Trap: `code-review` has two interactive fallbacks this table does not fully close.**
+> Vendoring the skill composes its text onto the reviewer's existing `system.md`/`user.md`
+> (SSSF's own built-in review methodology); it doesn't rewrite the skill's own "Process."
+> That real process says "pin the fixed point... if they didn't specify one, ask for it"
+> and "if nothing is found, ask the user where the spec is" — both written for an
+> interactive session. SSSF's reviewer prompt already supplies an equivalent (reads
+> `plan.md` from `context_handoff_dir`, falls back to `prompt`), which happens to satisfy
+> the spec-source question in practice, but nothing documents that this is deliberate
+> coverage for `code-review`'s own ask-conditions, and the fixed-point question is not
+> addressed at all. Unlike `wayfinder`'s fallback (Part C, Problem 1, treated in full),
+> this one has never been traced end to end — treat it as unverified, not resolved.
 
 **Not vendored — interactive-only, run by a human outside any agent:**
 
@@ -973,6 +985,7 @@ next run and what a human reads afterward.
 
 | Version | Date | Changes |
 |---|---|---|
+| 4.19 | 2026-10-06 | Fixed a wrong citation in the Cheat sheet: `code-review`'s headless-safety was attributed to the reviewer's `writes: specs/` grant, but that permission belongs to the **planner**, not the reviewer (whose own config is `writes: []`, read-only). The real mechanism is the planner's write landing `plan.md` in `context_handoff_dir`, which the reviewer's prompt reads. Found by checking a freshly-pulled copy of the Pocock skills against this playbook's claims. Also flagged, not yet resolved: `code-review`'s own two interactive ask-fallbacks (fixed point, spec source) have never been traced end to end for headless safety the way `wayfinder`'s was. |
 | 4.18 | 2026-09-25 | Two corrections surfaced by a teacher/student assessment round against the docs. (1) The Filing section's `Blocked by:` comma-split sharp edge is now described as fixed — `adw_watch.py` strips parentheticals before splitting and has a regression test — matching Chapter 7's filing-checkpoints lesson, which already said so. (2) Part D's "Claim" step no longer says concurrent watchers "never double-pick": claim-then-commit is ordering, not a lock, and a same-instant scan race is an acknowledged gap — matching Chapter 7's `just watch` lesson and `adw_watch.py` itself. |
 | 4.17 | 2026-09-14 | Added a "Cheat sheet" section: three lookup tables for the five vendored skills (role/mode/output per skill), the two interactive-only skills (`grill-with-docs`, `triage`), and the handoff format/location between every conveyor stage (scout→planner→builder→reviewer→documenter, plus the queue's watcher→planner path). Also fixed the frontmatter `version:` field, which had drifted two versions behind the version-history table's own top row (said 4.14 while the table already listed 4.16) — bumping this same edit closes that gap rather than leaving it to compound further. |
 | 4.16 | 2026-09-13 | B1 closed out: `just watch --once` succeeded live end to end after the v4.15 fix (a downstream project, device-management-ui, `adw_id: c1eff7ac` — 10/10 phases, reviewer approved 12/12 plan requirements and 6/6 acceptance criteria, real commits for plan/build/docs, ticket auto-resolved). Updated "What this playbook does not claim" from "not yet run live" to the actual result, including the one real defect the run surfaced and fixed along the way — framed as evidence the chain can work, not a reliability guarantee. |
