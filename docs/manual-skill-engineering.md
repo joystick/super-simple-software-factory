@@ -1,6 +1,6 @@
 ---
 title: "Manual — Skill Engineering"
-version: 1.1
+version: 1.2
 updated: 2026-09-25
 status: draft
 ---
@@ -172,6 +172,15 @@ first run either way.
   money; `skill_token_budget` exists so that price is visible at the
   moment you're paying it.
 
+## See also
+
+- [`docs/reference/agent-configuration/Skill-compatibility-checklist.md`](reference/agent-configuration/Skill-compatibility-checklist.md)
+  — before vendoring any third-party skill onto a role, the six checks that
+  verify its own assumptions (interactive fallbacks, sibling-skill
+  dispatch, output shape, writes, composition order, terminology) actually
+  hold for that role, headless. This manual explains the mechanism;
+  that page explains what can go wrong trusting it blindly.
+
 ## A note on scope
 
 This manual currently covers one feature. The adoption playbook
@@ -189,5 +198,6 @@ tracked here.
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.2 | 2026-10-07 | Added a "See also" link to the new skill-compatibility checklist (`docs/reference/agent-configuration/Skill-compatibility-checklist.md`) — six checks to run before vendoring any third-party skill onto a role headless. |
 | 1.1 | 2026-09-25 | Corrected the "claude_code only" boundary: `skill_engineering_applies()` now allowlists all four shipped coding agents (`claude_code`/`pi` via `--system-prompt`, `agy`/`opencode` folded into the user turn). Found as a docs-internal contradiction against `config.md`, the playbook, and the Chapter 4 lesson during a teacher/student assessment round. |
 | 1.0 | 2026-08-31 | Initial manual. Covers the skill_engineering feature end to end, post the branch's adversarial-review correction rounds (the claude_code-only boundary is now enforced, not just claimed). |
