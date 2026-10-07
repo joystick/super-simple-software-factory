@@ -1,7 +1,7 @@
 ---
 title: "Adoption playbook — putting SSSF to work on real code"
-version: 4.19
-updated: 2026-10-06
+version: 4.20
+updated: 2026-10-07
 status: active
 ---
 
@@ -981,10 +981,99 @@ Everything under `context_handoff/` is runtime state (gitignored, one adw_id's
 own working set); everything else in the right column is what survives to the
 next run and what a human reads afterward.
 
+## Cheat sheet — the extended Pocock+ToB roster (validated downstream)
+
+The five-skill cheat sheet above is SSSF's own shipped default. A downstream
+adopter (`weather-report`) extended it with a cross-ecosystem research pass —
+every role's real `system.md`/`user.md` checked against both the full Pocock
+catalog and the full Trail of Bits catalog (`trailofbits/skills`, ~44
+plugins/88 `SKILL.md` files), using the six-check compatibility framework in
+`docs/reference/agent-configuration/Skill-compatibility-checklist.md`. This
+is downstream-repo config, not a change to SSSF itself — SSSF stays
+skill-agnostic (see "Where the two layers sit"); recorded here because the
+pattern and its two validated runs are reusable evidence for the next
+adopter who wants to extend their own roster past the five defaults.
+
+**The roster, in composition order:**
+
+| Role | `skill_engineering` list | New vs. the five-skill default |
+|---|---|---|
+| planner | `codebase-design`, `tdd`, `wayfinder`, `to-spec`, `to-tickets`, `sharp-edges` | + `codebase-design`, `sharp-edges`; `tdd` moved before `wayfinder` |
+| builder | `codebase-design`, `tdd`, `property-based-testing` | + `codebase-design`, `property-based-testing` (ToB) — builder has no default skill wiring in the five-skill table at all |
+| scout | `codebase-design` | + `codebase-design` (reference only) |
+| reviewer | `sharp-edges`, `differential-review`, `code-review` | + `sharp-edges`, `differential-review` (both ToB), ahead of the existing `code-review` |
+| documenter | `writing-for-agents`, `pr` | + both — documenter has no default skill wiring in the five-skill table either |
+
+`codebase-design` is reference-only on every role it touches (shared seam
+vocabulary, no interactive asks, nothing to override). The other three new
+skills needed a real `system.md` amendment, because each has one interactive
+fallback the five-skill table's own compatibility framework would flag:
+
+- **planner + `tdd`**: `tdd`'s "write down the seams under test and confirm
+  them with the user" never applies headless. Added a 4th override bullet —
+  name the seams from the request/`scout_findings.md` yourself, record them
+  as a "Seams" list in `plan.md`. (The existing five-skill override block
+  only ever named `wayfinder`/`to-spec`/`to-tickets`; `tdd` was already
+  vendored to the planner under the default roster and had this same gap —
+  this roster is the first to close it.)
+- **builder + `property-based-testing`** (ToB): the skill says to "let the
+  user decide" before adding a property-testing library as a new
+  dependency. Added a headless override — reuse an existing
+  `proptest`/`quickcheck`/`hypothesis`-class dependency if one is already
+  named; otherwise add the smallest standard choice as a dev-only
+  dependency and say so plainly in `notes_for_next_agent`, never ask.
+- **reviewer + `sharp-edges`/`differential-review`** (both ToB): the
+  reviewer's own "not your job: generic style opinions" line would put both
+  skills' real findings out of scope by accident. Amended it to carve out
+  footguns/security regressions as in-scope evidence (not style opinions),
+  reported the same way as spec requirements, blocking only when a
+  reasonable engineer would actually block a merge. Also redirected
+  `differential-review`'s own "always generate a report file" instruction
+  at the existing `review.md`, so the reviewer writes one report, not two.
+
+ToB skills need one more step this table's Pocock skills don't:
+`compose()` ships exactly one vendored file, but a ToB `SKILL.md` often
+splits its real substance across `references/*.md` siblings. `sharp-edges`,
+`differential-review`, and `property-based-testing` were each hand-flattened
+(the `SKILL.md` plus only its relevant reference files — e.g. `sharp-edges`
+dropped 11 other-language reference files, keeping only `lang-rust.md` and
+the language-agnostic ones) into one composite file, carrying a
+CC-BY-SA-4.0 attribution comment block naming the exact upstream commit,
+before being vendored through the normal `vendor_skill.py --as <name>` path.
+This is check 7 of the compatibility framework (sibling-file dependency —
+not yet folded into the checklist page itself as of this writing).
+
+**Validated in two independent live runs**, both via `just simple-sdlc`
+against this extended roster as the adopting repo's **default**
+`sssf.config.yaml` (not a side experiment config — this result is what
+made the roster its default):
+
+| Run | adw_id | Ticket | Phases | Revise loop? | Tests | Cost |
+|---|---|---|---|---|---|---|
+| 1 | `a1fba942` | Property-based tests for a coordinate parser (`parse_coords`) | 10/10 | No | 38/38 pass (4 new) | $1.16 |
+| 2 | `aca5e802` | Country filter on a search endpoint (`GET /ports`) | 10/10 | No | 109/109 pass (5 new) | $0.78 |
+
+Both runs: reviewer produced one `review.md` with a distinct "Sharp-Edges
+Analysis" section separate from the spec-conformance checklist (the
+style-opinions amendment holding — new findings got a real reporting slot,
+without turning every observation into a blocker); builder added its new
+test-only dependency (`proptest`) with zero interactive pause (the headless
+override firing as designed); planner's plan already named seams/an
+independent oracle before the builder ran. Neither run exercised the revise
+loop, `diagnosing-bugs`, or a reviewer/builder disagreement — both tickets
+happened to pass on the first attempt, so this is evidence the roster's
+required amendments resolve their target fallbacks in a real run, not that
+the roster improves outcomes on every ticket shape. `property-based-testing`
+in particular is expected to help mainly on codec/parser/numeric code and
+to add little elsewhere; the second run (a straightforward query-filter
+addition, not parser-shaped) still passed clean, but with less surface for
+that specific skill to add value on.
+
 ## Version history
 
 | Version | Date | Changes |
 |---|---|---|
+| 4.20 | 2026-10-07 | Added a new "Cheat sheet — the extended Pocock+ToB roster" section documenting a downstream adopter's (`weather-report`) cross-ecosystem skill-engineering extension: codebase-design/tdd/sharp-edges on planner, codebase-design/tdd/property-based-testing on builder, sharp-edges/differential-review/code-review on reviewer, codebase-design on scout, writing-for-agents/pr on documenter. Documents the three required `system.md` amendments (planner's tdd seam-naming override, builder's headless PBT-dependency override, reviewer's sharp-edges/differential-review scope amendment), the ToB sibling-file-flattening step (compatibility check 7, not yet folded into the checklist page), and two independent live `just simple-sdlc` runs against the roster as the adopting repo's production default (not an experiment config) — both 10/10 phases, no revise loop. This is downstream-repo config, recorded here as reusable evidence, not a change to SSSF's own skill-agnostic shipped default. |
 | 4.19 | 2026-10-06 | Fixed a wrong citation in the Cheat sheet: `code-review`'s headless-safety was attributed to the reviewer's `writes: specs/` grant, but that permission belongs to the **planner**, not the reviewer (whose own config is `writes: []`, read-only). The real mechanism is the planner's write landing `plan.md` in `context_handoff_dir`, which the reviewer's prompt reads. Found by checking a freshly-pulled copy of the Pocock skills against this playbook's claims. Also flagged, not yet resolved: `code-review`'s own two interactive ask-fallbacks (fixed point, spec source) have never been traced end to end for headless safety the way `wayfinder`'s was. |
 | 4.18 | 2026-09-25 | Two corrections surfaced by a teacher/student assessment round against the docs. (1) The Filing section's `Blocked by:` comma-split sharp edge is now described as fixed — `adw_watch.py` strips parentheticals before splitting and has a regression test — matching Chapter 7's filing-checkpoints lesson, which already said so. (2) Part D's "Claim" step no longer says concurrent watchers "never double-pick": claim-then-commit is ordering, not a lock, and a same-instant scan race is an acknowledged gap — matching Chapter 7's `just watch` lesson and `adw_watch.py` itself. |
 | 4.17 | 2026-09-14 | Added a "Cheat sheet" section: three lookup tables for the five vendored skills (role/mode/output per skill), the two interactive-only skills (`grill-with-docs`, `triage`), and the handoff format/location between every conveyor stage (scout→planner→builder→reviewer→documenter, plus the queue's watcher→planner path). Also fixed the frontmatter `version:` field, which had drifted two versions behind the version-history table's own top row (said 4.14 while the table already listed 4.16) — bumping this same edit closes that gap rather than leaving it to compound further. |
