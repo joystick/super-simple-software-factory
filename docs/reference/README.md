@@ -110,6 +110,14 @@ Second pass (13 pages, the genuine remainder):
 - `the-queue/The-four-jobs.md`
 - `the-queue/Bootstrap-vocabulary.md`
 
+Third pass (2026-10-07, 1 page) — a new standing procedure, not part of the
+original 80-concept manifest. `skill_engineering:` lets any third-party
+skill plug into a role, but no such skill was written with SSSF's headless
+conveyor in mind; this page is the checklist for verifying the plug
+actually fits before trusting it unattended, derived from three real,
+independently-verified compatibility gaps:
+- `agent-configuration/Skill-compatibility-checklist.md`
+
 All 44 own-page rows in the manifest now resolve to either a real dedicated
 page or a real section inside one of the 23 pages above — none are dead
 ends. This second pass is pending an in-depth opus review before being
