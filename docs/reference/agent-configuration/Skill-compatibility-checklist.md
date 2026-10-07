@@ -22,7 +22,7 @@ as "the text's own assumptions hold in this role, headless." Every item
 below is a real, independently-verified case where that gap mattered, not a
 theoretical concern.
 
-## Before vendoring any skill onto any role, check all six
+## Before vendoring any skill onto any role, check all seven
 
 ### 1. Dispatch dependency
 
@@ -127,6 +127,37 @@ last recorded, and check its own changelog for renamed
 files/fields/conventions. Update every file in this repo that references
 the old name in the same change, not as a follow-up.
 
+### 7. Sibling-file dependency
+
+Does the skill's own `SKILL.md` split its real substance across sibling
+reference files (`references/*.md`, bare peer files in the skill's own
+directory) that `compose()` won't pull in? `compose()` vendors exactly the
+one file named in `skill_engineering:` — it has no notion of a skill
+directory, so a `SKILL.md` that reads "see `references/foo.md` for X"
+composes a pointer to a file that was never vendored and is not reachable
+any other way in a headless run (the same unreachability check #1 covers
+for a sibling *skill*, here applied to a sibling *file* of the same skill).
+
+**Verified case:** Trail of Bits' `sharp-edges` splits a ~290-line
+`SKILL.md` across 15 `references/*.md` siblings (4 category files plus 11
+per-language files); `differential-review` splits across 4 bare peer files
+(`methodology.md`, `adversarial.md`, `patterns.md`, `reporting.md`); even
+Pocock's own `writing-for-agents` splits a `SKILL-MECHANICS.md` out of
+`SKILL.md`. Vendoring any of these by pointing `skill_engineering:` at the
+upstream `SKILL.md` path alone composes a prompt full of dead links.
+
+**Rule:** hand-flatten before vendoring — merge `SKILL.md` and the
+reference files a given role actually needs into one composite file,
+rewriting internal links to the composite's own section anchors, and
+record the merge in the file's own provenance header (which siblings were
+kept, which were dropped and why, the upstream commit SHA, and the
+license if it differs from the rest of this repo's vendored skills — e.g.
+Trail of Bits' CC-BY-SA-4.0 vs. Pocock's MIT). Trim per-language or
+per-stack reference files down to the ones this repo's own stack actually
+uses (keep `lang-rust.md`, drop the other ten, if this is a Rust repo);
+keep category-level/language-agnostic reference files in full. Then vendor
+the resulting single file through the normal path.
+
 ## What "passing" this checklist looks like
 
 Every vendored skill in `adws/adw_data/skill_engineering/` should have a
@@ -151,4 +182,5 @@ compatibility.
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.1 | 2026-10-07 | Added check #7 (sibling-file dependency), folding in the gap the "extended Pocock+ToB roster" cheat sheet (`docs/playbook-adopting-sssf.md`) had already flagged as real but not yet in this page: a skill whose substance is split across `references/*.md` or bare peer files composes a dead pointer unless those siblings are hand-flattened into one vendored file first. Derived from a second downstream adopter independently hitting the same gap vendoring Trail of Bits' `sharp-edges`/`differential-review` and Pocock's own `writing-for-agents`. |
 | 1.0 | 2026-10-07 | Initial checklist, derived from three real, independently-verified compatibility gaps found while tracing the actual prompt-composition mechanics against a live `sssf.config.yaml`: `wayfinder`'s unvendored Skill-tool dispatch, `code-review`'s unaddressed interactive fallback, and the `CONTEXT.md`→`GLOSSARY.md` rename drift. |
