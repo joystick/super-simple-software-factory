@@ -1,6 +1,6 @@
 ---
 title: "Adoption playbook — putting SSSF to work on real code"
-version: 4.21
+version: 4.22
 updated: 2026-10-07
 status: active
 ---
@@ -994,34 +994,60 @@ skill-agnostic (see "Where the two layers sit"); recorded here because the
 pattern and its two validated runs are reusable evidence for the next
 adopter who wants to extend their own roster past the five defaults.
 
-**The roster, in composition order:**
+**The roster, in composition order (current, 2026-10-07):**
 
 | Role | `skill_engineering` list | New vs. the five-skill default |
 |---|---|---|
-| planner | `codebase-design`, `tdd`, `wayfinder`, `to-spec`, `to-tickets`, `sharp-edges` | + `codebase-design`, `sharp-edges`; `tdd` moved before `wayfinder` |
+| planner | `codebase-design-planner`, `tdd-planner`, `sharp-edges-planner` | Replaces `wayfinder`/`to-spec`/`to-tickets` entirely (see "Re-armed" below) — all three files are planner-specific trims, not the shared copies other roles use |
 | builder | `codebase-design`, `tdd`, `property-based-testing` | + `codebase-design`, `property-based-testing` (ToB) — builder has no default skill wiring in the five-skill table at all |
 | scout | `codebase-design` | + `codebase-design` (reference only) |
 | reviewer | `sharp-edges`, `differential-review`, `code-review` | + `sharp-edges`, `differential-review` (both ToB), ahead of the existing `code-review` |
 | documenter | `writing-for-agents`, `pr` | + both — documenter has no default skill wiring in the five-skill table either |
 
+**The planner roster was re-armed once already**, after the first version
+of this roster shipped with `codebase-design, tdd, wayfinder, to-spec,
+to-tickets, sharp-edges`. A 3-round opus-vs-fable debate (the adopting
+repo's own `docs/agents/planner-roster-debate.md`) found `wayfinder`/
+`to-spec`/`to-tickets` were dead text on every queued ticket: the human
+bootstrap chain (`grill-with-docs`/`wayfinder` → `to-spec` → `to-tickets` →
+`/triage`, run interactively, outside this pipeline) already does
+everything those three skills' text describes, before a ticket ever
+reaches `ready-for-agent` — the planner's own dispatch-detection (see Part
+C, Problem 1) was already skipping them on every real queue dispatch, so
+composing them was pure overhead with a live downside: opencode's own
+skill auto-discovery (see the harness note below) could still resolve
+`wayfinder`'s own "ask" text from disk even after removal from this list,
+if the harness-level fix hadn't also shipped.
+
 `codebase-design` is reference-only on every role it touches (shared seam
-vocabulary, no interactive asks, nothing to override). The other three new
-skills needed a real `system.md` amendment, because each has one interactive
-fallback the five-skill table's own compatibility framework would flag:
+vocabulary, no interactive asks, nothing to override). The other two
+skills on the planner, plus `property-based-testing` on the builder, each
+needed a real `system.md` amendment, because each has one interactive
+fallback the compatibility framework would flag:
 
 - **planner + `tdd`**: `tdd`'s "write down the seams under test and confirm
-  them with the user" never applies headless. Added a 4th override bullet —
-  name the seams from the request/`scout_findings.md` yourself, record them
-  as a "Seams" list in `plan.md`. (The existing five-skill override block
-  only ever named `wayfinder`/`to-spec`/`to-tickets`; `tdd` was already
-  vendored to the planner under the default roster and had this same gap —
-  this roster is the first to close it.)
+  them with the user" never applies headless. Added a bullet — name the
+  seams from the request/`scout_findings.md` yourself, record them as a
+  "Seams" list in `plan.md`. Also struck `tdd`'s own "call the Skill tool
+  with codebase-design" line — composition order already puts
+  `codebase-design` first, and under the harness note below that call
+  could otherwise resolve a stale global copy instead of this repo's
+  vendored one.
+- **planner + `sharp-edges`**: its own Phase 4 ("write minimal code
+  demonstrating the footgun") assumes a code-writing role; the planner
+  only writes `plan.md`. Amended to record each sharp edge as a named test
+  the builder must write at a seam in `plan.md`'s own Seams list, not as a
+  standalone report.
 - **builder + `property-based-testing`** (ToB): the skill says to "let the
   user decide" before adding a property-testing library as a new
   dependency. Added a headless override — reuse an existing
   `proptest`/`quickcheck`/`hypothesis`-class dependency if one is already
   named; otherwise add the smallest standard choice as a dev-only
-  dependency and say so plainly in `notes_for_next_agent`, never ask.
+  dependency and say so plainly in `notes_for_next_agent`, never ask. A
+  companion scope-discipline line was added separately: don't add an
+  inverse/decoder/round-trip test the ticket itself didn't ask for — a
+  query/filter-shaped ticket has no meaningful inverse, and reaching for
+  one anyway is headless scope creep dressed up as thoroughness.
 - **reviewer + `sharp-edges`/`differential-review`** (both ToB): the
   reviewer's own "not your job: generic style opinions" line would put both
   skills' real findings out of scope by accident. Amended it to carve out
@@ -1030,6 +1056,27 @@ fallback the five-skill table's own compatibility framework would flag:
   reasonable engineer would actually block a merge. Also redirected
   `differential-review`'s own "always generate a report file" instruction
   at the existing `review.md`, so the reviewer writes one report, not two.
+
+**A harness-level leak, found by the same debate, applies beneath all of
+this:** the `opencode` coding-agent interface auto-discovers skills from
+both `~/.claude/skills/` (global) and the project's own `.claude/skills/`
+— independent of this harness's `skill_engineering:` composition — and
+injects the operator's own `~/.claude/CLAUDE.md` into every prompt. This
+means removing a skill from a roster entry's `skill_engineering:` list
+does **not** make it unreachable: the skill tool can still resolve it from
+disk if a role ever calls it, and an operator's unrelated global steering
+file (persona rules, unrelated project conventions) rides into every
+prompt uninvited. The fix lives in the opencode coding-agent module itself
+(`OPENCODE_DISABLE_CLAUDE_CODE_SKILLS=1`,
+`OPENCODE_DISABLE_CLAUDE_CODE_PROMPT=1` on the subprocess env, scoped to
+that module only), not in any `sssf.config.yaml` — but it is load-bearing
+for every claim this section makes about what a roster's composed
+`skill_engineering:` list actually controls, for any role running on
+`coding_agent: opencode`. Confirmed live (not just inferred): a direct
+`opencode run --print-logs` call showed 33 `"duplicate skill name"`
+warnings pulling in `grilling`/`domain-modeling`/`to-tickets`/`triage`
+from disk and 72 tools/skills registered without the two env vars; zero
+skill-path log lines and 32 registered with them.
 
 ToB skills need one more step this table's Pocock skills don't:
 `compose()` ships exactly one vendored file, but a ToB `SKILL.md` often
@@ -1043,54 +1090,55 @@ before being vendored through the normal `vendor_skill.py --as <name>` path.
 This is check 7 of the compatibility framework (sibling-file dependency —
 not yet folded into the checklist page itself as of this writing).
 
-**Validated in two independent live runs**, both via `just simple-sdlc`.
-**Correction:** only run 2 used the promoted production `sssf.config.yaml`
-(commit `3c7873f`); run 1 predates that promotion and ran under a separate
-`sssf.config.experiment-pocock-tob.yaml` — its clean result is what led to
-the promotion, not evidence gathered *after* it. Caught by a follow-up
-research pass that cross-checked commit timestamps; corrected here rather
-than left as an inflated claim.
+**Validated in four independent live runs** — the first two via direct
+`just simple-sdlc "<text>"` CLI dispatch, the last two via the real
+`just watch` queue path (see below for why that distinction matters).
+**Correction on run 1:** only run 2 used the promoted production
+`sssf.config.yaml` (commit `3c7873f`); run 1 predates that promotion and
+ran under a separate `sssf.config.experiment-pocock-tob.yaml` — its clean
+result is what led to the promotion, not evidence gathered *after* it.
 
-| Run | adw_id | Config | Ticket | Phases | Revise loop? | Tests | Cost |
-|---|---|---|---|---|---|---|---|
-| 1 | `a1fba942` | experiment config (pre-promotion) | Property-based tests for a coordinate parser (`parse_coords`) | 10/10 | No | 38/38 pass (4 new) | $1.16 |
-| 2 | `aca5e802` | production `sssf.config.yaml` (post-promotion) | Country filter on a search endpoint (`GET /ports`) | 10/10 | No | 109/109 pass (5 new) | $0.78 |
+| # | adw_id | Dispatch | Ticket | Phases | Tests | Cost |
+|---|---|---|---|---|---|---|
+| 1 | `a1fba942` | CLI, pre-promotion config | PBT for a coordinate parser (`parse_coords`) | 10/10 | 38/38 (4 new) | $1.16 |
+| 2 | `aca5e802` | CLI, production config | Country filter on `GET /ports` | 10/10 | 109/109 (5 new) | $0.78 |
+| 3 | `2480c78a` | **`just watch`**, re-armed planner | Bug: NMEA minute carry (`format_nmea_lat`/`lon`) | 10/10 | 7/7 nmea, 22/22 route\_ | $1.15 |
+| 4 | `380a46ec` | **`just watch`**, re-armed planner | Bug: NaN edge weight in `from_custom` | 10/10 | 27/27 | $0.51 |
 
-Both runs: reviewer produced one `review.md` with a distinct "Sharp-Edges
-Analysis" section separate from the spec-conformance checklist (the
-style-opinions amendment holding — new findings got a real reporting slot,
-without turning every observation into a blocker); builder added its new
-test-only dependency (`proptest`) with zero interactive pause (the headless
-override firing as designed); planner's plan already named seams/an
-independent oracle before the builder ran. Neither run exercised the revise
-loop, `diagnosing-bugs`, or a reviewer/builder disagreement — both tickets
-happened to pass on the first attempt, so this is evidence the roster's
-required amendments resolve their target fallbacks in a real run, not that
-the roster improves outcomes on every ticket shape. `property-based-testing`
-in particular is expected to help mainly on codec/parser/numeric code and
-to add little elsewhere; the second run (a straightforward query-filter
-addition, not parser-shaped) still passed clean, but with less surface for
-that specific skill to add value on.
+None of the four hit a revise loop. Runs 1–2: reviewer produced one
+`review.md` with a distinct "Sharp-Edges Analysis" section separate from
+the spec-conformance checklist (the style-opinions amendment holding — new
+findings got a real reporting slot, without turning every observation
+into a blocker); builder added its new test-only dependency (`proptest`)
+with zero interactive pause. `property-based-testing` is expected to help
+mainly on codec/parser/numeric code and add little elsewhere; run 2 (a
+straightforward query-filter addition, not parser-shaped) still passed
+clean, but with less surface for that specific skill to add value on.
 
-**Neither run went through `just watch`'s queue** — both were direct
-`just simple-sdlc "<text>"` CLI dispatches. That matters: a queued ticket's
-body already carries a `Status:` line, which the planner's dispatch-
-detection treats as "already filed," skipping `wayfinder`/`to-spec`/
-`to-tickets` entirely on both the old and the new roster alike — so the
-new roster's `codebase-design`/`sharp-edges` being vendored ahead of
-`wayfinder` on the planner has no effect on that detection either way. A
-follow-up research pass surfaced a real consequence of dispatching by
-direct CLI instead of the queue: the ticket file's own `Status:` line
-never gets flipped to `resolved` (only `just watch`'s claim/resolve cycle
-does that), so a ticket built this way sits at `ready-for-agent` and will
-be picked up and rebuilt by the next real `just watch` claim unless
-someone updates its status by hand. Full trace in `weather-report/docs/
-agents/bootstrap-afk-pocock-tob-research.md`.
+**Runs 1–2 did not go through `just watch`'s queue** — a real, separate
+gap from the roster question. A queued ticket's body already carries a
+`Status:` line, which the planner's dispatch-detection treats as "already
+filed," skipping `wayfinder`/`to-spec`/`to-tickets` entirely on the
+*original* roster (they're gone from the *re-armed* one regardless). A
+real consequence surfaced: dispatching by direct CLI never flips the
+ticket's own `Status:` line to `resolved` (only `just watch`'s
+claim/resolve cycle does that), so a ticket built this way sits at
+`ready-for-agent` and gets rebuilt by the next real `just watch` claim
+unless someone updates its status by hand — this happened for real on run
+2's own ticket, caught and fixed by hand afterward. **Runs 3–4 close this
+gap**: both are real `just watch --once` dispatches, against the re-armed
+planner roster, each claiming, building, reviewing, documenting, and
+resolving a filed bug ticket with no manual status intervention needed —
+the watcher's own commits (`claim` → `resolve`) did the bookkeeping
+correctly both times. Full trace of the gap and its fix: `weather-report/
+docs/agents/bootstrap-afk-pocock-tob-research.md` and
+`docs/agents/planner-roster-debate.md`.
 
 ## Version history
 
 | Version | Date | Changes |
 |---|---|---|
+| 4.22 | 2026-10-07 | Updated the Pocock+ToB cheat sheet for the downstream adopter's planner re-arm (3-round opus-vs-fable debate, `docs/agents/planner-roster-debate.md`): the planner's roster table was still showing the original `codebase-design, tdd, wayfinder, to-spec, to-tickets, sharp-edges` list, stale since the adopter replaced `wayfinder`/`to-spec`/`to-tickets` entirely with planner-specific trims (`codebase-design-planner`, `tdd-planner`, `sharp-edges-planner`) after finding them dead text on every queued ticket. Added a harness-level leak this same debate found and live-confirmed: `opencode`'s own skill auto-discovery and `CLAUDE.md` auto-injection bypass this harness's `skill_engineering:` composition entirely unless two env vars are set in the coding-agent module itself — load-bearing for every claim this section makes about what a roster controls. Added two more validated live runs (3, 4) that close the "neither run went through `just watch`'s queue" gap v4.21 flagged — both are real `just watch --once` dispatches against the re-armed roster, resolving two filed bug tickets with correct automatic status bookkeeping. Narrowed the results table from 8 to 7 columns after the PDF regeneration's own visual QA caught the Cost column clipping off the page edge in the rendered PDF — the stale content would have gone unnoticed without that regeneration. |
 | 4.21 | 2026-10-07 | Corrected v4.20's own claim within hours: run `a1fba942` was cited as evidence gathered against the promoted production `sssf.config.yaml`, but it actually ran under the pre-promotion experiment config (`sssf.config.experiment-pocock-tob.yaml`) — only run `aca5e802` ran post-promotion. Found by a follow-up opus research pass cross-checking commit timestamps. Also added a caveat the same research surfaced: neither run went through `just watch`'s queue, so the queue path's `wayfinder`/`to-spec`/`to-tickets` dispatch-detection skip (which fires on any ticket body carrying a `Status:` line, old or new roster alike) was never actually exercised by either validated run — and dispatching by direct CLI instead of the queue leaves the ticket's own `Status:` line stuck at `ready-for-agent`, risking a redundant rebuild on the next real `just watch` claim. Full trace: `weather-report/docs/agents/bootstrap-afk-pocock-tob-research.md`. |
 | 4.20 | 2026-10-07 | Added a new "Cheat sheet — the extended Pocock+ToB roster" section documenting a downstream adopter's (`weather-report`) cross-ecosystem skill-engineering extension: codebase-design/tdd/sharp-edges on planner, codebase-design/tdd/property-based-testing on builder, sharp-edges/differential-review/code-review on reviewer, codebase-design on scout, writing-for-agents/pr on documenter. Documents the three required `system.md` amendments (planner's tdd seam-naming override, builder's headless PBT-dependency override, reviewer's sharp-edges/differential-review scope amendment), the ToB sibling-file-flattening step (compatibility check 7, not yet folded into the checklist page), and two independent live `just simple-sdlc` runs against the roster as the adopting repo's production default (not an experiment config) — both 10/10 phases, no revise loop. This is downstream-repo config, recorded here as reusable evidence, not a change to SSSF's own skill-agnostic shipped default. |
 | 4.19 | 2026-10-06 | Fixed a wrong citation in the Cheat sheet: `code-review`'s headless-safety was attributed to the reviewer's `writes: specs/` grant, but that permission belongs to the **planner**, not the reviewer (whose own config is `writes: []`, read-only). The real mechanism is the planner's write landing `plan.md` in `context_handoff_dir`, which the reviewer's prompt reads. Found by checking a freshly-pulled copy of the Pocock skills against this playbook's claims. Also flagged, not yet resolved: `code-review`'s own two interactive ask-fallbacks (fixed point, spec source) have never been traced end to end for headless safety the way `wayfinder`'s was. |
