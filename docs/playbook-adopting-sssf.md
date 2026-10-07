@@ -1,6 +1,6 @@
 ---
 title: "Adoption playbook — putting SSSF to work on real code"
-version: 4.20
+version: 4.21
 updated: 2026-10-07
 status: active
 ---
@@ -1043,15 +1043,18 @@ before being vendored through the normal `vendor_skill.py --as <name>` path.
 This is check 7 of the compatibility framework (sibling-file dependency —
 not yet folded into the checklist page itself as of this writing).
 
-**Validated in two independent live runs**, both via `just simple-sdlc`
-against this extended roster as the adopting repo's **default**
-`sssf.config.yaml` (not a side experiment config — this result is what
-made the roster its default):
+**Validated in two independent live runs**, both via `just simple-sdlc`.
+**Correction:** only run 2 used the promoted production `sssf.config.yaml`
+(commit `3c7873f`); run 1 predates that promotion and ran under a separate
+`sssf.config.experiment-pocock-tob.yaml` — its clean result is what led to
+the promotion, not evidence gathered *after* it. Caught by a follow-up
+research pass that cross-checked commit timestamps; corrected here rather
+than left as an inflated claim.
 
-| Run | adw_id | Ticket | Phases | Revise loop? | Tests | Cost |
-|---|---|---|---|---|---|---|
-| 1 | `a1fba942` | Property-based tests for a coordinate parser (`parse_coords`) | 10/10 | No | 38/38 pass (4 new) | $1.16 |
-| 2 | `aca5e802` | Country filter on a search endpoint (`GET /ports`) | 10/10 | No | 109/109 pass (5 new) | $0.78 |
+| Run | adw_id | Config | Ticket | Phases | Revise loop? | Tests | Cost |
+|---|---|---|---|---|---|---|---|
+| 1 | `a1fba942` | experiment config (pre-promotion) | Property-based tests for a coordinate parser (`parse_coords`) | 10/10 | No | 38/38 pass (4 new) | $1.16 |
+| 2 | `aca5e802` | production `sssf.config.yaml` (post-promotion) | Country filter on a search endpoint (`GET /ports`) | 10/10 | No | 109/109 pass (5 new) | $0.78 |
 
 Both runs: reviewer produced one `review.md` with a distinct "Sharp-Edges
 Analysis" section separate from the spec-conformance checklist (the
@@ -1069,10 +1072,26 @@ to add little elsewhere; the second run (a straightforward query-filter
 addition, not parser-shaped) still passed clean, but with less surface for
 that specific skill to add value on.
 
+**Neither run went through `just watch`'s queue** — both were direct
+`just simple-sdlc "<text>"` CLI dispatches. That matters: a queued ticket's
+body already carries a `Status:` line, which the planner's dispatch-
+detection treats as "already filed," skipping `wayfinder`/`to-spec`/
+`to-tickets` entirely on both the old and the new roster alike — so the
+new roster's `codebase-design`/`sharp-edges` being vendored ahead of
+`wayfinder` on the planner has no effect on that detection either way. A
+follow-up research pass surfaced a real consequence of dispatching by
+direct CLI instead of the queue: the ticket file's own `Status:` line
+never gets flipped to `resolved` (only `just watch`'s claim/resolve cycle
+does that), so a ticket built this way sits at `ready-for-agent` and will
+be picked up and rebuilt by the next real `just watch` claim unless
+someone updates its status by hand. Full trace in `weather-report/docs/
+agents/bootstrap-afk-pocock-tob-research.md`.
+
 ## Version history
 
 | Version | Date | Changes |
 |---|---|---|
+| 4.21 | 2026-10-07 | Corrected v4.20's own claim within hours: run `a1fba942` was cited as evidence gathered against the promoted production `sssf.config.yaml`, but it actually ran under the pre-promotion experiment config (`sssf.config.experiment-pocock-tob.yaml`) — only run `aca5e802` ran post-promotion. Found by a follow-up opus research pass cross-checking commit timestamps. Also added a caveat the same research surfaced: neither run went through `just watch`'s queue, so the queue path's `wayfinder`/`to-spec`/`to-tickets` dispatch-detection skip (which fires on any ticket body carrying a `Status:` line, old or new roster alike) was never actually exercised by either validated run — and dispatching by direct CLI instead of the queue leaves the ticket's own `Status:` line stuck at `ready-for-agent`, risking a redundant rebuild on the next real `just watch` claim. Full trace: `weather-report/docs/agents/bootstrap-afk-pocock-tob-research.md`. |
 | 4.20 | 2026-10-07 | Added a new "Cheat sheet — the extended Pocock+ToB roster" section documenting a downstream adopter's (`weather-report`) cross-ecosystem skill-engineering extension: codebase-design/tdd/sharp-edges on planner, codebase-design/tdd/property-based-testing on builder, sharp-edges/differential-review/code-review on reviewer, codebase-design on scout, writing-for-agents/pr on documenter. Documents the three required `system.md` amendments (planner's tdd seam-naming override, builder's headless PBT-dependency override, reviewer's sharp-edges/differential-review scope amendment), the ToB sibling-file-flattening step (compatibility check 7, not yet folded into the checklist page), and two independent live `just simple-sdlc` runs against the roster as the adopting repo's production default (not an experiment config) — both 10/10 phases, no revise loop. This is downstream-repo config, recorded here as reusable evidence, not a change to SSSF's own skill-agnostic shipped default. |
 | 4.19 | 2026-10-06 | Fixed a wrong citation in the Cheat sheet: `code-review`'s headless-safety was attributed to the reviewer's `writes: specs/` grant, but that permission belongs to the **planner**, not the reviewer (whose own config is `writes: []`, read-only). The real mechanism is the planner's write landing `plan.md` in `context_handoff_dir`, which the reviewer's prompt reads. Found by checking a freshly-pulled copy of the Pocock skills against this playbook's claims. Also flagged, not yet resolved: `code-review`'s own two interactive ask-fallbacks (fixed point, spec source) have never been traced end to end for headless safety the way `wayfinder`'s was. |
 | 4.18 | 2026-09-25 | Two corrections surfaced by a teacher/student assessment round against the docs. (1) The Filing section's `Blocked by:` comma-split sharp edge is now described as fixed — `adw_watch.py` strips parentheticals before splitting and has a regression test — matching Chapter 7's filing-checkpoints lesson, which already said so. (2) Part D's "Claim" step no longer says concurrent watchers "never double-pick": claim-then-commit is ordering, not a lock, and a same-instant scan race is an acknowledged gap — matching Chapter 7's `just watch` lesson and `adw_watch.py` itself. |
