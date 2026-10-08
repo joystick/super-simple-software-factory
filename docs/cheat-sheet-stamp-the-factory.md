@@ -1,11 +1,11 @@
 ---
-title: "Cheat sheet — planting the factory into a brand-new monorepo"
-version: 1.0
+title: "Cheat sheet — stamping the factory into a brand-new monorepo"
+version: 1.1
 updated: 2026-10-08
 status: active
 ---
 
-# Plant the factory: step-by-step
+# Stamp the factory: step-by-step
 
 Grounded in the exact steps used to bring up `weather-report`'s extended
 Pocock+Trail of Bits roster. Every command below is real, not illustrative.
@@ -167,4 +167,5 @@ new repo.
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.1 | 2026-10-08 | Renamed from `cheat-sheet-plant-the-factory.md` (final version 1.0) — "stamp" is this project's own term (README: "stamped into any repo", "The skill is the product... stamping config, adws, and prompt_engineering into three different target repos"); "plant" was never used elsewhere in this codebase. Title and heading updated to match; no content/structure change. |
 | 1.0 | 2026-10-08 | Initial cheat sheet, derived from the live `weather-report` setup (Pocock+ToB extended roster, re-armed planner, opencode harness patch). |
