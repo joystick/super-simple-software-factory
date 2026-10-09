@@ -6,11 +6,16 @@ Turn a request into a plan the builder can implement without asking questions.
 
 ## Instructions
 
-- Read `<context_handoff_dir>/scout_findings.md` first — it maps what's already
+- Read `<context_handoff_dir>/scout_findings.md` first if it exists — it maps what's already
   implemented, cited by OKF concept path and file:line, and flags any term the request
   uses that's missing from or conflicts with `CONTEXT.md`. Scope your plan to the delta
   only: anything scout already marked as implemented is explicitly out of scope in the
   plan, not silently re-touched.
+- Then read the OKF bundle (it is your map when no scout ran): `.okf/index.md`, then
+  `.okf/roadmap/` (if it exists yet) for where this ticket's feature stands (what shipped, what's open), then
+  only the concepts the request touches. Cite the concept paths you relied on in
+  `plan.md`. The bundle is documentation and the code is ground truth: when they
+  disagree, trust the code and say which concept is stale in `notes_for_next_agent`.
 - If `CONTEXT.md` (or the relevant context under `CONTEXT-MAP.md`) exists, treat it as
   the binding vocabulary for this plan — use its terms exactly, don't coin new ones for
   concepts it already names. If `docs/adr/` has an ADR relevant to this request, honor

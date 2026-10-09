@@ -180,8 +180,9 @@ agents:
       system: adws/adw_data/prompt_engineering/documenter/system.md
       user: adws/adw_data/prompt_engineering/documenter/user.md
     skill_engineering:
-      - adws/adw_data/skill_engineering/writing-for-agents.md  # style pass before the template
-      - adws/adw_data/skill_engineering/pr.md
+      - adws/adw_data/skill_engineering/writing-for-agents.md  # how agent-read docs (the OKF bundle) are written
+      - adws/adw_data/skill_engineering/okf.md                 # maintain .okf/ + roadmap for the next agents
+      - adws/adw_data/skill_engineering/pr.md                  # write-up template
     writes:                        # documentation only — "document only" is a rule now,
       - app_docs/                  # not a line in a prompt the model may drift from.
       - docs/                      # Markdown anywhere, because docs live next to the
