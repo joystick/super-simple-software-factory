@@ -44,16 +44,27 @@ PROVENANCE_HEADER_RE = re.compile(
     re.MULTILINE,
 )
 
+# A hand-flattened composite records which sibling files it merged in, in a
+# manifest directly under the header: nothing but `kept:` / `dropped:` lines.
+# Same strictness rule as the header, same parity test in test_vendor_skill.py.
+FLATTEN_MANIFEST_RE = re.compile(
+    r"\A<!--\s*sssf:flattened\n"
+    r"(?:(?:kept|dropped): .*\n)+"
+    r"-->\s*",
+)
+
 
 class SkillFileError(ValueError):
     """A named skill_engineering path is missing, empty, or not a file."""
 
 
 def _strip_provenance(text: str) -> str:
-    """Remove a leading vendoring header, if present. A comment about where
-    a file came from is not an instruction to the model, and leaving it in
-    the prompt is both noise and a small correctness risk."""
-    return PROVENANCE_HEADER_RE.sub("", text, count=1)
+    """Remove a leading vendoring header and flatten manifest, if present.
+    A comment about where a file came from is not an instruction to the
+    model, and leaving it in the prompt is both noise and a small
+    correctness risk."""
+    text = PROVENANCE_HEADER_RE.sub("", text, count=1)
+    return FLATTEN_MANIFEST_RE.sub("", text, count=1)
 
 
 def skill_name(path: Path) -> str:

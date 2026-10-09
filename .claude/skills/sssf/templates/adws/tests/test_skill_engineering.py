@@ -218,3 +218,60 @@ def test_a_file_with_no_provenance_header_is_unaffected(tmp_path):
 
     composed = skill_engineering.compose("System.", [str(plain)])
     assert "Every PR states the why, not the what." in composed
+
+
+# ── flatten manifest — a hand-flattened composite (SKILL.md + sibling
+#    reference files merged into one vendored file) records which siblings it
+#    kept and dropped, right after the provenance header. Like the header, it
+#    is bookkeeping for humans and vendor_skill.py --check, never an
+#    instruction, so it must not reach the model either. ──
+
+FLATTENED_FIXTURE = VENDORED_FIXTURE.replace(
+    "-->\n\n# TDD",
+    "-->\n\n"
+    "<!-- sssf:flattened\n"
+    "kept: tests.md sha256:" + "a" * 64 + "\n"
+    "dropped: scripts/run.py -- tool runner, belongs in a code phase\n"
+    "-->\n\n"
+    "# TDD",
+)
+
+
+def test_flatten_manifest_is_stripped_from_composed_text(tmp_path):
+    vendored = tmp_path / "tdd.md"
+    vendored.write_text(FLATTENED_FIXTURE)
+
+    composed = skill_engineering.compose("System.", [str(vendored)])
+
+    assert "sssf:flattened" not in composed
+    assert "kept:" not in composed
+    assert "dropped:" not in composed
+    assert "Red, green, refactor." in composed
+
+
+def test_flatten_manifest_does_not_count_toward_the_token_estimate(tmp_path):
+    flattened_dir = tmp_path / "flattened"
+    flattened_dir.mkdir()
+    (flattened_dir / "tdd.md").write_text(FLATTENED_FIXTURE)
+    plain_dir = tmp_path / "plain"
+    plain_dir.mkdir()
+    (plain_dir / "tdd.md").write_text("# TDD\n\nRed, green, refactor.\n")
+
+    assert skill_engineering.estimate_tokens([str(flattened_dir / "tdd.md")]) == \
+        skill_engineering.estimate_tokens([str(plain_dir / "tdd.md")])
+
+
+def test_prose_documenting_the_flatten_format_is_not_stripped(tmp_path):
+    # Only a manifest sitting directly under the header, made of nothing but
+    # kept:/dropped: lines, is machine-written. A skill that merely describes
+    # the format keeps every word of that description.
+    doc = tmp_path / "meta.md"
+    doc.write_text(
+        "# About flattening\n\n"
+        "<!-- sssf:flattened\n"
+        "this line is prose, not a kept: or dropped: entry -->\n\n"
+        "Real content follows.\n"
+    )
+    composed = skill_engineering.compose("System.", [str(doc)])
+    assert "About flattening" in composed
+    assert "this line is prose" in composed

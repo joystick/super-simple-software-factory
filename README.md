@@ -64,6 +64,8 @@ Copy `.claude/skills/sssf/` into the target repo and type `/sssf install` inside
 # 1. get the skill into the target repo
 mkdir -p .claude/skills
 cp -r /path/to/super-simple-software-factory/.claude/skills/sssf .claude/skills/
+# optional companion: context-aware vendoring of multi-file skills (tdd, codebase-design, ...)
+cp -r /path/to/super-simple-software-factory/.claude/skills/sssf-skill-vendoring .claude/skills/
 
 # 2. stamp the factory (run from the target repo ROOT, the cwd is where everything lands)
 uv run .claude/skills/sssf/scripts/install.py

@@ -2,6 +2,8 @@
 
 Vendor a Pocock-style workflow protocol (`tdd`, `codebase-design`, a grilling protocol, a house convention you wrote yourself) and attach it to an agent, end to end.
 
+> **Most real skills need more than this cookbook.** `vendor_skill.py` copies one file. If the skill directory has sibling files (`DEEPENING.md`, `references/*.md`), asks the user anything, calls the Skill tool, or is going onto a role it wasn't written for, follow the **`sssf-skill-vendoring`** skill (`.claude/skills/sssf-skill-vendoring/SKILL.md`) instead. It inventories the directory, checks it against the role, flattens the siblings, and has the result reviewed. This cookbook stays the reference for the mechanics both share: attaching, cost, auditing, and drift.
+
 ## Vendor it in
 
 ```bash
@@ -29,7 +31,7 @@ agents:
       - adws/adw_data/skill_engineering/tdd.md
 ```
 
-**Only takes effect under `coding_agent: claude_code`.** Skills ride in `--system-prompt`, a `claude_code`-specific delivery mechanism — `pi` and `agy` ignore the field, and `agents.validate()` warns you about it (never fails the run) if you attach one to either anyway.
+**Delivered to all four coding agents, through two channels.** `claude_code` and `pi` take the composed text as a real `--system-prompt`. `agy` and `opencode` have no such flag, so they fold it into the user turn instead. That's a weaker channel, resent every turn, but the text still arrives. `agents.skill_engineering_applies()` is the source of truth. (Earlier versions of this cookbook said the field only worked under `claude_code`. That stopped being true when `pi`, `agy`, and `opencode` gained composition; see `references/config.md`.)
 
 **Composition order is the list order, never sorted**, and the agent's own `system.md` always comes first — its identity and output contract outrank any borrowed protocol. Attach several:
 

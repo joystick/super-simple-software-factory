@@ -7,10 +7,16 @@ adws/adw_data/skill_engineering/, stamped with provenance so drift from the
 source is detectable later. A deliberate, reviewable act that produces a
 diff — never an auto-update. See docs/prd-skill-engineering.md.
 
+This copies ONE file. A skill whose substance spans sibling files, or that
+assumes an interactive user, needs the sssf-skill-vendoring procedure
+(.claude/skills/sssf-skill-vendoring/SKILL.md), which uses this tool for
+the stamping step and records the merge in an sssf:flattened manifest.
+
 Usage:
     uv run <skill>/scripts/vendor_skill.py <source> [--as NAME]
         [--dest-dir adws/adw_data/skill_engineering]
     uv run <skill>/scripts/vendor_skill.py --check <vendored-file>
+    uv run <skill>/scripts/vendor_skill.py --hash <sibling-file>
 """
 
 from __future__ import annotations
@@ -40,10 +46,36 @@ HEADER_RE = re.compile(
     r"-->\s*",
     re.MULTILINE,
 )
+# A hand-flattened composite's manifest, directly under the header: which
+# sibling files were merged in (with their hash, so --check can see them
+# drift) and which were left out. Paths are relative to the vendored
+# source's own directory. Must stay in step with skill_engineering.py's
+# FLATTEN_MANIFEST_RE — test_vendor_skill.py checks that they agree.
+FLATTEN_RE = re.compile(
+    r"\A<!--\s*sssf:flattened\n"
+    r"(?:(?:kept|dropped): .*\n)+"
+    r"-->\s*",
+)
+KEPT_RE = re.compile(r"^kept: (?P<path>\S+) sha256:(?P<hash>[0-9a-f]{64})\s*$", re.MULTILINE)
 
 
 def _hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def file_hash(path: str | Path) -> str:
+    """The hash vendor() and check_drift() use, for writing a manifest's
+    `kept:` lines. Not `shasum`: read_text() normalizes line endings first."""
+    return _hash(Path(path).read_text())
+
+
+def _flatten_manifest(vendored_text: str) -> str | None:
+    """The manifest block of a flattened file, or None for a plain vendor."""
+    header = HEADER_RE.match(vendored_text)
+    if header is None:
+        return None
+    manifest = FLATTEN_RE.match(vendored_text[header.end():])
+    return manifest.group(0) if manifest else None
 
 
 def _display_source(source: Path) -> str:
@@ -66,6 +98,14 @@ def _display_source(source: Path) -> str:
 class HandAuthoredFileError(ValueError):
     """The destination exists and was not vendored by this tool (no
     provenance header) — refuse rather than silently overwrite it."""
+
+
+class FlattenedFileError(ValueError):
+    """The destination is a hand-flattened composite (SKILL.md plus merged
+    sibling files) and its SKILL.md changed upstream. A plain re-vendor
+    would replace the whole composite with bare SKILL.md, silently dropping
+    every merged sibling — refuse, and point at the procedure that rebuilds
+    it properly."""
 
 
 class UnsafeNameError(ValueError):
@@ -123,7 +163,8 @@ def vendor(source: str | Path, dest_dir: str | Path, name: str | None = None,
     dest = Path(dest_dir) / f"{name}.md"
 
     if dest.is_file():
-        existing = HEADER_RE.match(dest.read_text())
+        existing_text = dest.read_text()
+        existing = HEADER_RE.match(existing_text)
         if existing is None:
             raise HandAuthoredFileError(
                 f"{dest} already exists and has no provenance header — refusing to "
@@ -131,6 +172,13 @@ def vendor(source: str | Path, dest_dir: str | Path, name: str | None = None,
                 "under a different --as name, if you meant to replace it.")
         if existing.group("hash") == source_hash:
             return VendorResult(dest=dest, source_hash=source_hash, changed=False)
+        if _flatten_manifest(existing_text) is not None:
+            raise FlattenedFileError(
+                f"{dest} is a flattened composite (it has an sssf:flattened manifest) "
+                "and its SKILL.md changed upstream. Re-vendoring would replace it with "
+                "bare SKILL.md and drop every merged sibling. Rebuild it with the "
+                "sssf-skill-vendoring procedure instead, or delete it first if you "
+                "really want the plain file.")
 
     dest.parent.mkdir(parents=True, exist_ok=True)
     header = HEADER_TEMPLATE.format(
@@ -152,7 +200,8 @@ def check_drift(vendored_path: str | Path) -> DriftResult:
     Reports; never resolves. Re-vendoring on purpose is how drift is fixed.
     """
     vendored_path = Path(vendored_path)
-    match = HEADER_RE.match(vendored_path.read_text())
+    text = vendored_path.read_text()
+    match = HEADER_RE.match(text)
     if not match:
         return DriftResult(drifted=False,
                            message=f"{vendored_path}: no provenance header (hand-authored, not vendored)")
@@ -161,11 +210,24 @@ def check_drift(vendored_path: str | Path) -> DriftResult:
     if not source.is_file():
         return DriftResult(drifted=True, message=f"source gone: {source}")
 
-    current_hash = _hash(source.read_text())
-    if current_hash != match.group("hash"):
-        return DriftResult(drifted=True,
-                           message=f"source changed since vendoring: {source}")
-    return DriftResult(drifted=False, message=f"{vendored_path}: matches {source}")
+    problems = []
+    if _hash(source.read_text()) != match.group("hash"):
+        problems.append(f"source changed since vendoring: {source}")
+
+    # A flattened composite also tracks every sibling it merged in; dropped
+    # siblings were a deliberate exclusion and are not checked.
+    manifest = _flatten_manifest(text)
+    for kept in KEPT_RE.finditer(manifest or ""):
+        sibling = source.parent / kept.group("path")
+        if not sibling.is_file():
+            problems.append(f"merged sibling gone: {sibling}")
+        elif _hash(sibling.read_text()) != kept.group("hash"):
+            problems.append(f"merged sibling changed since flattening: {sibling}")
+
+    if problems:
+        return DriftResult(drifted=True, message="; ".join(problems))
+    siblings = f" (+ {len(KEPT_RE.findall(manifest))} merged sibling(s))" if manifest else ""
+    return DriftResult(drifted=False, message=f"{vendored_path}: matches {source}{siblings}")
 
 
 def main() -> int:
@@ -178,7 +240,14 @@ def main() -> int:
     parser.add_argument("--dest-dir", default=DEFAULT_DEST_DIR)
     parser.add_argument("--check", action="store_true",
                         help="report drift for an already-vendored file instead of vendoring")
+    parser.add_argument("--hash", action="store_true",
+                        help="print the content hash of a sibling file, for a flatten "
+                             "manifest's `kept:` line")
     args = parser.parse_args()
+
+    if args.hash:
+        print(file_hash(args.path))
+        return 0
 
     if args.check:
         drift = check_drift(args.path)
@@ -187,7 +256,7 @@ def main() -> int:
 
     try:
         result = vendor(args.path, args.dest_dir, name=args.name)
-    except (HandAuthoredFileError, UnsafeNameError) as e:
+    except (HandAuthoredFileError, FlattenedFileError, UnsafeNameError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
     if result.changed:

@@ -304,3 +304,106 @@ def test_vendor_accepts_a_bare_filename_stem_as_name(tmp_path):
 
     assert result.dest == dest_dir / "my-tdd-variant.md"
     assert result.dest.is_file()
+
+
+# ── flattened composites. compose() ships one file per skill_engineering
+#    entry, so a skill whose substance lives in sibling files (DEEPENING.md,
+#    references/*.md) gets those siblings merged into the vendored file by
+#    hand. The merge is recorded in an <!-- sssf:flattened --> manifest right
+#    under the provenance header, listing each kept sibling with its hash.
+#    That manifest is what lets --check see sibling drift, and what stops a
+#    plain re-vendor from silently overwriting the merge with bare SKILL.md. ──
+
+def _flattened_skill(tmp_path):
+    """A skill dir with SKILL.md + DEEPENING.md, vendored and then flattened
+    the way the sssf-skill-vendoring procedure does it. Returns (skill_dir,
+    vendored_path)."""
+    skill_dir = tmp_path / "codebase-design"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text("# Codebase Design\n\nGlossary here.\n")
+    (skill_dir / "DEEPENING.md").write_text("# Deepening\n\nCategories here.\n")
+    result = vendor_skill.vendor(skill_dir / "SKILL.md", tmp_path / "vendored")
+    raw = result.dest.read_text()
+    header = vendor_skill.HEADER_RE.match(raw)
+    manifest = (
+        "<!-- sssf:flattened\n"
+        f"kept: DEEPENING.md sha256:{vendor_skill.file_hash(skill_dir / 'DEEPENING.md')}\n"
+        "dropped: DESIGN-IT-TWICE.md -- interactive procedure, no user headless\n"
+        "-->\n\n"
+    )
+    result.dest.write_text(raw[:header.end()] + manifest + raw[header.end():]
+                           + "\nCategories here.\n")
+    return skill_dir, result.dest
+
+
+def test_check_drift_is_clean_when_skill_md_and_every_kept_sibling_match(tmp_path):
+    _, vendored = _flattened_skill(tmp_path)
+
+    drift = vendor_skill.check_drift(vendored)
+
+    assert drift.drifted is False
+
+
+def test_check_drift_reports_a_changed_kept_sibling(tmp_path):
+    skill_dir, vendored = _flattened_skill(tmp_path)
+    (skill_dir / "DEEPENING.md").write_text("# Deepening\n\nRewritten upstream.\n")
+
+    drift = vendor_skill.check_drift(vendored)
+
+    assert drift.drifted is True
+    assert "DEEPENING.md" in drift.message
+
+
+def test_check_drift_reports_a_deleted_kept_sibling(tmp_path):
+    skill_dir, vendored = _flattened_skill(tmp_path)
+    (skill_dir / "DEEPENING.md").unlink()
+
+    drift = vendor_skill.check_drift(vendored)
+
+    assert drift.drifted is True
+    assert "DEEPENING.md" in drift.message
+
+
+def test_dropped_siblings_are_not_drift_checked(tmp_path):
+    # A dropped sibling was a deliberate exclusion; whether it still exists
+    # upstream says nothing about whether the composite is current.
+    _, vendored = _flattened_skill(tmp_path)   # DESIGN-IT-TWICE.md never existed
+
+    assert vendor_skill.check_drift(vendored).drifted is False
+
+
+def test_vendor_refuses_to_overwrite_a_flattened_file_when_skill_md_changed(tmp_path):
+    # The sharp edge this guards: SKILL.md changes upstream, someone re-runs
+    # the plain vendor command, and the merged siblings vanish without a word.
+    skill_dir, vendored = _flattened_skill(tmp_path)
+    before = vendored.read_text()
+    (skill_dir / "SKILL.md").write_text("# Codebase Design\n\nGlossary v2.\n")
+
+    with pytest.raises(vendor_skill.FlattenedFileError):
+        vendor_skill.vendor(skill_dir / "SKILL.md", tmp_path / "vendored")
+    assert vendored.read_text() == before
+
+
+def test_revendoring_a_flattened_file_with_unchanged_skill_md_is_still_a_no_op(tmp_path):
+    skill_dir, vendored = _flattened_skill(tmp_path)
+    before = vendored.read_text()
+
+    result = vendor_skill.vendor(skill_dir / "SKILL.md", tmp_path / "vendored")
+
+    assert result.changed is False
+    assert vendored.read_text() == before
+
+
+def test_a_flatten_manifest_is_recognized_by_both_modules(tmp_path):
+    # Same reasoning as the header cross-check above: two copies of one
+    # format, kept in step by this test rather than a shared import.
+    from adw_modules import skill_engineering
+
+    _, vendored = _flattened_skill(tmp_path)
+    raw = vendored.read_text()
+    after_header = vendor_skill.HEADER_RE.sub("", raw, count=1)
+
+    assert vendor_skill.FLATTEN_RE.match(after_header) is not None
+    assert skill_engineering.FLATTEN_MANIFEST_RE.match(after_header) is not None
+    assert vendor_skill.FLATTEN_RE.sub("", after_header, count=1) == \
+        skill_engineering.FLATTEN_MANIFEST_RE.sub("", after_header, count=1)
