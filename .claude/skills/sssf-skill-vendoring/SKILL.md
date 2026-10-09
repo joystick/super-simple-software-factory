@@ -1,7 +1,7 @@
 ---
 name: sssf-skill-vendoring
 description: Vendor any third-party or house skill (tdd, codebase-design, a Trail of Bits skill, a grilling protocol) into an SSSF repo's adws/adw_data/skill_engineering/ so the agent that loads it can actually use it headless. Inventories the whole skill directory, checks it against the consuming role's real config and prompts, flattens sibling files, records the merge, wires and validates it, and runs an architect/expert review. Use instead of a bare vendor_skill.py call whenever a skill has more than one file, asks the user anything, dispatches other skills, or is going onto a role it wasn't written for — or when the user says "vendor this skill", "skill architect", or "skill expert".
-version: 1.0
+version: 1.1
 updated: 2026-10-09
 ---
 
@@ -15,6 +15,8 @@ updated: 2026-10-09
 - **The repo has conventions.** For example, `CONTEXT.md` vs `GLOSSARY.md`.
 
 This procedure covers all four. It still uses `vendor_skill.py` for the stamping, so `--check` keeps tracking drift.
+
+**Worked example:** `reference/README.md` is a complete, live-tested output of this procedure: 9 Pocock and Trail of Bits files, the role overrides they rely on, and the roster that loads them. Start from it, or compare your own run against it.
 
 ## The bar
 
@@ -187,4 +189,5 @@ Run `vendor_skill.py --check` on a schedule or in pre-commit. When it reports dr
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.1 | 2026-10-09 | Added `reference/`: the worked example from weather-report (9 vendored files, role overrides, roster). |
 | 1.0 | 2026-10-09 | Initial version. Supersedes the user-level `~/.claude/skills/skill-architect-review/SKILL.md` (final version 1.0, same date), which became step 7 here. Adds the full vendoring procedure around it, plus the `sssf:flattened` manifest, which is now stripped by `skill_engineering.py` and drift-checked and overwrite-guarded by `vendor_skill.py`. |
