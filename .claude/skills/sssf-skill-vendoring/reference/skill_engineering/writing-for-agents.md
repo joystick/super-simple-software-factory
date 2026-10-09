@@ -3,6 +3,12 @@ source: ~/Projects/training/super-simple-software-factory/downloads/skills/skill
 date: 2026-10-07
 sha256: 551adca942227b44192edba88acd4e8db911f0121ce58ad16944ccf6a896a74a
 -->
+<!-- sssf:flattened
+dropped: SKILL-MECHANICS.md -- skill packaging only (frontmatter, invocation choice, router skills); the documenter writes change write-ups, never skills
+dropped: agents/openai.yaml -- harness display metadata, no prompt content
+dropped: intro "When the document you're writing is a skill, read SKILL-MECHANICS.md ..." -- pointer to the dropped sibling; the documenter never writes a skill
+dropped: "When to split" bullet "By invocation, skill-specific: see SKILL-MECHANICS.md" -- pointer to the dropped sibling; skill-only branch, the "By sequence" bullet stands alone
+-->
 
 ---
 name: writing-for-agents
@@ -10,8 +16,6 @@ description: Writing documents for agents. Use when creating or editing skills, 
 ---
 
 Reference for writing any document an agent consumes: a skill, an `AGENTS.md` / `CLAUDE.md`, a doc reached by a pointer. The packaging differs; the writing does not: the same levers make each one predictable, since the agent takes the same _process_ every run rather than producing the same output.
-
-When the document you're writing is a skill, read [`SKILL-MECHANICS.md`](SKILL-MECHANICS.md) for frontmatter, invocation choice, and router skills.
 
 ## Context pointers
 
@@ -62,7 +66,6 @@ The strongest criteria are both checkable and exhaustive.
 Splitting one document into two spends one of the two loads, so split only when the cut earns it:
 
 - **By sequence**: split a run of steps where the post-completion steps tempt the agent to rush the one in front of it. Keeping them out of view drives more legwork on the current task. Beware the reverse: merging sequences exposes each step's later steps to what follows, inviting premature completion.
-- **By invocation**, skill-specific: see [`SKILL-MECHANICS.md`](SKILL-MECHANICS.md).
 
 ## Leading words
 

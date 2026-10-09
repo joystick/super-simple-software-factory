@@ -1,19 +1,19 @@
 ---
 title: "Skill engineering primer — reference implementation"
-version: 1.0
+version: 1.1
 updated: 2026-10-09
 status: active
 ---
 
 # Skill engineering primer: reference implementation
 
-A complete, working skill-engineering setup produced by the `sssf-skill-vendoring` procedure (`../SKILL.md`), taken from the downstream adopter `weather-report` (a Rust/Axum service). The files are copied verbatim from that repo after its run `f0333196`, in which every composite was loaded live (10/10 phases).
+A complete, working skill-engineering setup produced by the `sssf-skill-vendoring` procedure (`../SKILL.md`), taken from the downstream adopter `weather-report` (a Rust/Axum service). All 9 files went through the procedure: an opus architect built each one and a fable expert approved it. Six of them were loaded live in run `f0333196` (10/10 phases). `code-review`, `writing-for-agents` and `pr` were processed after that run and haven't been loaded live in their final form.
 
 | Path | What it is |
 |---|---|
 | `sssf.config.yaml` | The roster that loads these files. Its model ids are account-specific (opencode `muse-spark`, `anthropic/claude-*`), so swap in your own. |
 | `skill_engineering/*.md` | The 9 vendored files. Copy them to `adws/adw_data/skill_engineering/`. |
-| `prompt_engineering/{planner,builder,reviewer}/` | The role prompts with the overrides these files depend on. Merge them into yours; don't overwrite blindly. |
+| `prompt_engineering/{planner,builder,reviewer,documenter}/` | The role prompts with the overrides these files depend on. Merge them into yours; don't overwrite blindly. |
 
 ## Upstream pins
 
@@ -37,11 +37,11 @@ On another machine, the header's `source:` is `~/`-relative, so clone into the s
 | `sharp-edges.md` | ToB `sharp-edges` | reviewer | **processed** | crypto-apis, config-patterns, auth-patterns, case-studies, lang-rust | `## Agent` struck | 11.9k |
 | `differential-review.md` | ToB `differential-review` | reviewer | **processed** | methodology, adversarial, reporting, patterns | adversarial-modeler dispatch struck; one report at `<context_handoff_dir>/review.md`; `git checkout` → read-only `git show`/`git diff`; issue-writer hand-offs removed | 8.1k |
 | `property-based-testing.md` | ToB `property-based-testing` | builder | **processed** | generating, refactoring, reviewing, interpreting-failures, libraries | links → section names | 5.3k |
-| `code-review.md` | Pocock `code-review` | reviewer | plain vendor | — | none; fails check #1 (parallel sub-agents) and #2 (asks for the fixed point and spec) | 1.6k |
-| `writing-for-agents.md` | Pocock `writing-for-agents` | documenter | plain vendor | — | none; fails check #7 (2 links to unvendored `SKILL-MECHANICS.md`) | 2.7k |
-| `pr.md` | Pocock `pr` | documenter | plain vendor | — | none; fails check #6 (`GLOSSARY.md`; repos following SSSF use `CONTEXT.md`) | 1.0k |
+| `code-review.md` | Pocock `code-review` | reviewer | **processed** | — | fixed point is `HEAD` + the uncommitted working tree (the build isn't committed yet at review time); spec = `plan.md` else the prompt; the two axes run in sequence by the reviewer, no sub-agents | 1.6k |
+| `writing-for-agents.md` | Pocock `writing-for-agents` | documenter | **processed** | — | `SKILL-MECHANICS.md` and both pointers to it dropped (skill packaging only) | 2.7k |
+| `pr.md` | Pocock `pr` | documenter | **processed** | — | "PR body" reframed as the change write-up; `GLOSSARY.md`→`CONTEXT.md`; `CREDITS.md` dropped (frontmatter credits remain) | 1.0k |
 
-**Processed** means the file was built by the procedure: it has an `sssf:flattened` manifest recording every kept and dropped file and edit, an opus architect built it, and a fable expert approved it. The three plain vendors have no review yet. They load and work today, but they don't meet the USABLE bar.
+**Processed** means the file was built by the procedure: it has an `sssf:flattened` manifest recording every kept and dropped file and edit, an opus architect built it, and a fable expert approved it.
 
 ## Role overrides these files depend on
 
@@ -54,6 +54,8 @@ The composites don't carry headless behavior themselves. The role's `system.md` 
 | builder | seams come from `plan.md` | `tdd` |
 | builder | decide the dev-dependency yourself; refactor only when the plan asks; no inverse the ticket didn't ask for; no "ask the maintainer" | `property-based-testing` |
 | reviewer | sharp-edges/differential-review findings are in scope; one `review.md`; `audit-context-building` is not available | `sharp-edges`, `differential-review` |
+| reviewer | smell-baseline findings never block | `code-review` |
+| documenter | structure the write-up as Summary / Evidence / Merge Danger | `pr` |
 
 ## Adopting it
 
@@ -67,4 +69,5 @@ The composites don't carry headless behavior themselves. The role's `system.md` 
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.1 | 2026-10-09 | `code-review`, `writing-for-agents` and `pr` processed (all 9 files now processed); reviewer smell override and documenter `pr` mapping added; documenter prompt included. |
 | 1.0 | 2026-10-09 | Initial reference implementation: 9 vendored files, 4 role prompts and the roster from weather-report after live run `f0333196`. Six files processed by `sssf-skill-vendoring`; `code-review`, `writing-for-agents` and `pr` are plain vendors, with their failing checks listed. |

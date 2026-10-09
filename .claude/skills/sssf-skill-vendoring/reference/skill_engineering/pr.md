@@ -3,10 +3,19 @@ source: ~/Projects/training/super-simple-software-factory/downloads/skills/skill
 date: 2026-10-07
 sha256: ab63f1cf78647389edcd386c9427c5dfca27ed2836930c24773ffee834c19bcd
 -->
+<!-- sssf:flattened
+dropped: CREDITS.md -- attribution prose; the frontmatter metadata.credits block carries it
+dropped: agents/openai.yaml -- harness display metadata, no prompt content
+dropped: SKILL.md description "Use when writing a PR body." -- reframed to the change write-up, this role's only output
+dropped: SKILL.md "writing the PR body" -- reframed to "writing the change write-up"; the documenter never writes a PR body
+dropped: SKILL.md `GLOSSARY.md` -- renamed to `CONTEXT.md`, this repo's domain doc
+dropped: SKILL.md "A PR that is cheap to roll back" -- reframed to "A change"
+dropped: SKILL.md "introduced by this PR" -- reframed to "the change being written up"
+-->
 
 ---
 name: pr
-description: "Use when writing a PR body."
+description: "Use when writing the change write-up."
 metadata:
   credits:
     skill: show-me
@@ -15,7 +24,7 @@ metadata:
     url: "https://github.com/humanlayer/skills/blob/main/plugins/show-me/skills/show-me/SKILL.md"
 ---
 
-Use this template for writing the PR body:
+Use this template for writing the change write-up:
 
 ```markdown
 ## Summary
@@ -40,7 +49,7 @@ Use this template for writing the PR body:
 
 ## Sections
 
-Skip all preambles and keep prose brief. Use the user's domain language from `GLOSSARY.md`.
+Skip all preambles and keep prose brief. Use the user's domain language from `CONTEXT.md`.
 
 ### Summary
 
@@ -171,6 +180,6 @@ Execution-based evidence is A-tier. Test results, console output. Show the exact
 
 ### Merge Danger
 
-Describe whether it's a one-way or two-way door. You can walk back through two-way doors, but not one-way doors. A PR that is cheap to roll back is lower risk. Changes that involve destructive actions or hard-to-reverse decisions are one-way doors.
+Describe whether it's a one-way or two-way door. You can walk back through two-way doors, but not one-way doors. A change that is cheap to roll back is lower risk. Changes that involve destructive actions or hard-to-reverse decisions are one-way doors.
 
-The blast radius is the potential impact or scope of the changes introduced by this PR. Consider all possibilities. Examples are layout shift, breakages for consumers, mobile responsiveness, etc.
+The blast radius is the potential impact or scope of the changes introduced by the change being written up. Consider all possibilities. Examples are layout shift, breakages for consumers, mobile responsiveness, etc.
