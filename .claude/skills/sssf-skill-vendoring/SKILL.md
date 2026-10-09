@@ -41,8 +41,12 @@ This procedure covers all four. It still uses `vendor_skill.py` for the stamping
 # the composition module must strip the flatten manifest, or the manifest reaches the model
 grep -q FLATTEN_MANIFEST_RE adws/adw_modules/skill_engineering.py && echo ok
 # vendor_skill.py must know about manifests (FlattenedFileError, --hash)
-grep -q FlattenedFileError .claude/skills/sssf/scripts/vendor_skill.py && echo ok
+VENDOR=.claude/skills/sssf/scripts/vendor_skill.py
+[ -f "$VENDOR" ] || VENDOR=/path/to/super-simple-software-factory/.claude/skills/sssf/scripts/vendor_skill.py
+grep -q FlattenedFileError "$VENDOR" && echo ok
 ```
+
+Some installs trim the target's `.claude/skills/sssf/` down to `apps/visualizer`, so the script isn't there. In that case run it from an SSSF checkout and pass `--dest-dir` with the target's absolute `adws/adw_data/skill_engineering` path. `--check` resolves the source from the header, so it works from anywhere.
 
 If the first check fails, port `FLATTEN_MANIFEST_RE` and the two-step `_strip_provenance` from this skill's sibling `sssf/templates/adws/adw_modules/skill_engineering.py` by hand. **Don't** use `install.py --force`: it overwrites your config and prompts too. If any consuming role runs `coding_agent: opencode`, also confirm `adws/adw_modules/agent_opencode.py` sets `OPENCODE_DISABLE_CLAUDE_CODE_SKILLS=1`. Without it, opencode auto-loads skills from `.claude/skills/` underneath your `skill_engineering:` list, and a skill you deliberately left out stays reachable.
 
@@ -98,10 +102,10 @@ Where a check fails, fix it in the right layer:
 
 ```bash
 SKILL_SRC=~/.claude/skills/codebase-design            # the real upstream dir, never a temp copy
-# 1. stamp SKILL.md from its real path, so --check can track it
-uv run .claude/skills/sssf/scripts/vendor_skill.py "$SKILL_SRC/SKILL.md" --as codebase-design
+# 1. stamp SKILL.md from its real path, so --check can track it ($VENDOR: see Preconditions)
+uv run "$VENDOR" "$SKILL_SRC/SKILL.md" --as codebase-design
 # 2. hash each sibling you're keeping
-uv run .claude/skills/sssf/scripts/vendor_skill.py --hash "$SKILL_SRC/DEEPENING.md"
+uv run "$VENDOR" --hash "$SKILL_SRC/DEEPENING.md"
 ```
 
 Then edit the vendored file in place:
@@ -125,7 +129,7 @@ Never vendor from a temporary staging copy. If the header's `source:` points at 
 - Add the file to each role's `skill_engineering:` in the decided order, and add any `system.md` overrides from step 4.
 - `just skills`: the file appears under the right roles, and nothing that should be in use shows `(unused)`.
 - `agents.validate()` passes. The `just` recipes run it, or call `agents.load_config` + `agents.validate` directly.
-- `uv run .claude/skills/sssf/scripts/vendor_skill.py --check <file>` reports no drift, and the message counts the merged siblings.
+- `uv run "$VENDOR" --check <file>` reports no drift, and the message counts the merged siblings.
 - Check the estimated token cost in the console line when the role starts (`skill_engineering: … (est. N tokens/turn)`), and set `skill_token_budget` if it's large.
 
 ### 7. Review: skill architect + skill expert
