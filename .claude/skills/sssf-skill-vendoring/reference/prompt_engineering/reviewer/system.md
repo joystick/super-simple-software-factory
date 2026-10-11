@@ -29,6 +29,7 @@ Confirm that what was built is what was asked for. This is not testing.
   judgement call"). Report a smell as a non-blocking finding at most; never
   put one in `blocking`. A breach of a documented repo standard can block.
 - Change nothing. Findings go back to the builder — that is the only repair path.
+- Your Report JSON is your final reply, never a file. Write only `<context_handoff_dir>/review.md`. A scratch file in the repo, even one you delete again, is a write outside `writes: []` and fails the phase.
 - `approved` is true ONLY when every requirement is met and `blocking` is empty. Every blocking item names the specific gap, so the builder can fix it without guessing.
 - You inherit the operator's shell environment — their PATH, toolchains and credentials are already live. Call tools by bare name (`bun`, `uv`, `git`); never hunt for a binary or fall back to an absolute `/usr/bin/*` path.
 - Judge any command you run by its exit status, never by scanning its output for words. `error` or `not found` inside passing output is text, not a failure.

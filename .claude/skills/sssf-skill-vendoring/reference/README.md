@@ -1,7 +1,7 @@
 ---
 title: "Skill engineering primer — reference implementation"
-version: 1.2
-updated: 2026-10-09
+version: 1.3
+updated: 2026-10-11
 status: active
 ---
 
@@ -13,12 +13,14 @@ All 10 have been loaded in live `just watch` runs:
 - The first six: run `f0333196`.
 - `code-review`, `writing-for-agents` and `pr`: run `a101fda9`.
 - `okf`: run `2b07fef7`, where the documenter updated the OKF bundle and the `okf_maintained` gate passed on the first attempt.
+- The generated roadmap: run `32ad6429`. The documenter ran `just okf-roadmap`, wrote narrative only, and the gate's drift check passed. The watcher's resolve commit then carried the ticket into the roadmap as `resolved`.
 
 | Path | What it is |
 |---|---|
 | `sssf.config.yaml` | The roster that loads these files. Its model ids are account-specific (opencode `muse-spark`, `anthropic/claude-*`), so swap in your own. |
 | `skill_engineering/*.md` | The 10 vendored files. Copy them to `adws/adw_data/skill_engineering/`. |
 | `prompt_engineering/{planner,builder,reviewer,documenter}/` | The role prompts with the overrides these files depend on. Merge them into yours; don't overwrite blindly. |
+| `code/` | The adopter-side code the OKF overrides rely on: `sync_okf_roadmap.py` (goes in `scripts/`), and the `okf_maintained` gate and watcher hook as snippets to paste into `gates.py` and `adw_watch.py`. |
 
 ## Upstream pins
 
@@ -63,14 +65,28 @@ The composites don't carry headless behavior themselves. The role prompts do (st
 | builder | decide the dev-dependency yourself; refactor only when the plan asks; no inverse the ticket didn't ask for; no "ask the maintainer" | `property-based-testing` |
 | reviewer | sharp-edges/differential-review findings are in scope; one `review.md`; `audit-context-building` is not available | `sharp-edges`, `differential-review` |
 | reviewer | smell-baseline findings never block | `code-review` |
+| reviewer, documenter | the Report JSON is the reply, never a file; no scratch files in the repo, even ones deleted again | any skill that writes a report file |
 | documenter | structure the write-up as Summary / Evidence / Merge Danger | `pr` |
-| documenter | maintain `.okf/` in maintain mode, one roadmap concept per `.scratch/<feature>/`, validator 0 errors, never a whole-bundle `--migrate`; the `user.md` task steps 4–6 make it explicit | `okf`, `writing-for-agents` |
+| documenter | maintain `.okf/` in maintain mode, validator 0 errors, never a whole-bundle `--migrate`; the `user.md` task steps 4–6 make it explicit | `okf`, `writing-for-agents` |
+| documenter | roadmap: run `just okf-roadmap`, write narrative only, never hand-edit ticket rows | `okf` |
 
 **The OKF upkeep needs `user.md` as well as a gate.** In the first live run with `okf.md` composed and the duties only in `system.md`, the documenter touched nothing under `.okf/`, because its `user.md` task list defines the job. So `weather-report` added two things:
 - **Task steps:** explicit `user.md` steps for the bundle.
-- **A gate:** `okf_maintained` in `adws/adw_modules/gates.py`, wired into `adw_simple_sdlc.py` and `adw_document.py`. It requires an existing `.okf/*.md` path in `artifacts` and `scripts/okf_validate.py` to exit 0. A miss comes back to the documenter as a correction.
+- **A gate:** `okf_maintained` (`code/okf_maintained_gate.py`), wired into `adw_simple_sdlc.py` and `adw_document.py`. It requires:
+  - an existing `.okf/*.md` path in `artifacts`, including a `.okf/roadmap/<feature>.md`;
+  - `scripts/okf_validate.py` to exit 0;
+  - when the repo has the roadmap generator, `sync_okf_roadmap.py --check` to pass.
 
-The gate is adopter-side code, not SSSF core: an OKF-specific gate in the factory would hard-wire one third-party skill into a skill-agnostic factory.
+  A miss comes back to the documenter as a correction. The roadmap requirement was added after run `9c166220`: the gate passed on the builder's `.okf` files alone while the roadmap was never touched.
+
+**Ticket status is generated, never transcribed.** In run `9c166220` the documenter (haiku) listed a resolved ticket as `needs-triage`. Status is a fact the issue files already hold, so `code/sync_okf_roadmap.py` (`just okf-roadmap`) copies it:
+- one `.okf/roadmap/<feature>.md` per `.scratch/<feature>/`;
+- only the block between the `okf-roadmap:tickets` markers is generated (number, status, delivering session); narrative outside it survives;
+- the index is rebuilt; output is deterministic, and `--check` changes nothing.
+
+`code/watcher_roadmap_hook.py` runs it in `commit_watcher_state`, so the commit that flips a ticket's `Status:` also updates its roadmap entry. The documenter runs before resolve and only ever sees its own ticket as `claimed`.
+
+The gate, the generator and the hook are adopter-side code, not SSSF core: OKF-specific code in the factory would hard-wire one third-party skill into a skill-agnostic factory.
 
 ## Adopting it
 
@@ -78,7 +94,9 @@ The gate is adopter-side code, not SSSF core: an OKF-specific gate in the factor
 2. Copy `skill_engineering/*.md` and merge the role overrides above.
 3. **For the OKF parts:**
    - Copy `okf-skills/skills/validate/scripts/okf_validate.py` to your repo's `scripts/`.
-   - Add the `okf_maintained` gate to your documenter phases.
+   - Copy `code/sync_okf_roadmap.py` to `scripts/`, and add `okf-roadmap` / `okf-roadmap-check` recipes (`uv run scripts/sync_okf_roadmap.py [--check]`).
+   - Paste `code/okf_maintained_gate.py` into `gates.py` and add `gates.okf_maintained()` to your documenter phases.
+   - Replace `commit_watcher_state` in `adw_watch.py` with `code/watcher_roadmap_hook.py`. If your tests run from the repo root, point `ROADMAP_SYNC` elsewhere in them, so a test never regenerates your real bundle.
    - Make sure a `.okf/` bundle exists. For a repo with history and no bundle, build the first one with scaccogatto's interactive `backfill` skill; that's a bootstrap-phase job, not an AFK one.
 4. **Adapt to your stack.** Both sharp-edges files keep only `lang-rust.md`. For another language, rebuild them with the procedure from step 4, keeping your language's reference instead.
 5. Wire `skill_engineering:` per `sssf.config.yaml`, with your own models. Then run `just skills` and `agents.validate()`, run `vendor_skill.py --check` on every file, and do one live run.
@@ -88,6 +106,7 @@ The gate is adopter-side code, not SSSF core: an OKF-specific gate in the factor
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.3 | 2026-10-11 | Synced weather-report `e1d9ce8` and `b52e3e1`: reviewer and documenter prompts (the Report is the reply, never a file; roadmap via `just okf-roadmap`, narrative only); the stricter `okf_maintained` gate (roadmap concept required, generator drift check); the roadmap generator and watcher hook, now shipped under `code/`. Live-tested in run `32ad6429`. |
 | 1.2 | 2026-10-09 | Added `okf.md` (scaccogatto okf-skills @ 8e31878) for the documenter, the OKF role overrides (documenter maintain + roadmap, planner consume), the documenter `user.md`, and the note on why the upkeep needed task steps plus an adopter-side `okf_maintained` gate. All 10 files are now live-tested. |
 | 1.1 | 2026-10-09 | `code-review`, `writing-for-agents` and `pr` processed (all 9 files now processed); reviewer smell override and documenter `pr` mapping added; documenter prompt included. |
 | 1.0 | 2026-10-09 | Initial reference implementation: 9 vendored files, 4 role prompts and the roster from weather-report after live run `f0333196`. Six files processed by `sssf-skill-vendoring`; `code-review`, `writing-for-agents` and `pr` are plain vendors, with their failing checks listed. |

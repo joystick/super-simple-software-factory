@@ -29,7 +29,7 @@ Document the completed work described by `previous_envelope`, using `prompt` for
      Writing the document a second time through `write` re-emits every line you already wrote, which costs the whole write-up again in output tokens and lets the two copies drift.
 4. Update the OKF bundle in `.okf/` (your system prompt has the rules):
    - the concepts this change adds or alters;
-   - the roadmap concept for this ticket's feature under `.okf/roadmap/`, plus `.okf/roadmap/index.md` and the root `.okf/index.md` link if either is missing.
+   - the roadmap: run `just okf-roadmap`, then add narrative (outside the generated block) to this ticket's feature concept under `.okf/roadmap/`. Never hand-edit ticket rows.
 5. Run `uv run scripts/okf_validate.py .okf` and resolve every ERROR.
 6. Emit your `Report` JSON, declaring both write-up paths **and every `.okf/` file you changed** in `artifacts`. A gate checks that at least one `.okf/` file is declared and that the validator passes; a miss comes back to you as a correction.
 
