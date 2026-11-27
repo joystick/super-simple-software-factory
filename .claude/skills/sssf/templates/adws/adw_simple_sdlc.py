@@ -58,6 +58,37 @@ DOCUMENT_NOTES = ("Read diff_path in full before writing. Document only what the
                   "describes.")
 
 
+COMMIT = "commit"
+SKIP_NO_CHANGES = "skip-no-changes"
+CLAIMS_MISMATCH = "claims-mismatch"
+
+
+def classify_build_landing(tree_is_dirty: bool, claimed_files: list[str]) -> str:
+    """What should commit_build do? Pure, so it can be tested without a run.
+
+    Three outcomes, and the third is the reason this is not just
+    `if is_dirty()`:
+
+    * COMMIT -- the builder changed files. Normal path.
+    * SKIP_NO_CHANGES -- clean tree AND the builder claimed nothing. The
+      planner correctly finding the work already done is a FEATURE: its own
+      system prompt tells it to scope to the delta and not re-touch what
+      exists. The reviewer can still approve ("6/6 requirements already met
+      by existing code"). Previously the only outcome here was
+      git_helper.commit_all() raising "nothing to commit" -- a hard crash on
+      a successful run (#19).
+    * CLAIMS_MISMATCH -- clean tree but the builder claimed files it changed.
+      That is a builder reporting work it did not do, and it must stay a
+      failure. `gates.diff_matches_claims` does NOT catch it: that gate only
+      asserts each claimed file EXISTS, so naming an untouched file that
+      happens to exist passes it. Before this split, the generic "nothing to
+      commit" error masked this case as the same thing as a legitimate no-op.
+    """
+    if tree_is_dirty:
+        return COMMIT
+    return CLAIMS_MISMATCH if claimed_files else SKIP_NO_CHANGES
+
+
 def main(prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw_id: str | None = None) -> int:
     cfg = agents.load_config(config)
     agents.validate(cfg, REQUIRED_AGENTS)
@@ -142,11 +173,37 @@ def main(prompt: str, config: str = "adws/adw_sssf_config/sssf.config.yaml", adw
     # describing yet. The plan commit stands — it is a record of what was asked.
     verified = (test is not None and test.passed
                 and review is not None and review.approved)
+    landed = False
     if verified:
         with run.phase(PhaseParams(name="commit_build", kind="code", owner="git",
                                    description="Land the code only now: green suite, approved review")) as ph:
-            commit(ph, build)
+            # In a non-repo, fall through to commit_all()'s own clear
+            # "not a git repository" error rather than asking is_dirty()
+            # first, which would raise something far less useful.
+            dirty = (not git_helper.is_repo()) or git_helper.is_dirty()
+            claimed = list(getattr(build, "changed_files", []) or [])
+            decision = classify_build_landing(dirty, claimed)
+            if decision == COMMIT:
+                commit(ph, build)
+                landed = True
+            elif decision == CLAIMS_MISMATCH:
+                raise RuntimeError(
+                    "the builder reported changed files but the working tree is "
+                    f"clean: {', '.join(claimed)}. gates.diff_matches_claims only "
+                    "checks those paths EXIST, so naming an untouched file passes "
+                    "it. Treat this as a failed build, not an empty one.")
+            else:
+                ph.log(skipped="nothing to commit",
+                       reason="the builder correctly changed nothing — the "
+                              "requested work was already done (#19)")
 
+    # Everything below describes a change. On a legitimate no-op there is
+    # nothing to diff and nothing to write up, so the whole documentation
+    # branch is skipped rather than fed an empty changeset. This is also why
+    # the `changes` phase can keep RAISING on an empty diff: reaching it now
+    # means a commit really did land and produced no diff, which is a genuine
+    # inconsistency, not the already-done case (#19).
+    if verified and landed:
         with run.phase(PhaseParams(name="changes", kind="code", owner="git",
                                    description="Diff the whole run against its pinned baseline, for the documenter")) as ph:
             changeset = changes.capture(run, ChangeCapture(base=baseline))
