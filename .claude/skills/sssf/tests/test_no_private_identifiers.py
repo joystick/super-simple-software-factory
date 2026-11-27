@@ -43,10 +43,22 @@ DENYLIST = [
 NEUTRAL_EXAMPLES = ["route-builder", "cart-pricing"]
 
 
+# This file necessarily contains every forbidden name -- that is what a
+# denylist is. Once it became tracked, `git grep` started finding them here
+# and the guard failed on itself, every term at once. Excluding it is the
+# honest fix: the alternative (assembling the names from fragments to dodge
+# the grep) would make the list unreadable, which is worse than a one-line
+# pathspec. Found by running the suite after committing, not before.
+SELF = ":(exclude).claude/skills/sssf/tests/test_no_private_identifiers.py"
+
+
 def tracked_hits(needle: str) -> list[str]:
-    """Files git actually tracks that contain `needle`, case-insensitively."""
+    """Files git actually tracks that contain `needle`, case-insensitively.
+
+    Excludes this file (see SELF) -- everything else is in scope.
+    """
     r = subprocess.run(
-        ["git", "grep", "-i", "-l", needle, "--", "."],
+        ["git", "grep", "-i", "-l", needle, "--", ".", SELF],
         cwd=REPO, capture_output=True, text=True,
     )
     # exit 1 == no matches, which is the passing case
