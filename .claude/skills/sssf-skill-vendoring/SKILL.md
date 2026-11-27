@@ -189,5 +189,5 @@ Run `vendor_skill.py --check` on a schedule or in pre-commit. When it reports dr
 
 | Version | Date | Changes |
 |---|---|---|
-| 1.1 | 2026-10-09 | Added `reference/`: the worked example from weather-report (9 vendored files, role overrides, roster). |
+| 1.1 | 2026-10-09 | Added `reference/`: the worked example from a Rust/Axum adopter (9 vendored files, role overrides, roster). |
 | 1.0 | 2026-10-09 | Initial version. Supersedes the user-level `~/.claude/skills/skill-architect-review/SKILL.md` (final version 1.0, same date), which became step 7 here. Adds the full vendoring procedure around it, plus the `sssf:flattened` manifest, which is now stripped by `skill_engineering.py` and drift-checked and overwrite-guarded by `vendor_skill.py`. |

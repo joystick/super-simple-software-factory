@@ -1,4 +1,4 @@
-# From weather-report adws/adw_watch.py. Replace commit_watcher_state() in your
+# From a downstream adopter's adws/adw_watch.py. Replace commit_watcher_state() in your
 # adw_watch.py with this (add `import subprocess`), so every claim/resolve commit
 # also regenerates .okf/roadmap/ via scripts/sync_okf_roadmap.py.
 

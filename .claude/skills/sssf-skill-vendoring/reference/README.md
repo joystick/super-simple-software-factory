@@ -7,7 +7,7 @@ status: active
 
 # Skill engineering primer: reference implementation
 
-A complete, working skill-engineering setup produced by the `sssf-skill-vendoring` procedure (`../SKILL.md`), taken from the downstream adopter `weather-report` (a Rust/Axum service). All 10 files went through the procedure: an opus architect built each one and a fable expert approved it.
+A complete, working skill-engineering setup produced by the `sssf-skill-vendoring` procedure (`../SKILL.md`), taken from a downstream adopter — a Rust/Axum service. All 10 files went through the procedure: an opus architect built each one and a fable expert approved it.
 
 All 10 have been loaded in live `just watch` runs:
 - The first six: run `f0333196`.
@@ -70,7 +70,7 @@ The composites don't carry headless behavior themselves. The role prompts do (st
 | documenter | maintain `.okf/` in maintain mode, validator 0 errors, never a whole-bundle `--migrate`; the `user.md` task steps 4–6 make it explicit | `okf`, `writing-for-agents` |
 | documenter | roadmap: run `just okf-roadmap`, write narrative only, never hand-edit ticket rows | `okf` |
 
-**The OKF upkeep needs `user.md` as well as a gate.** In the first live run with `okf.md` composed and the duties only in `system.md`, the documenter touched nothing under `.okf/`, because its `user.md` task list defines the job. So `weather-report` added two things:
+**The OKF upkeep needs `user.md` as well as a gate.** In the first live run with `okf.md` composed and the duties only in `system.md`, the documenter touched nothing under `.okf/`, because its `user.md` task list defines the job. So that adopter added two things:
 - **Task steps:** explicit `user.md` steps for the bundle.
 - **A gate:** `okf_maintained` (`code/okf_maintained_gate.py`), wired into `adw_simple_sdlc.py` and `adw_document.py`. It requires:
   - an existing `.okf/*.md` path in `artifacts`, including a `.okf/roadmap/<feature>.md`;
@@ -106,7 +106,7 @@ The gate, the generator and the hook are adopter-side code, not SSSF core: OKF-s
 
 | Version | Date | Changes |
 |---|---|---|
-| 1.3 | 2026-10-11 | Synced weather-report `e1d9ce8` and `b52e3e1`: reviewer and documenter prompts (the Report is the reply, never a file; roadmap via `just okf-roadmap`, narrative only); the stricter `okf_maintained` gate (roadmap concept required, generator drift check); the roadmap generator and watcher hook, now shipped under `code/`. Live-tested in run `32ad6429`. |
+| 1.3 | 2026-10-11 | Synced the adopter's `e1d9ce8` and `b52e3e1`: reviewer and documenter prompts (the Report is the reply, never a file; roadmap via `just okf-roadmap`, narrative only); the stricter `okf_maintained` gate (roadmap concept required, generator drift check); the roadmap generator and watcher hook, now shipped under `code/`. Live-tested in run `32ad6429`. |
 | 1.2 | 2026-10-09 | Added `okf.md` (scaccogatto okf-skills @ 8e31878) for the documenter, the OKF role overrides (documenter maintain + roadmap, planner consume), the documenter `user.md`, and the note on why the upkeep needed task steps plus an adopter-side `okf_maintained` gate. All 10 files are now live-tested. |
 | 1.1 | 2026-10-09 | `code-review`, `writing-for-agents` and `pr` processed (all 9 files now processed); reviewer smell override and documenter `pr` mapping added; documenter prompt included. |
-| 1.0 | 2026-10-09 | Initial reference implementation: 9 vendored files, 4 role prompts and the roster from weather-report after live run `f0333196`. Six files processed by `sssf-skill-vendoring`; `code-review`, `writing-for-agents` and `pr` are plain vendors, with their failing checks listed. |
+| 1.0 | 2026-10-09 | Initial reference implementation: 9 vendored files, 4 role prompts and the roster from that adopter after live run `f0333196`. Six files processed by `sssf-skill-vendoring`; `code-review`, `writing-for-agents` and `pr` are plain vendors, with their failing checks listed. |

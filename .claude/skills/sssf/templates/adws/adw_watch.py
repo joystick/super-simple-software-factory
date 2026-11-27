@@ -82,7 +82,7 @@ from adw_modules import git_helper, utils
 # \*{0,2} tolerates the two real forms seen in the wild: plain "Status: X"
 # (this script's own set_status() writes) and "**Status:** X" (to-tickets'
 # own local-ticket-template, per its SKILL.md, uses bold) -- found live,
-# 2026-09-14, when to-tickets published four portfinder tickets entirely in
+# 2026-09-14, when to-tickets published four real adopter tickets entirely in
 # bold and every one of them was silently invisible to the frontier scan.
 # It does NOT tolerate arbitrary other markup (underscores, backticks,
 # missing colon) on purpose -- see _check_format() below, which flags those

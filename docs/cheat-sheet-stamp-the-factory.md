@@ -7,7 +7,7 @@ status: active
 
 # Stamp the factory: step-by-step
 
-Grounded in the exact steps used to bring up `weather-report`'s extended
+Grounded in the exact steps used to bring up one adopter's extended
 Pocock+Trail of Bits roster. Every command below is real, not illustrative.
 See `docs/playbook-adopting-sssf.md` for the full rationale; this is the
 condensed, print-ready checklist.
@@ -52,7 +52,7 @@ uses, in place of bare `operator_env()`. Without it, opencode
 auto-discovers skills from `~/.claude/skills/` and injects your global
 `CLAUDE.md` into every prompt — underneath whatever `skill_engineering:`
 actually says. Live-confirmed bug, not theoretical: see
-`weather-report/.scratch/sssf-ops/issues/01-opencode-config-leaks.md`.
+that adopter's `.scratch/sssf-ops/issues/01-opencode-config-leaks.md`.
 
 ## Phase 3 — Vendor the Pocock bootstrap skillset
 
@@ -64,7 +64,7 @@ headless role in this roster.
 
 Confirm the label mapping matches the five canonical triage roles
 (`needs-triage`/`needs-info`/`ready-for-agent`/`ready-for-human`/
-`wontfix`) — `weather-report/docs/agents/issue-tracker.md` has a working
+`wontfix`) — that adopter's `docs/agents/issue-tracker.md` has a working
 example.
 
 ## Phase 4 — Vendor the `skill_engineering` roster's 8 source skills
@@ -90,7 +90,7 @@ ToB skills need hand-flattening first (compatibility check #7 —
 ```bash
 mkdir -p .scratch/_tob-vendor-staging/flattened
 # concatenate SKILL.md + only the reference files your stack needs
-# (weather-report kept lang-rust.md, dropped the other 10 — use yours)
+# (the Rust adopter kept lang-rust.md, dropped the other 10 — use yours)
 # add a CC-BY-SA-4.0 attribution header naming the exact upstream commit
 uv run .../vendor_skill.py .scratch/_tob-vendor-staging/flattened/sharp-edges.md \
   --dest-dir adws/adw_data/skill_engineering --as sharp-edges
@@ -100,13 +100,19 @@ rm -rf .scratch/_tob-vendor-staging
 
 ## Phase 5 — Build the planner-specific trimmed variants
 
-Three files no other role needs — copy directly from `weather-report`,
-repo-specific trims, not upstream vendors:
+Three files no other role needs — repo-specific trims, not upstream
+vendors. One of the three ships in this repo; copy it from there:
 
 ```bash
-cp /path/to/weather-report/adws/adw_data/skill_engineering/{codebase-design-planner,tdd-planner,sharp-edges-planner}.md \
+cp .claude/skills/sssf-skill-vendoring/reference/skill_engineering/sharp-edges-planner.md \
    adws/adw_data/skill_engineering/
 ```
+
+`codebase-design-planner.md` and `tdd-planner.md` are **not** in
+`reference/` — they were trims made in an adopter repo and were never
+vendored back here. Build them the same way: take the full vendored file and
+cut what plan-time does not need (see `sharp-edges-planner.md`'s own
+`dropped:` header lines for the shape of that reasoning).
 
 Non-Rust stack? Re-check `sharp-edges-planner.md`'s trim — swap
 `lang-rust.md` for your own language file and re-flatten.
@@ -114,23 +120,21 @@ Non-Rust stack? Re-check `sharp-edges-planner.md`'s trim — swap
 ## Phase 6 — Copy the prompt amendments
 
 ```bash
-cp /path/to/weather-report/adws/adw_data/prompt_engineering/planner/{system,user}.md \
-   adws/adw_data/prompt_engineering/planner/
-cp /path/to/weather-report/adws/adw_data/prompt_engineering/builder/system.md \
-   adws/adw_data/prompt_engineering/builder/
-cp /path/to/weather-report/adws/adw_data/prompt_engineering/reviewer/system.md \
-   adws/adw_data/prompt_engineering/reviewer/
+REF=.claude/skills/sssf-skill-vendoring/reference/prompt_engineering
+cp $REF/planner/{system,user}.md  adws/adw_data/prompt_engineering/planner/
+cp $REF/builder/system.md         adws/adw_data/prompt_engineering/builder/
+cp $REF/reviewer/system.md        adws/adw_data/prompt_engineering/reviewer/
 ```
 
 Carries: the already-implemented backstop, the single-phase rule, the
 seam-naming override, the sharp-edges Phase-4 rewrite, the style-opinions
-carve-out. Re-read once — some reference `weather-report`-specific
-conventions (`CONTEXT.md`, `docs/adr/`); verify against your own repo.
+carve-out. Re-read once — some reference adopter-specific conventions
+(`CONTEXT.md`, `docs/adr/`); verify against your own repo.
 
 ## Phase 7 — Drop in the roster wiring
 
-Copy `weather-report/adws/adw_sssf_config/sssf.config.yaml`'s `agents:`
-block wholesale. Adjust only:
+Copy `.claude/skills/sssf-skill-vendoring/reference/sssf.config.yaml`'s
+`agents:` block wholesale. Adjust only:
 
 - `model:` strings to your own `opencode models`/`claude` catalog
 - `writes:`/`protected_files:` paths if your repo layout differs
@@ -168,4 +172,4 @@ new repo.
 | Version | Date | Changes |
 |---|---|---|
 | 1.1 | 2026-10-08 | Renamed from `cheat-sheet-plant-the-factory.md` (final version 1.0) — "stamp" is this project's own term (README: "stamped into any repo", "The skill is the product... stamping config, adws, and prompt_engineering into three different target repos"); "plant" was never used elsewhere in this codebase. Title and heading updated to match; no content/structure change. |
-| 1.0 | 2026-10-08 | Initial cheat sheet, derived from the live `weather-report` setup (Pocock+ToB extended roster, re-armed planner, opencode harness patch). |
+| 1.0 | 2026-10-08 | Initial cheat sheet, derived from one adopter's live setup (Pocock+ToB extended roster, re-armed planner, opencode harness patch). |

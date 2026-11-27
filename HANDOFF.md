@@ -1,6 +1,6 @@
 ---
 title: "Handoff — where this work stands and how to pick it up"
-version: 1.9
+version: 1.10
 updated: 2026-11-27
 status: active
 ---
@@ -90,6 +90,32 @@ that installs this skill. Sat uncommitted for over a week; reviewed and committe
     literally built and named at the time (4.0/4.1) were deliberately left saying `just
     sssf` — accurate history, not something to retroactively rewrite.
   Both verified: full suite green (124 passed) after porting.
+
+## Publishing hygiene — real adopter names (issue #23)
+
+This repo is **public**, and `.claude/skills/sssf-skill-vendoring/` is a
+**shipped** skill: a name written there propagates into every adopter repo that
+installs it, not merely to people browsing GitHub.
+
+Tracked files are now clean of real adopter project names, and
+`.claude/skills/sssf/tests/test_no_private_identifiers.py` fails on a denylist
+of them so it cannot silently regress. The convention is a neutral label that
+keeps the engineering detail — "a downstream adopter", "the Rust adopter",
+"that adopter" — because the value of those passages is the *failure*, never
+the repo it happened in. `route-builder` and `cart-pricing` are the deliberate
+non-existent stand-ins used in docs, lessons and fixtures.
+
+**The scrub does not reach history, and no attempt was made to.** `git log -S`
+finds the old names in ~20 commits going back to 2026-09-08; the repo is public
+and long since pushed, so the names remain retrievable from history exactly as a
+pushed secret would. What was fixed is that nothing *new* ships them. If those
+names are ever judged genuinely sensitive rather than untidy, that is a separate
+and much larger decision (history rewrite + force-push, or a fresh repo) and
+should be taken deliberately, not inherited from this cleanup.
+
+Out of scope by design: `downloads/` (gitignored) and `.claude/settings.local.json`
+(untracked) still contain real names. Neither is published, and testing them
+would produce permanent false failures.
 
 ## Open
 
@@ -230,3 +256,4 @@ The guard invisible through the public entry point. The gate table that was simp
 | 1.7 | 2026-09-10 | Ported another real fix back from a downstream project, found after its first two live `just watch` dispatches (a PIN-authentication access gate, a biometric-unlock follow-up) both landed with zero review: `adw_watch.py` always called `adw_plan_build_test.main()` (planner → builder → test → commit, no reviewer/revision-loop/documenter), not the fuller `adw_simple_sdlc.py` chain the playbook's own prose implied. An unattended queue dispatch has nothing else checking it besides the test gate — worse than a manual `just sdlc` run a human reads afterward. Switched the dispatch target (identical 3-arg signature, confirmed before switching); the roster already had `reviewer`/`documenter` configured. Playbook bumped to 4.4; "What this playbook does not claim" corrected — `just watch` genuinely has shipped two real issues now, but not yet through this corrected full-chain path. Full suite green (124 passed). |
 | 1.8 | 2026-09-10 | Self-correction: the "126 passed" test count reported in this file's 1.6/1.7 rows and in commits `8b80fdc`/`6a3a981`'s messages was wrong — the fork's suite has always been 124 tests, identical to a downstream project's count, confirmed by rerunning both directly. Fixed both rows here to say 124. The two already-pushed commit messages still say 126 and are left as-is rather than rewriting pushed history; treat this row as the correction of record. |
 | 1.9 | 2026-11-27 | Closed Open item 3 (issue #20): `adw_watch.py`'s frontier scan is now **tracker-agnostic**. One adapter protocol selected from the `detect_tracker()` value that already existed — `LocalTracker` / `GitHubTracker` / `GitLabTracker`. Triggered by the same failure recurring in a second adopter, one whose tracker had migrated to GitHub Issues: `just watch` could not be used at all there and every ticket was dispatched manually (`adw_simple_sdlc.py` per issue), exactly as row 1.4's adopter did. Both of item 3's open design questions resolved: remote trackers make `commit_state` a no-op and never consult git (a label change is already durable), and the dirty-tree refusal is scoped to local trackers since it exists only because local claiming commits; `discover_issues()` additionally recognizes the older single-`issue.md`-per-feature shape rather than pushing a migration onto every older adopter. Fail-closed preserved and now tested at preflight **and** mid-run: a missing/unauthenticated CLI exits 2, never a falsely-empty queue — "looks like an empty queue" was the original bug and is strictly worse than an error. Two semantics genuinely invert between families and are pinned by tests, not inferred: an unfindable blocker still blocks locally (dangling ref) but is resolved remotely (`gh` lists open issues only, so absence IS the evidence it closed), and "resolved" is the literal string locally but a closed issue remotely. Also fixed a robustness gap found by the existing suite during the refactor — `TrackerUnavailable` raised from `discover()` escaped `run_once` as a traceback instead of exit 2. One test retired deliberately: `test_main_returns_2_for_a_non_local_tracker` pinned the "not implemented yet" refusal this replaces, and was environment-dependent (unmocked, so it only still passed because `tmp_path` isn't a git repo); its surviving property is covered by `test_main_exits_2_when_the_tracker_cli_is_unavailable` with the CLI mocked. Suite: **143 passed** (was 124; +19 adapter tests, all CLI calls faked — no network, no `gh`/`glab` needed). Separately noted for a downstream port: that adopter's vendored `adw_watch.py` is **stale against this template** in `read_blocked_by` — it splits on commas before stripping parentheticals, so `Blocked by: None (Phase 10 complete, merged into X)` made an explicitly unblocked ticket permanently blocked; 18 ticket files were affected. The template has been correct since 2026-09-24; vendored `adws/` copies drift silently with nothing detecting it. |
+| 1.10 | 2026-11-27 | Brought the fork's own tracker to zero open issues, and closed the four that mattered with code rather than triage. **#19** `commit_build` crashed on a correct zero-change build (the planner finding work already done is a feature); split the clean-tree case into commit / skip / claims-mismatch, the third being a builder reporting work it did not do, which `gates.diff_matches_claims` never caught because it only asserts claimed paths EXIST. Fixing only `commit_build` would have moved the crash one phase later into `changes`, so the whole documentation branch is now gated on a commit having landed. **#21** remote dispatch prompts were title+body only, so a requirement appended as a comment reached no agent while the run still went green; comments are now included **filtered** (the watcher's own status notes, AI-triage notes and bots dropped — feeding a prior run's "flipped to ready-for-human" into the next attempt is worse than omitting it) with body-is-the-contract precedence stated in the prompt. This was a divergence #20 introduced, not an omission: local always included comments because `resolve_prompt` reads the whole ticket file. **#24** (split out of #20) `commit_watcher_state` assumed a git repo; now skips and says so once per run, closing HANDOFF item 3(a) in full. **#23** real adopter project names were in 11 tracked files of this PUBLIC repo, six of them inside the shipped `sssf-skill-vendoring` skill; scrubbed to neutral labels, with a denylist test so it cannot regress, and the cheat sheet's `cp /path/to/<private-repo>/...` commands repointed at the `reference/` dir that actually ships here — they had been instructing readers to copy from a repo they could not have. **#18** closed as answered: `--skip-plan` and `adw_build.py` are not redundant. Suite **124 → 163**. | 

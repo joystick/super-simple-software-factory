@@ -63,7 +63,7 @@ def test_read_blocked_by_returns_empty_list_when_absent():
 
 # ── bold-markup tolerance -- found live, 2026-09-14: to-tickets publishes
 #    its own local-ticket-template with **Status:**/**Blocked by:**, which
-#    the original plain-only regex never matched, so four real portfinder
+#    the original plain-only regex never matched, so four real adopter
 #    tickets were silently invisible to the frontier scan with no error ──
 
 def test_read_status_accepts_the_bold_form_to_tickets_actually_writes():
@@ -137,7 +137,7 @@ def test_read_blocked_by_no_warning_without_a_path(capsys):
 
 
 def test_discover_issues_finds_bold_form_tickets(tmp_path):
-    issues_dir = tmp_path / "portfinder" / "issues"
+    issues_dir = tmp_path / "route-builder" / "issues"
     issues_dir.mkdir(parents=True)
     (issues_dir / "05-seed.md").write_text(
         "# 05: Seed\n\n**What to build:** the thing.\n\n**Status:** ready-for-agent\n")

@@ -91,3 +91,37 @@ fresh (`core-execution-model/Chains.md`).
   `files_non_empty`, the gates a loaded plan still has to pass.
 - `.claude/skills/sssf/references/handoff.md#envelope-schema` — the
   `PlanOutput` / `EnvelopeBase` fields the loader fills in.
+
+## `--skip-plan` vs `adw_build.py` — both stay (issue #18)
+
+These are the two planner-free entry points, and they are **not** redundant.
+#18 asked whether `--skip-plan` still earns its place now that `adw_build.py`
+is a documented planner-free path. Reading both: it does, because they answer
+different questions.
+
+| | `adw_build.py` | `--skip-plan PLAN_FILE` |
+|---|---|---|
+| Plan phase | **none at all** | a `plan` phase, `kind="code"` |
+| Plan artifact | none | the file, as the plan's **sole** artifact |
+| `artifacts_exist` / `files_non_empty` | nothing to check | check that real file |
+| What the builder receives | the prompt | the prompt **plus** `previous=plan` |
+| Roster requirement | `REQUIRED_AGENTS = ["builder"]` — works with **no planner configured** | the chain's full roster |
+
+So:
+
+- **No plan exists and none is wanted** — the prompt itself is the
+  instruction. Use `adw_build.py`. It is also the only option on a roster
+  with no planner agent at all.
+- **A plan already exists** — hand-written, or `specs/<adw_id>_*.md` from a
+  previous run whose plan you read and approved — and you want the builder to
+  work *from that document*, with the plan still gated and still visible as a
+  phase in the trace. Use `--skip-plan`.
+
+The distinction that matters most is the fourth row: `--skip-plan` hands the
+plan to the builder as prior context and records
+`notes_for_next_agent="Plan was loaded from an existing file (--skip-plan),
+not freshly generated."`, so the builder knows it is implementing a document
+rather than interpreting a prompt. `adw_build.py` has no document to hand it.
+
+Collapsing the two would mean either losing the no-planner-roster path or
+losing the gated plan-as-artifact path. Neither is dead weight.

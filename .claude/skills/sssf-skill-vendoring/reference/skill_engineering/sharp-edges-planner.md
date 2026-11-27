@@ -6,8 +6,8 @@ sha256: 3b69a709c2f8f0cfcf57d40a3186e166f307865cc8ed924be4098e549a121e9c
 <!-- sssf:flattened
 kept: references/config-patterns.md sha256:1d99f2716f7bef18efe71015ce0c56e0f4961c042faa503d796d6d4d1626fdc6
 kept: references/lang-rust.md sha256:3d14993ea70b2b2df3fc0f388cbd1631470895c27ccbd9d764296d1da8f5b6ee
-dropped: references/crypto-apis.md, references/auth-patterns.md, references/case-studies.md -- weather-report is a Rust/Axum routing service, not an auth or crypto library; plan-time prevention needs the config and language footguns (the reviewer's sharp-edges.md carries the full set)
-dropped: references/lang-c.md, references/lang-csharp.md, references/lang-go.md, references/lang-java.md, references/lang-javascript.md, references/lang-kotlin.md, references/lang-php.md, references/lang-python.md, references/lang-ruby.md, references/lang-swift.md -- other stacks; weather-report is Rust
+dropped: references/crypto-apis.md, references/auth-patterns.md, references/case-studies.md -- this adopter is a Rust/Axum routing service, not an auth or crypto library; plan-time prevention needs the config and language footguns (the reviewer's sharp-edges.md carries the full set)
+dropped: references/lang-c.md, references/lang-csharp.md, references/lang-go.md, references/lang-java.md, references/lang-javascript.md, references/lang-kotlin.md, references/lang-php.md, references/lang-python.md, references/lang-ruby.md, references/lang-swift.md -- other stacks; this adopter is Rust
 dropped: references/language-specific.md -- combined multi-language quick reference; the Rust guide is merged instead
 dropped: agents/openai.yaml -- harness display metadata, no prompt content
 dropped: assets/trail-of-bits-mark.svg -- image, no prompt content

@@ -9,7 +9,7 @@ kept: references/config-patterns.md sha256:1d99f2716f7bef18efe71015ce0c56e0f4961
 kept: references/auth-patterns.md sha256:1fbf526ca1db7204f9ebb1bf4eb3c48c544676623d23e5d28e01f6f63c355be2
 kept: references/case-studies.md sha256:2e81a320728b4597bf84c490176d5bf212f1e6ba6f87aafba61ad1734de35332
 kept: references/lang-rust.md sha256:3d14993ea70b2b2df3fc0f388cbd1631470895c27ccbd9d764296d1da8f5b6ee
-dropped: references/lang-c.md, references/lang-csharp.md, references/lang-go.md, references/lang-java.md, references/lang-javascript.md, references/lang-kotlin.md, references/lang-php.md, references/lang-python.md, references/lang-ruby.md, references/lang-swift.md -- other stacks; weather-report is Rust
+dropped: references/lang-c.md, references/lang-csharp.md, references/lang-go.md, references/lang-java.md, references/lang-javascript.md, references/lang-kotlin.md, references/lang-php.md, references/lang-python.md, references/lang-ruby.md, references/lang-swift.md -- other stacks; this adopter is Rust
 dropped: references/language-specific.md -- combined multi-language quick reference; the Rust guide is merged instead
 dropped: agents/openai.yaml -- harness display metadata, no prompt content
 dropped: assets/trail-of-bits-mark.svg -- image, no prompt content

@@ -1,4 +1,4 @@
-# From weather-report adws/adw_modules/gates.py. Paste into your gates.py (it uses
+# From a downstream adopter's adws/adw_modules/gates.py. Paste into your gates.py (it uses
 # that module's subprocess, Path, EnvelopeBase, GateReport and TAIL_CHARS), then add
 # `gates.okf_maintained()` to every documenter phase's gates= list
 # (adw_simple_sdlc.py, adw_document.py).
