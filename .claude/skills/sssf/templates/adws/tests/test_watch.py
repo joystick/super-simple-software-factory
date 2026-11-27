@@ -8,6 +8,10 @@ adoption playbook's Part D.
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+
 import adw_watch
 
 
@@ -467,13 +471,14 @@ def test_detect_tracker_returns_unknown_with_no_signal(tmp_path):
 
 # ── main() exit codes ───────────────────────────────────────────────────
 
-def test_main_returns_2_for_a_non_local_tracker(tmp_path, monkeypatch):
-    doc_dir = tmp_path / "docs" / "agents"
-    doc_dir.mkdir(parents=True)
-    (doc_dir / "issue-tracker.md").write_text("# Issue tracker: GitHub\n")
-    monkeypatch.chdir(tmp_path)
-
-    assert adw_watch.main(".scratch", "adws/adw_sssf_config/sssf.config.yaml", once=True, interval=1) == 2
+# test_main_returns_2_for_a_non_local_tracker was deleted with issue #20.
+# It asserted "GitHub tracker -> exit 2, not implemented yet", which is the
+# behaviour #20 deliberately replaced. It was also environment-dependent: it
+# ran no mocks, so on a machine with `gh` authenticated it only still passed
+# because tmp_path isn't a git repo. The property worth keeping -- an
+# unreachable tracker exits 2 and never reports a falsely-empty queue -- is
+# covered by test_main_exits_2_when_the_tracker_cli_is_unavailable, with the
+# CLI mocked.
 
 
 def test_main_returns_1_for_an_empty_queue(tmp_path, monkeypatch):
@@ -522,3 +527,247 @@ def test_run_once_refuses_to_claim_against_a_dirty_tree(tmp_path, monkeypatch):
     assert found is False
     assert calls == []  # never even reached dispatch
     assert "Status: ready-for-agent" in (scratch / "feature" / "issues" / "01-a.md").read_text()
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Tracker adapters (issue #20). Every CLI call is faked -- no network, no
+# `gh`/`glab` binary needed to run this suite.
+# ══════════════════════════════════════════════════════════════════════════
+
+def fake_runner(script):
+    """Returns (runner, calls). `script` maps a command prefix to
+    (exit_code, stdout); anything unmatched succeeds with empty output."""
+    calls = []
+
+    def run(argv):
+        calls.append(argv)
+        for prefix, result in script.items():
+            if argv[:len(prefix)] == list(prefix):
+                return result
+        return 0, ""
+
+    return run, calls
+
+
+GH_AUTH_OK = {("gh", "auth", "status"): (0, "Logged in")}
+
+
+def gh_list(rows):
+    import json as _json
+    return {("gh", "issue", "list"): (0, _json.dumps(rows))}
+
+
+# ── fail-closed: the property the old hard refusal got right ──────────────
+
+def test_github_preflight_raises_when_the_cli_is_missing():
+    run, _ = fake_runner({("gh", "auth", "status"): (127, "gh: command not found")})
+    with pytest.raises(adw_watch.TrackerUnavailable):
+        adw_watch.GitHubTracker(run).preflight()
+
+
+def test_main_exits_2_when_the_tracker_cli_is_unavailable(tmp_path, monkeypatch):
+    # Replaces the old test_main_returns_2_for_a_non_local_tracker, which
+    # pinned "GitHub -> not implemented". GitHub IS implemented now; what must
+    # survive is the fail-closed property -- an unreachable tracker exits 2 and
+    # never reports a falsely-empty queue, which an operator reads as "no work".
+    doc = tmp_path / "docs" / "agents"
+    doc.mkdir(parents=True)
+    (doc / "issue-tracker.md").write_text("# Issue tracker: GitHub\n")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(adw_watch, "_run_cli",
+                        lambda argv: (127, "gh: command not found"))
+
+    assert adw_watch.main(".scratch", "cfg.yaml", once=True, interval=1) == 2
+
+
+def test_make_tracker_refuses_an_unknown_tracker():
+    with pytest.raises(adw_watch.TrackerUnavailable):
+        adw_watch.make_tracker("unknown", Path(".scratch"))
+
+
+# ── discovery: labels carry status, "#N" bodies carry blockers ────────────
+
+def test_github_discover_reads_status_from_labels_and_blockers_from_the_body():
+    run, _ = fake_runner({**GH_AUTH_OK, **gh_list([
+        {"number": 7, "title": "Do it", "body": "Blocked by: #3, #4\n",
+         "labels": [{"name": "ready-for-agent"}]},
+    ])})
+    issues = adw_watch.GitHubTracker(run).discover()
+
+    assert len(issues) == 1
+    assert issues[0].status == adw_watch.READY
+    assert issues[0].number == "7"
+    assert issues[0].blocked_by == ["3", "4"]   # the "#" is stripped
+    assert issues[0].path is None
+    assert str(issues[0]) == "#7"
+
+
+def test_github_claimed_label_wins_so_a_second_watcher_cannot_reclaim():
+    run, _ = fake_runner({**GH_AUTH_OK, **gh_list([
+        {"number": 7, "title": "t", "body": "",
+         "labels": [{"name": "ready-for-agent"}, {"name": "claimed"}]},
+    ])})
+    assert adw_watch.GitHubTracker(run).discover()[0].status == adw_watch.CLAIMED
+
+
+def test_github_unlabelled_issue_is_not_ready():
+    run, _ = fake_runner({**GH_AUTH_OK, **gh_list([
+        {"number": 7, "title": "t", "body": "", "labels": []},
+    ])})
+    assert adw_watch.GitHubTracker(run).discover()[0].status != adw_watch.READY
+
+
+# ── the semantics that INVERT between tracker families ───────────────────
+
+def test_remote_treats_a_missing_blocker_as_resolved_because_it_closed():
+    # gh is queried for OPEN issues only, so #3's absence IS the evidence it
+    # closed. Treating absence as blocking would deadlock the queue the moment
+    # a blocker was legitimately closed.
+    run, _ = fake_runner({**GH_AUTH_OK, **gh_list([
+        {"number": 7, "title": "t", "body": "Blocked by: #3\n",
+         "labels": [{"name": "ready-for-agent"}]},
+    ])})
+    tracker = adw_watch.GitHubTracker(run)
+    picked = adw_watch.frontier(tracker.discover(), tracker.missing_means_resolved)
+
+    assert picked is not None and picked.number == "7"
+
+
+def test_local_treats_a_missing_blocker_as_still_blocking(tmp_path):
+    # Opposite default: local discovery sees every ticket regardless of status,
+    # so an unfindable blocker is a typo/dangling ref -- never silently unblock.
+    issues_dir = tmp_path / "feature" / "issues"
+    make_issue(issues_dir, "02-b", "ready-for-agent", blocked_by=["99"])
+
+    assert adw_watch.frontier(adw_watch.discover_issues(tmp_path)) is None
+
+
+def test_remote_still_blocks_on_an_open_blocker():
+    run, _ = fake_runner({**GH_AUTH_OK, **gh_list([
+        {"number": 7, "title": "t", "body": "Blocked by: #3\n",
+         "labels": [{"name": "ready-for-agent"}]},
+        {"number": 3, "title": "blocker", "body": "",
+         "labels": [{"name": "ready-for-agent"}]},
+    ])})
+    tracker = adw_watch.GitHubTracker(run)
+    picked = adw_watch.frontier(tracker.discover(), tracker.missing_means_resolved)
+
+    assert picked.number == "3"   # the blocker itself, never #7
+
+
+# ── status writes map onto labels / close ────────────────────────────────
+
+def test_github_claim_swaps_the_ready_label_for_claimed():
+    run, calls = fake_runner(GH_AUTH_OK)
+    issue = adw_watch.Issue(path=None, number="7", feature="", status="ready-for-agent",
+                            blocked_by=[])
+    adw_watch.GitHubTracker(run).set_status(issue, adw_watch.CLAIMED)
+
+    assert calls == [["gh", "issue", "edit", "7",
+                      "--add-label", "claimed", "--remove-label", "ready-for-agent"]]
+
+
+def test_github_resolve_closes_the_issue_rather_than_labelling_it():
+    # "resolved" is the issue being closed. A `resolved` label would be a
+    # second source of truth that can disagree with the issue's own state.
+    run, calls = fake_runner(GH_AUTH_OK)
+    issue = adw_watch.Issue(path=None, number="7", feature="", status="claimed",
+                            blocked_by=[])
+    adw_watch.GitHubTracker(run).set_status(issue, adw_watch.RESOLVED)
+
+    assert ["gh", "issue", "close", "7", "--reason", "completed"] in calls
+
+
+def test_github_failure_flips_to_ready_for_human_without_closing():
+    run, calls = fake_runner(GH_AUTH_OK)
+    issue = adw_watch.Issue(path=None, number="7", feature="", status="claimed",
+                            blocked_by=[])
+    adw_watch.GitHubTracker(run).set_status(issue, adw_watch.FAILED_STATE)
+
+    assert ["gh", "issue", "edit", "7", "--remove-label", "claimed",
+            "--add-label", "ready-for-human"] in calls
+    assert not any("close" in c for c in calls)
+
+
+def test_remote_commit_state_is_a_noop_and_needs_no_git_repo(monkeypatch):
+    # A label change is already durable server-side. This is also what frees
+    # the remote trackers from the old unconditional "must be a git repo"
+    # assumption (HANDOFF item 3's other half) -- so it must not touch git
+    # even to ask.
+    def explode():
+        raise AssertionError("remote tracker must not consult git at all")
+
+    monkeypatch.setattr(adw_watch.git_helper, "is_dirty", explode)
+    monkeypatch.setattr(adw_watch.git_helper, "is_repo", explode)
+
+    adw_watch.GitHubTracker(lambda a: (0, "")).commit_state("anything")
+
+
+def test_remote_dispatch_does_not_refuse_on_a_dirty_tree(monkeypatch):
+    # The dirty-tree guard exists because local claiming commits. Remote
+    # claiming commits nothing, so the guard must not apply -- it would block
+    # the queue for a reason that cannot affect it.
+    run, _ = fake_runner({**GH_AUTH_OK, **gh_list([
+        {"number": 7, "title": "t", "body": "", "labels": [{"name": "ready-for-agent"}]},
+    ])})
+    monkeypatch.setattr(adw_watch.git_helper, "is_repo", lambda: True)
+    monkeypatch.setattr(adw_watch.git_helper, "is_dirty", lambda: True)
+    monkeypatch.setattr(adw_watch.adw_simple_sdlc, "main", lambda *a, **kw: 0)
+
+    assert adw_watch.run_once(Path(".scratch"), "cfg.yaml",
+                              adw_watch.GitHubTracker(run)) is True
+
+
+def test_remote_prompt_is_built_from_the_issue_title_and_body():
+    issue = adw_watch.Issue(path=None, number="7", feature="", status="ready-for-agent",
+                            blocked_by=[], title="Add the thing", body="Do it well.")
+    prompt = adw_watch.GitHubTracker(lambda a: (0, "")).prompt_for(issue)
+
+    assert "Add the thing" in prompt and "Do it well." in prompt
+
+
+# ── ordering ─────────────────────────────────────────────────────────────
+
+def test_frontier_orders_remote_numbers_numerically_not_lexically():
+    # "#10" must sort AFTER "#9". A plain string sort puts "10" first; local
+    # tickets are zero-padded "01".."09" and so never exposed this.
+    run, _ = fake_runner({**GH_AUTH_OK, **gh_list([
+        {"number": 10, "title": "ten", "body": "", "labels": [{"name": "ready-for-agent"}]},
+        {"number": 9, "title": "nine", "body": "", "labels": [{"name": "ready-for-agent"}]},
+    ])})
+    tracker = adw_watch.GitHubTracker(run)
+    picked = adw_watch.frontier(tracker.discover(), tracker.missing_means_resolved)
+
+    assert picked.number == "9"
+
+
+# ── the older one-file-per-feature local shape (HANDOFF item 3) ───────────
+
+def test_local_discovers_the_single_issue_md_shape(tmp_path):
+    # .scratch/<feature>/issue.md with no issues/ dir and no NN- prefix.
+    # Previously found by nothing and reported as an empty queue.
+    feature = tmp_path / "legacy-feature"
+    feature.mkdir()
+    (feature / "issue.md").write_text("# Legacy\n\nStatus: ready-for-agent\n")
+
+    found = adw_watch.discover_issues(tmp_path)
+
+    assert len(found) == 1
+    assert found[0].feature == "legacy-feature"
+    assert found[0].number == "01"
+    assert adw_watch.frontier(found).path == feature / "issue.md"
+
+
+def test_local_prefers_the_issues_dir_when_both_shapes_exist(tmp_path):
+    feature = tmp_path / "feature"
+    make_issue(feature / "issues", "01-real", "ready-for-agent")
+    (feature / "issue.md").write_text("# Stale\n\nStatus: ready-for-agent\n")
+
+    found = adw_watch.discover_issues(tmp_path)
+
+    assert [i.path.name for i in found] == ["01-real.md"]
+
+
+def test_local_ignores_a_stray_file_in_the_scratch_root(tmp_path):
+    (tmp_path / "notes.md").write_text("# not a feature dir\n\nStatus: ready-for-agent\n")
+    assert adw_watch.discover_issues(tmp_path) == []

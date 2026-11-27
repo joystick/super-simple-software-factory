@@ -1,7 +1,7 @@
 ---
 title: "Handoff — where this work stands and how to pick it up"
-version: 1.8
-updated: 2026-09-10
+version: 1.9
+updated: 2026-11-27
 status: active
 ---
 
@@ -93,7 +93,9 @@ that installs this skill. Sat uncommitted for over a week; reviewed and committe
 
 ## Open
 
-**Nothing is blocked.** Four things were deliberately left:
+**Nothing is blocked.** Three things remain deliberately left (item 3 closed
+2026-11-27, issue #20 — kept in place, marked CLOSED, rather than deleted, so the
+two design questions it resolved stay readable):
 
 1. **The dead-gate demo** (~£1). Break the TypeScript rebuild repo's test gate to an `echo`, plant a known
    bug, run a real `just sdlc` on an unrelated feature, watch the factory commit the bug and
@@ -123,12 +125,41 @@ that installs this skill. Sat uncommitted for over a week; reviewed and committe
      `Blocked by:` convention. The watcher would silently find nothing there, not error —
      worse than the git problem, because it looks like an empty queue instead of a
      shape mismatch.
-   Neither is fixed. Not attempted live against a downstream project — that project's next ticket
-   was picked and dispatched manually (`adw_plan_build_test.py` directly) instead, once this
-   surfaced. Fixing this needs: (a) decide the non-git behavior for `commit_watcher_state`/
-   `detect_tracker`, (b) decide whether `discover_issues()` should also recognize the
-   single-`issue.md` shape, or whether that's a tracker-migration problem for the target repo
-   instead (`docs/agents/issue-tracker.md` there would need updating either way).
+   **CLOSED 2026-11-27 (issue #20).** Both halves are fixed, after the same
+   failure recurred in a second adopter — one whose tracker had since migrated to
+   GitHub Issues, where `just watch` could not be used at all and every ticket had
+   to be dispatched manually (`adw_simple_sdlc.py` per issue), exactly as the first
+   adopter did. Recurrence in a different shape was the argument for a seam rather
+   than another special case.
+
+   `adw_watch.py` now selects a **tracker adapter** from the `detect_tracker()`
+   value it already computed — `LocalTracker` / `GitHubTracker` / `GitLabTracker`,
+   one protocol (`discover` / `set_status` / `append_comment` / `commit_state` /
+   `prompt_for` / `preflight`). Resolutions to the two open design questions:
+
+   - **(a) non-git behaviour.** Remote trackers make `commit_state` a **no-op** and
+     never consult git at all: a label change is already durable server-side, so
+     there is nothing local to commit. The dirty-tree refusal is likewise scoped to
+     local trackers — it exists because local claiming commits, which cannot apply
+     to a tracker that commits nothing. A git-free repo on a remote tracker now
+     works; a git-free repo on the *local* tracker still needs `is_repo()` gating in
+     `commit_watcher_state`, which remains open and is the narrower residue of this
+     item.
+   - **(b) single-`issue.md`.** `discover_issues()` **does** now recognize it
+     (`.scratch/<feature>/issue.md`, numbered `01`, `issues/` preferred when both
+     exist). It was the cheaper half of the answer and removes a silent-empty-queue
+     failure from every older adopter repo, rather than pushing a migration onto
+     each of them.
+
+   The fail-closed property the old hard refusal got right is preserved and now
+   tested: a missing or unauthenticated CLI — at preflight **or** mid-run — exits 2
+   with a clear message, never a falsely-empty queue. Two semantics genuinely invert
+   between the families and are pinned by tests rather than left to inference: a
+   blocker that cannot be found is **still blocking** locally (a dangling ref) but
+   **resolved** remotely (`gh` lists open issues only, so absence is the evidence it
+   closed), and "resolved" means the literal string locally but a **closed issue**
+   remotely. Suite: 143 passed, with every CLI call faked — no network, no `gh`/`glab`
+   binary needed.
 4. **Not every vendored skill belongs on a headless agent via `skill_engineering:` — the
    `code-review` skill is a concrete counter-example, found live in a downstream project.**
    Vendored alongside `wayfinder`/`write-a-prd`/`prd-to-plan`/`tdd` (all four wired to
@@ -192,3 +223,4 @@ The guard invisible through the public entry point. The gate table that was simp
 | 1.6 | 2026-09-09 | Ported two fixes back from a downstream project after it became the first target repo to actually run `adw_watch.py`'s git-dependent code against a real, live git history: a real bug in `git_helper.py`'s `_git()` (a full `.strip()` corrupted the first path in multi-line porcelain output — fixed to `.rstrip()`), and `just sssf` renamed to `just watch` to match its script name. Playbook bumped to 4.3 with a new changelog row; historical 4.0/4.1 rows deliberately left saying `just sssf`, matching what was actually named at the time. Full suite green (124 passed). |
 | 1.7 | 2026-09-10 | Ported another real fix back from a downstream project, found after its first two live `just watch` dispatches (a PIN-authentication access gate, a biometric-unlock follow-up) both landed with zero review: `adw_watch.py` always called `adw_plan_build_test.main()` (planner → builder → test → commit, no reviewer/revision-loop/documenter), not the fuller `adw_simple_sdlc.py` chain the playbook's own prose implied. An unattended queue dispatch has nothing else checking it besides the test gate — worse than a manual `just sdlc` run a human reads afterward. Switched the dispatch target (identical 3-arg signature, confirmed before switching); the roster already had `reviewer`/`documenter` configured. Playbook bumped to 4.4; "What this playbook does not claim" corrected — `just watch` genuinely has shipped two real issues now, but not yet through this corrected full-chain path. Full suite green (124 passed). |
 | 1.8 | 2026-09-10 | Self-correction: the "126 passed" test count reported in this file's 1.6/1.7 rows and in commits `8b80fdc`/`6a3a981`'s messages was wrong — the fork's suite has always been 124 tests, identical to a downstream project's count, confirmed by rerunning both directly. Fixed both rows here to say 124. The two already-pushed commit messages still say 126 and are left as-is rather than rewriting pushed history; treat this row as the correction of record. |
+| 1.9 | 2026-11-27 | Closed Open item 3 (issue #20): `adw_watch.py`'s frontier scan is now **tracker-agnostic**. One adapter protocol selected from the `detect_tracker()` value that already existed — `LocalTracker` / `GitHubTracker` / `GitLabTracker`. Triggered by the same failure recurring in a second adopter, one whose tracker had migrated to GitHub Issues: `just watch` could not be used at all there and every ticket was dispatched manually (`adw_simple_sdlc.py` per issue), exactly as row 1.4's adopter did. Both of item 3's open design questions resolved: remote trackers make `commit_state` a no-op and never consult git (a label change is already durable), and the dirty-tree refusal is scoped to local trackers since it exists only because local claiming commits; `discover_issues()` additionally recognizes the older single-`issue.md`-per-feature shape rather than pushing a migration onto every older adopter. Fail-closed preserved and now tested at preflight **and** mid-run: a missing/unauthenticated CLI exits 2, never a falsely-empty queue — "looks like an empty queue" was the original bug and is strictly worse than an error. Two semantics genuinely invert between families and are pinned by tests, not inferred: an unfindable blocker still blocks locally (dangling ref) but is resolved remotely (`gh` lists open issues only, so absence IS the evidence it closed), and "resolved" is the literal string locally but a closed issue remotely. Also fixed a robustness gap found by the existing suite during the refactor — `TrackerUnavailable` raised from `discover()` escaped `run_once` as a traceback instead of exit 2. One test retired deliberately: `test_main_returns_2_for_a_non_local_tracker` pinned the "not implemented yet" refusal this replaces, and was environment-dependent (unmocked, so it only still passed because `tmp_path` isn't a git repo); its surviving property is covered by `test_main_exits_2_when_the_tracker_cli_is_unavailable` with the CLI mocked. Suite: **143 passed** (was 124; +19 adapter tests, all CLI calls faked — no network, no `gh`/`glab` needed). Separately noted for a downstream port: that adopter's vendored `adw_watch.py` is **stale against this template** in `read_blocked_by` — it splits on commas before stripping parentheticals, so `Blocked by: None (Phase 10 complete, merged into X)` made an explicitly unblocked ticket permanently blocked; 18 ticket files were affected. The template has been correct since 2026-09-24; vendored `adws/` copies drift silently with nothing detecting it. |
