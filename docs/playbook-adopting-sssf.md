@@ -767,6 +767,13 @@ After running either skill interactively, either hand its output to
 `Blocked by:` lines — same shape the Mandatory checkpoints below already
 check for.
 
+**Review deltas go in the ticket body, never in comments.** On a remote
+tracker the dispatch prompt is title + body only (`prompt_for` — see
+upstream issue #21); a requirement appended as a comment never reaches
+the planner, builder, or reviewer, and the run still goes green without
+it. Edit the Acceptance criteria (or add a `Review deltas` section) in
+the body itself. Comments are audit trail, not instructions.
+
 **If you write a stub yourself** (rather than handing `/triage` a bare
 description), it must contain what `/triage` and `just watch` both actually
 parse, not just prose for a human:
