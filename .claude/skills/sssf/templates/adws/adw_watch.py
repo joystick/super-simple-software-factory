@@ -44,19 +44,25 @@ same convention as `.scratch/<effort>/issues/NN-<slug>.md` ticket files
 wayfinder already uses. A failed run flips back to `ready-for-human` (a
 triage state) rather than sitting `claimed` forever, so a person sees it.
 
-Every status write (claim, resolve, or fail) is committed immediately -- the
-ADW's own commit phase fires mid-run, before this script's final write, so
-without this the last status transition would sit uncommitted after every
-run. Because claiming commits, `run_once` refuses to claim anything against
-a dirty working tree: an unrelated in-progress change sitting there would get
-swept into that commit, same `git add -A` gotcha every ADW commit phase
-carries.
+On the LOCAL tracker every status write (claim, resolve, or fail) is
+committed immediately -- the ADW's own commit phase fires mid-run, before
+this script's final write, so without this the last status transition would
+sit uncommitted after every run. Because claiming commits, `run_once`
+refuses to claim anything against a dirty working tree: an unrelated
+in-progress change sitting there would get swept into that commit, same
+`git add -A` gotcha every ADW commit phase carries. In a repo that is not a
+git repo at all, committing is skipped with one printed line (#24).
+
+Remote trackers commit nothing and never consult git: a label change is
+already durable on the server. The dirty-tree refusal therefore does not
+apply to them either.
 
 --once runs a single scan-claim-dispatch-resolve cycle then exits: 0 if work
 was found and dispatched (regardless of outcome -- check the issue's new
-Status to know which), 1 if the queue was empty, 2 if the tracker isn't
-local-markdown. That's the right mode for cron/launchd. Without --once, loops
-on --interval seconds.
+Status to know which), 1 if the queue was empty, 2 if the selected tracker
+is unavailable (CLI missing or unauthenticated) or cannot be identified.
+That's the right mode for cron/launchd. Without --once, loops on --interval
+seconds.
 """
 
 from __future__ import annotations
@@ -334,6 +340,9 @@ def append_comment(path: Path, note: str) -> None:
     path.write_text(text + f"\n\n{note}\n")
 
 
+_warned_not_a_repo = False
+
+
 def commit_watcher_state(message: str) -> None:
     """Commit the watcher's own claim/resolve writes to the issue file.
 
@@ -341,7 +350,29 @@ def commit_watcher_state(message: str) -> None:
     before dispatch() writes the final Status: -- so without this, that final
     write sits uncommitted after every run, needing a manual follow-up commit.
     is_dirty() guards against there being nothing to commit (e.g. a crash
-    before set_status ran)."""
+    before set_status ran).
+
+    In a repo that is not a git repo at all (an adopter made that choice
+    deliberately; #24), SKIP rather than refuse to run: for such a repo the
+    working tree IS the storage model, so the status writes are already as
+    durable as anything else there, and denying the whole queue over a
+    version-control preference would be disproportionate.
+
+    But say so, once per process. An operator who expects claim/resolve
+    commits and silently gets none has no way to tell this apart from a
+    watcher that isn't working -- the same failure shape as the
+    falsely-empty queue in #20. Once, not per call, because dispatch()
+    calls this up to three times per issue and a repeated line would train
+    the reader to ignore it.
+    """
+    global _warned_not_a_repo
+    if not git_helper.is_repo():
+        if not _warned_not_a_repo:
+            print("just watch: not a git repo -- claim/resolve status writes will "
+                  "not be committed (they stay in the working tree, which is this "
+                  "repo's storage model anyway). Said once per run; see #24.")
+            _warned_not_a_repo = True
+        return
     if git_helper.is_dirty():
         sha = git_helper.commit_all(message)
         print(f"just watch: committed watcher state ({sha}): {message}")
@@ -688,7 +719,7 @@ if __name__ == "__main__":
     parser.add_argument("--scratch-dir", default=".scratch")
     parser.add_argument("--once", action="store_true",
                         help="one scan-claim-dispatch-resolve cycle, then exit "
-                             "(0 dispatched, 1 empty queue, 2 unsupported tracker) -- "
+                             "(0 dispatched, 1 empty queue, 2 tracker unavailable) -- "
                              "the right mode for cron/launchd")
     parser.add_argument("--interval", type=int, default=300,
                         help="seconds between scans when not --once (default 300)")

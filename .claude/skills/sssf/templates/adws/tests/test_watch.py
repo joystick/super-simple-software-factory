@@ -771,3 +771,49 @@ def test_local_prefers_the_issues_dir_when_both_shapes_exist(tmp_path):
 def test_local_ignores_a_stray_file_in_the_scratch_root(tmp_path):
     (tmp_path / "notes.md").write_text("# not a feature dir\n\nStatus: ready-for-agent\n")
     assert adw_watch.discover_issues(tmp_path) == []
+
+
+# ── git-free repo on the LOCAL tracker (#24) ─────────────────────────────
+
+def test_commit_watcher_state_skips_entirely_when_not_a_git_repo(monkeypatch, capsys):
+    # The whole point: never invoke git. is_dirty/commit_all must not even be
+    # consulted, because in a non-repo they are what raises.
+    def explode(*a, **kw):
+        raise AssertionError("must not touch git when is_repo() is False")
+
+    monkeypatch.setattr(adw_watch, "_warned_not_a_repo", False)
+    monkeypatch.setattr(adw_watch.git_helper, "is_repo", lambda: False)
+    monkeypatch.setattr(adw_watch.git_helper, "is_dirty", explode)
+    monkeypatch.setattr(adw_watch.git_helper, "commit_all", explode)
+
+    adw_watch.commit_watcher_state("claim something")
+
+    assert "not a git repo" in capsys.readouterr().out
+
+
+def test_commit_watcher_state_says_it_once_not_per_call(monkeypatch, capsys):
+    # dispatch() calls this up to three times per issue; a repeated line would
+    # train the operator to ignore it.
+    monkeypatch.setattr(adw_watch, "_warned_not_a_repo", False)
+    monkeypatch.setattr(adw_watch.git_helper, "is_repo", lambda: False)
+
+    for _ in range(3):
+        adw_watch.commit_watcher_state("x")
+
+    assert capsys.readouterr().out.count("not a git repo") == 1
+
+
+def test_dispatch_completes_in_a_git_free_repo(tmp_path, monkeypatch):
+    # End to end: the local tracker must still claim, dispatch and resolve
+    # when there is no git at all. Previously this errored on the first claim.
+    issues_dir = tmp_path / "feature" / "issues"
+    path = make_issue(issues_dir, "01-a", "ready-for-agent")
+    issue = adw_watch.discover_issues(tmp_path)[0]
+    monkeypatch.setattr(adw_watch, "_warned_not_a_repo", False)
+    monkeypatch.setattr(adw_watch.git_helper, "is_repo", lambda: False)
+    monkeypatch.setattr(adw_watch.adw_simple_sdlc, "main", lambda *a, **kw: 0)
+
+    ok, adw_id = adw_watch.dispatch(issue, "cfg.yaml")
+
+    assert ok is True
+    assert "Status: resolved" in path.read_text()

@@ -809,6 +809,16 @@ from your conversation — an uncommitted file is invisible to a fresh session,
 same reasoning as committing `CONTEXT.md`/ADRs before the headless loop
 starts.
 
+**If your repo isn't a git repo** (a deliberate choice in at least one adopter),
+the local tracker still works: `just watch` skips committing its own
+claim/resolve writes instead of erroring, and prints one line per run saying so
+(upstream #24). Nothing is lost that matters — in such a repo the working tree
+*is* the storage model, so the status writes are already as durable as every
+other file. What you give up is the audit trail of status transitions, which is
+the only reason committing them exists. Remote trackers are unaffected: they
+commit nothing and never consult git, because a label change is already durable
+server-side.
+
 ### Two owners of one file — protect the queue's extensions on re-sync
 
 `docs/agents/issue-tracker.md` itself has two owners. `/setup-matt-pocock-skills`

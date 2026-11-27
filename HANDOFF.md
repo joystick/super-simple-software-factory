@@ -142,9 +142,15 @@ two design questions it resolved stay readable):
      there is nothing local to commit. The dirty-tree refusal is likewise scoped to
      local trackers — it exists because local claiming commits, which cannot apply
      to a tracker that commits nothing. A git-free repo on a remote tracker now
-     works; a git-free repo on the *local* tracker still needs `is_repo()` gating in
-     `commit_watcher_state`, which remains open and is the narrower residue of this
-     item.
+     works, and **as of 2026-11-27 so does one on the local tracker** (#24):
+     `commit_watcher_state` returns early when `is_repo()` is false, printing one
+     line per run rather than failing or going silent. Item 3(a) is therefore
+     fully resolved. Skip-and-say-so was chosen over refuse-to-run: in a git-free
+     repo the working tree *is* the storage model, so the status writes are already
+     as durable as every other file there, and denying the whole queue over a
+     version-control preference would be disproportionate. What is given up is the
+     audit trail of status transitions, which is the only reason committing them
+     exists.
    - **(b) single-`issue.md`.** `discover_issues()` **does** now recognize it
      (`.scratch/<feature>/issue.md`, numbered `01`, `issues/` preferred when both
      exist). It was the cheaper half of the answer and removes a silent-empty-queue
