@@ -767,21 +767,25 @@ After running either skill interactively, either hand its output to
 `Blocked by:` lines — same shape the Mandatory checkpoints below already
 check for.
 
-**On a remote tracker, review deltas go in the ticket body, never in
-comments.** The dispatch prompt there is title + body only (`prompt_for` —
-see upstream issue #21); a requirement appended as a comment never reaches
-the planner, builder, or reviewer, and the run still goes green without it.
-Edit the Acceptance criteria (or add a `Review deltas` section) in the body
-itself.
+**Prefer the ticket body for anything that is a requirement.** Comments now
+reach the dispatch prompt on every tracker, so a review delta appended as a
+comment is no longer silently lost — but the body is still what the chain
+treats as the contract, and the prompt says so explicitly: where a comment
+contradicts the body, the later statement wins and the agent is told to flag
+it rather than silently pick one. A requirement in the body needs no such
+adjudication.
 
-On the **local** tracker comments do reach the prompt, because the whole
-ticket file *is* the prompt — `resolve_prompt` reads it entire, including
-the `## Comments` section the watcher itself appends to. So the same habit
-is harmless there, which is why this trap stayed invisible until a tracker
-existed that did not have that property. Removing the asymmetry is what
-issue #21 is open for; until it lands, put deltas in the body on every
-tracker and a ticket travels unchanged between them. Either way, treat
-comments as audit trail, not instructions.
+How each tracker gets there differs, which is worth knowing when a ticket
+moves between them. On the **local** tracker the whole ticket file *is* the
+prompt (`resolve_prompt` reads it entire, `## Comments` section included),
+so comments always rode along. Remote dispatch was title + body only until
+issue #21, which is why a delta posted as a comment on a GitHub-tracked
+ticket used to be ignored by the planner, builder and reviewer while the run
+still went green. Remote now fetches comments too, **filtered**: the
+watcher's own status notes, AI-triage notes carrying the generated-by-AI
+disclaimer, and bot comments are dropped, because feeding a previous run's
+"session failed, flipped to ready-for-human" back into the next attempt is
+worse than omitting it.
 
 **If you write a stub yourself** (rather than handing `/triage` a bare
 description), it must contain what `/triage` and `just watch` both actually
