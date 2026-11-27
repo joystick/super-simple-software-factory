@@ -767,12 +767,21 @@ After running either skill interactively, either hand its output to
 `Blocked by:` lines — same shape the Mandatory checkpoints below already
 check for.
 
-**Review deltas go in the ticket body, never in comments.** On a remote
-tracker the dispatch prompt is title + body only (`prompt_for` — see
-upstream issue #21); a requirement appended as a comment never reaches
-the planner, builder, or reviewer, and the run still goes green without
-it. Edit the Acceptance criteria (or add a `Review deltas` section) in
-the body itself. Comments are audit trail, not instructions.
+**On a remote tracker, review deltas go in the ticket body, never in
+comments.** The dispatch prompt there is title + body only (`prompt_for` —
+see upstream issue #21); a requirement appended as a comment never reaches
+the planner, builder, or reviewer, and the run still goes green without it.
+Edit the Acceptance criteria (or add a `Review deltas` section) in the body
+itself.
+
+On the **local** tracker comments do reach the prompt, because the whole
+ticket file *is* the prompt — `resolve_prompt` reads it entire, including
+the `## Comments` section the watcher itself appends to. So the same habit
+is harmless there, which is why this trap stayed invisible until a tracker
+existed that did not have that property. Removing the asymmetry is what
+issue #21 is open for; until it lands, put deltas in the body on every
+tracker and a ticket travels unchanged between them. Either way, treat
+comments as audit trail, not instructions.
 
 **If you write a stub yourself** (rather than handing `/triage` a bare
 description), it must contain what `/triage` and `just watch` both actually
